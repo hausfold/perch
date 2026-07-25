@@ -1,6 +1,6 @@
-# Morsel
+# Perch
 
-Morsel is the native macOS notch file shelf in the nebelhaus family.
+Perch is the native macOS notch file shelf in the nebelhaus family.
 
 ## Non-negotiable invariants
 
@@ -15,7 +15,7 @@ Morsel is the native macOS notch file shelf in the nebelhaus family.
 ## Build
 
 ```sh
-xcodebuild -project Morsel.xcodeproj -scheme Morsel \
+xcodebuild -project Perch.xcodeproj -scheme Perch \
   -configuration Debug -destination 'platform=macOS' \
   -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO test
 ```

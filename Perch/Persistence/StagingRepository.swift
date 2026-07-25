@@ -8,7 +8,7 @@ enum StagingRepositoryError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsafePath:
-            "Morsel rejected an unsafe staged-file path."
+            "Perch rejected an unsafe staged-file path."
         case .sourceMissing:
             "The dropped item disappeared before it could be staged."
         }
@@ -36,7 +36,7 @@ final class StagingRepository: @unchecked Sendable {
                 create: true
             )
             selectedRoot = support
-                .appending(path: "Morsel", directoryHint: .isDirectory)
+                .appending(path: "Perch", directoryHint: .isDirectory)
                 .appending(path: "ActiveShelf", directoryHint: .isDirectory)
         }
 
@@ -53,7 +53,7 @@ final class StagingRepository: @unchecked Sendable {
             cleanupInterruptedImports()
             let decoded: [ShelfItem]
             if let data = try? Data(contentsOf: manifestURL),
-               let manifest = try? JSONDecoder.morsel.decode(ShelfManifest.self, from: data),
+               let manifest = try? JSONDecoder.perch.decode(ShelfManifest.self, from: data),
                manifest.version <= ShelfManifest.currentVersion {
                 decoded = manifest.items
             } else {
@@ -170,7 +170,7 @@ final class StagingRepository: @unchecked Sendable {
     }
 
     private func persistUnlocked(_ items: [ShelfItem]) throws {
-        let data = try JSONEncoder.morsel.encode(ShelfManifest(items: items))
+        let data = try JSONEncoder.perch.encode(ShelfManifest(items: items))
         try data.write(to: manifestURL, options: [.atomic, .completeFileProtectionUnlessOpen])
     }
 
@@ -232,7 +232,7 @@ final class StagingRepository: @unchecked Sendable {
 }
 
 private extension JSONEncoder {
-    static var morsel: JSONEncoder {
+    static var perch: JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -241,7 +241,7 @@ private extension JSONEncoder {
 }
 
 private extension JSONDecoder {
-    static var morsel: JSONDecoder {
+    static var perch: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .millisecondsSince1970
         return decoder

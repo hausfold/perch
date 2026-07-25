@@ -16,7 +16,7 @@ final class ShelfPanelController: NSObject {
         settings: AppSettings,
         dropHandler: ShelfDropHandler
     ) {
-        screenID = screen.morselIdentifier
+        screenID = screen.perchIdentifier
         geometry = ShelfGeometry(screen: ScreenDescriptor(screen: screen))
         viewState = ShelfPanelState(hasCameraHousing: geometry.hasCameraHousing)
         panel = ShelfPanel(

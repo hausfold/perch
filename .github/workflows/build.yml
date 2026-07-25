@@ -20,8 +20,8 @@ jobs:
       - name: Test
         run: |
           xcodebuild \
-            -project Morsel.xcodeproj \
-            -scheme Morsel \
+            -project Perch.xcodeproj \
+            -scheme Perch \
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath DerivedData \
@@ -30,8 +30,8 @@ jobs:
       - name: Analyze
         run: |
           xcodebuild \
-            -project Morsel.xcodeproj \
-            -scheme Morsel \
+            -project Perch.xcodeproj \
+            -scheme Perch \
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath DerivedData \
@@ -40,8 +40,8 @@ jobs:
       - name: Release build
         run: |
           xcodebuild \
-            -project Morsel.xcodeproj \
-            -scheme Morsel \
+            -project Perch.xcodeproj \
+            -scheme Perch \
             -configuration Release \
             -destination 'platform=macOS' \
             -derivedDataPath DerivedData \

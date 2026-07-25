@@ -16,7 +16,7 @@ final class AppRuntime: ObservableObject {
             store = ShelfStore(repository: repository, settings: settings)
         } catch {
             let fallback = FileManager.default.temporaryDirectory
-                .appending(path: "Morsel-\(UUID().uuidString)", directoryHint: .isDirectory)
+                .appending(path: "Perch-\(UUID().uuidString)", directoryHint: .isDirectory)
             let repository = try! StagingRepository(rootURL: fallback)
             store = ShelfStore(repository: repository, settings: settings)
             store.latestError = "Persistent storage was unavailable. This shelf will last until the app quits."

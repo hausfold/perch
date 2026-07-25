@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 
 @main
-struct MorselApp: App {
-    @NSApplicationDelegateAdaptor(MorselAppDelegate.self) private var appDelegate
+struct PerchApp: App {
+    @NSApplicationDelegateAdaptor(PerchAppDelegate.self) private var appDelegate
     @StateObject private var runtime = AppRuntime.shared
 
     var body: some Scene {
@@ -23,12 +23,12 @@ struct MorselApp: App {
 
             Divider()
             SettingsLink()
-            Button("Quit Morsel") {
+            Button("Quit Perch") {
                 NSApp.terminate(nil)
             }
             .keyboardShortcut("q")
         } label: {
-            Label("Morsel", systemImage: runtime.store.items.isEmpty ? "tray" : "tray.full.fill")
+            Label("Perch", systemImage: runtime.store.items.isEmpty ? "tray" : "tray.full.fill")
         }
         .menuBarExtraStyle(.menu)
 
@@ -39,7 +39,7 @@ struct MorselApp: App {
 }
 
 @MainActor
-final class MorselAppDelegate: NSObject, NSApplicationDelegate {
+final class PerchAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppRuntime.shared.start()
     }

@@ -1,4 +1,4 @@
-# Morsel architecture
+# Perch architecture
 
 ## Invariants
 

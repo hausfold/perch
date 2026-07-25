@@ -1,5 +1,5 @@
 import XCTest
-@testable import Morsel
+@testable import Perch
 
 final class ScreenGeometryTests: XCTestCase {
     func testNotchedScreenUsesCameraHousingGapAndTopAnchor() {

@@ -21,7 +21,7 @@ struct ShelfPanelView: View {
         }
         .animation(.snappy(duration: 0.24, extraBounce: 0.08), value: state.isExpanded)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Morsel file shelf")
+        .accessibilityLabel("Perch file shelf")
     }
 
     private var collapsedShelf: some View {
@@ -90,7 +90,7 @@ struct ShelfPanelView: View {
         HStack(spacing: 10) {
             Image(systemName: "tray.full.fill")
                 .foregroundStyle(Color.accentColor)
-            Text("Morsel")
+            Text("Perch")
                 .font(.headline)
             Text(itemCountDescription)
                 .font(.caption)

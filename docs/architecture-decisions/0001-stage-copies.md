@@ -11,7 +11,7 @@ Advertising move allows a destination to remove the shelf's only durable copy.
 
 ## Decision
 
-Morsel copies every accepted representation into an app-owned UUID container.
+Perch copies every accepted representation into an app-owned UUID container.
 Outgoing dragging sessions advertise only `NSDragOperation.copy`. Clearing the
 shelf is a separate explicit operation, optionally automatic after AppKit
 reports a successful copy drag.
