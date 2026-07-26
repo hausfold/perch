@@ -22,3 +22,27 @@ xcodebuild -project Perch.xcodeproj -scheme Perch \
 
 Read `PRD.md`, `ARCHITECTURE.md`, and the ADRs before changing transfer
 semantics. Update them when a product boundary changes.
+
+## Release & downstream (like trill)
+
+Perch is a native Xcode app that macOS 26 won't let Nix build from source (the
+`_nixbld` user can't apply SwiftPM's manifest sandbox), so — exactly like
+trill — the family consumes a **CI-built, Developer-ID-signed, Apple-notarized
+release ZIP**, not a from-source build:
+
+- `VERSION` is the single source of truth (CalVer, `YYYY.MM.DD[-N]`); it names
+  the tag and is injected as `MARKETING_VERSION`. Cut releases with
+  `bench release perch` from the workshop — never hand-type a version.
+- `.github/workflows/release.yml` (on a `v*` tag) signs + notarizes + staples,
+  publishes the GitHub release, and rewrites the CI-owned pins in two places at
+  once: `Casks/perch.rb` (homebrew-tap) and `nix/release.nix` here.
+- `flake.nix` exposes `overlays.default` (puts `perch` in pkgs) + `packages`,
+  wrapping the release ZIP pinned in `nix/release.nix` (`nix/package.nix`). The
+  rice adds this input and installs `pkgs.perch` at a fixed `/Applications`
+  path, so perch rides the flake-lock chain like the rest of the family.
+- `nix/dev-app/` is the `prebuilt` injection point: `bench try` builds a signed
+  dev `Perch.app` from a source branch in your login session and overrides
+  `prebuilt` at it, so a branch feel-tests without waiting on a release.
+
+Not released yet: `nix/release.nix` holds a bootstrap placeholder and the rice
+keeps `nebelhaus.perch.enable = false` until the first `bench release perch`.
