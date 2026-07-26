@@ -12,7 +12,7 @@ final class ShelfStore: ObservableObject {
 
     private let pipeline: TransferPipeline
     private let settings: AppSettings
-    private let logger = Logger(subsystem: "com.nebelhaus.morsel", category: "Shelf")
+    private let logger = Logger(subsystem: "com.nebelhaus.perch", category: "Shelf")
 
     init(repository: StagingRepository, settings: AppSettings) {
         self.repository = repository
@@ -234,7 +234,7 @@ final class ShelfStore: ObservableObject {
 
     private let promisedFileQueue: OperationQueue = {
         let queue = OperationQueue()
-        queue.name = "com.nebelhaus.morsel.promises"
+        queue.name = "com.nebelhaus.perch.promises"
         queue.qualityOfService = .userInitiated
         queue.maxConcurrentOperationCount = 2
         return queue

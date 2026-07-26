@@ -1,13 +1,13 @@
 import Foundation
 import XCTest
-@testable import Morsel
+@testable import Perch
 
 final class TransferPipelineTests: XCTestCase {
     func testStagesFileAsPrivateCopy() async throws {
         let testRoot = FileManager.default.temporaryDirectory
-            .appending(path: "MorselPipeline-\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(path: "PerchPipeline-\(UUID().uuidString)", directoryHint: .isDirectory)
         let sourceRoot = FileManager.default.temporaryDirectory
-            .appending(path: "MorselSource-\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(path: "PerchSource-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
         defer {
             try? FileManager.default.removeItem(at: testRoot)

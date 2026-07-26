@@ -83,7 +83,7 @@ struct ShelfGeometry: Equatable, Sendable {
 }
 
 extension NSScreen {
-    var morselIdentifier: String {
+    var perchIdentifier: String {
         if let number = deviceDescription[.init("NSScreenNumber")] as? NSNumber {
             return number.stringValue
         }

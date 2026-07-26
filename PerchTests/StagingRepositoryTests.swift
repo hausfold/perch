@@ -1,5 +1,5 @@
 import XCTest
-@testable import Morsel
+@testable import Perch
 
 final class StagingRepositoryTests: XCTestCase {
     private var root: URL!
@@ -7,7 +7,7 @@ final class StagingRepositoryTests: XCTestCase {
 
     override func setUpWithError() throws {
         root = FileManager.default.temporaryDirectory
-            .appending(path: "MorselTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(path: "PerchTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         repository = try StagingRepository(rootURL: root)
     }
 

@@ -43,7 +43,7 @@ final class ShelfWindowSystem {
     func toggleShelfOnPointerScreen() {
         let point = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main
-        guard let screen, let panel = panels[screen.morselIdentifier] else { return }
+        guard let screen, let panel = panels[screen.perchIdentifier] else { return }
         panel.expand()
     }
 

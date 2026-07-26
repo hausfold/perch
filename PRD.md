@@ -1,4 +1,4 @@
-# Morsel v1 product requirements
+# Perch v1 product requirements
 
 ## Promise
 

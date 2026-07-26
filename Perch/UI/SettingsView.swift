@@ -18,7 +18,7 @@ struct SettingsView: View {
 
             Section("System") {
                 Toggle(
-                    "Launch Morsel at login",
+                    "Launch Perch at login",
                     isOn: Binding(
                         get: { settings.launchAtLogin },
                         set: { enabled in settings.setLaunchAtLogin(enabled) }
@@ -32,13 +32,13 @@ struct SettingsView: View {
             }
 
             Section {
-                Text("Morsel always stages a private copy and only offers copy operations when dragging out. Your original files are never moved or deleted.")
+                Text("Perch always stages a private copy and only offers copy operations when dragging out. Your original files are never moved or deleted.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
         .frame(width: 470, height: 330)
-        .navigationTitle("Morsel Settings")
+        .navigationTitle("Perch Settings")
     }
 }

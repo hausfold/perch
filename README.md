@@ -1,17 +1,17 @@
 <div align="center">
 
-# Morsel
+# Perch
 
 **A native, dependable temporary file shelf that grows out of your MacBook notch.**
 
 </div>
 
-Morsel lets you collect files, folders, Photos exports, Safari images, links,
+Perch lets you collect files, folders, Photos exports, Safari images, links,
 and text at the top of any display, then drag the whole group somewhere else in
 one motion. It is a menu-bar utility with no Dock icon and requires no
 Accessibility, Input Monitoring, or Screen Recording permission.
 
-> Morsel is a working title. Product naming is deliberately isolated from the
+> Perch is a working title. Product naming is deliberately isolated from the
 > storage and drag/drop architecture.
 
 ## v1 behavior
@@ -38,12 +38,12 @@ Accessibility, Input Monitoring, or Screen Recording permission.
 Requirements: Xcode 26 or newer, macOS 14 or newer.
 
 ```sh
-xcodebuild -project Morsel.xcodeproj -scheme Morsel \
+xcodebuild -project Perch.xcodeproj -scheme Perch \
   -configuration Debug -destination 'platform=macOS' \
   -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO test
 ```
 
-Open `Morsel.xcodeproj`, choose the Morsel scheme, and run **My Mac** for an
+Open `Perch.xcodeproj`, choose the Perch scheme, and run **My Mac** for an
 interactive build.
 
 ## Storage and privacy
@@ -51,8 +51,8 @@ interactive build.
 The active shelf lives at:
 
 ```text
-~/Library/Containers/com.nebelhaus.morsel/Data/Library/Application Support/
-  Morsel/ActiveShelf/
+~/Library/Containers/com.nebelhaus.perch/Data/Library/Application Support/
+  Perch/ActiveShelf/
 ```
 
 Each import gets a UUID directory, which prevents collisions without renaming

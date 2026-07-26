@@ -1,15 +1,15 @@
 import AppKit
 import XCTest
-@testable import Morsel
+@testable import Perch
 
 @MainActor
 final class ShelfDropHandlerTests: XCTestCase {
     func testFileURLPasteboardStagesARealCopy() async throws {
         let root = FileManager.default.temporaryDirectory
-            .appending(path: "MorselDrop-\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(path: "PerchDrop-\(UUID().uuidString)", directoryHint: .isDirectory)
         let source = FileManager.default.temporaryDirectory
             .appending(path: "drop-source-\(UUID().uuidString).txt")
-        let suiteName = "MorselDropSettings-\(UUID().uuidString)"
+        let suiteName = "PerchDropSettings-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer {
             try? FileManager.default.removeItem(at: root)
@@ -22,7 +22,7 @@ final class ShelfDropHandlerTests: XCTestCase {
         let settings = AppSettings(defaults: defaults)
         let store = ShelfStore(repository: repository, settings: settings)
         let handler = ShelfDropHandler(store: store)
-        let pasteboard = NSPasteboard(name: .init("MorselTests-\(UUID().uuidString)"))
+        let pasteboard = NSPasteboard(name: .init("PerchTests-\(UUID().uuidString)"))
         pasteboard.clearContents()
         pasteboard.writeObjects([source as NSURL])
 
@@ -38,8 +38,8 @@ final class ShelfDropHandlerTests: XCTestCase {
 
     func testTextPasteboardBecomesStagedTextFile() async throws {
         let root = FileManager.default.temporaryDirectory
-            .appending(path: "MorselText-\(UUID().uuidString)", directoryHint: .isDirectory)
-        let suiteName = "MorselTextSettings-\(UUID().uuidString)"
+            .appending(path: "PerchText-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let suiteName = "PerchTextSettings-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer {
             try? FileManager.default.removeItem(at: root)
@@ -52,7 +52,7 @@ final class ShelfDropHandlerTests: XCTestCase {
             settings: AppSettings(defaults: defaults)
         )
         let handler = ShelfDropHandler(store: store)
-        let pasteboard = NSPasteboard(name: .init("MorselTests-\(UUID().uuidString)"))
+        let pasteboard = NSPasteboard(name: .init("PerchTests-\(UUID().uuidString)"))
         pasteboard.clearContents()
         pasteboard.setString("a temporary thought", forType: .string)
 
