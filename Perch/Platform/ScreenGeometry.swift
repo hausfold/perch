@@ -73,8 +73,14 @@ struct ShelfGeometry: Equatable, Sendable {
         }
 
         // Keep the expanded panel at least as wide as the catch band so opening
-        // is a clean vertical unfurl (no sideways shrink that reads as lopsided).
-        let expandedWidth = max(collapsedWidth, min(660, max(360, screen.frame.width - 48)))
+        // is a clean vertical unfurl (no sideways shrink that reads as lopsided),
+        // up to a comfortable 660 — but never wider than the display can hold:
+        // `usable` (a 24pt inset per side) is a hard ceiling, so the panel stays
+        // fully on-screen even on an unusually narrow display. On every real Mac
+        // `usable` far exceeds 660, so this cap changes nothing there.
+        let usable = screen.frame.width - 48
+        let preferredWidth = max(collapsedWidth, min(660, max(360, usable)))
+        let expandedWidth = min(usable, preferredWidth)
         let expandedHeight = min(286, max(220, screen.frame.height * 0.28))
         collapsedFrame = CGRect(
             x: centerX - collapsedWidth / 2,
