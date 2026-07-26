@@ -15,9 +15,12 @@ final class ScreenGeometryTests: XCTestCase {
 
         XCTAssertTrue(geometry.hasCameraHousing)
         XCTAssertEqual(screen.cameraHousingWidth, 168)
-        XCTAssertEqual(geometry.collapsedFrame.width, 188)
+        // Wide catch band: 42% of the screen, clamped to [360, 640] (1512·0.42 = 635.04).
+        XCTAssertEqual(geometry.collapsedFrame.width, 635.04, accuracy: 0.01)
         XCTAssertEqual(geometry.collapsedFrame.maxY, screen.frame.maxY)
-        XCTAssertEqual(geometry.expandedFrame.maxY, screen.frame.maxY)
+        // The expanded panel bleeds 4pt above the top edge (topBleed) so the
+        // glass rim lands off-screen.
+        XCTAssertEqual(geometry.expandedFrame.maxY, screen.frame.maxY + 4)
         XCTAssertEqual(geometry.collapsedFrame.midX, screen.frame.midX)
     }
 
@@ -33,7 +36,9 @@ final class ScreenGeometryTests: XCTestCase {
         let geometry = ShelfGeometry(screen: screen)
 
         XCTAssertFalse(geometry.hasCameraHousing)
-        XCTAssertEqual(geometry.collapsedFrame.size, CGSize(width: 154, height: 28))
+        // Compact centered fallback: 32% of the screen, clamped to [300, 460]
+        // (1920·0.32 = 614.4 → 460), 44pt tall.
+        XCTAssertEqual(geometry.collapsedFrame.size, CGSize(width: 460, height: 44))
         XCTAssertEqual(geometry.collapsedFrame.midX, screen.frame.midX)
         XCTAssertEqual(geometry.collapsedFrame.maxY, screen.frame.maxY)
     }
