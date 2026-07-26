@@ -9,6 +9,10 @@ final class ShelfPanelController: NSObject {
     private let geometry: ShelfGeometry
     private let viewState: ShelfPanelState
     private var collapseTask: Task<Void, Never>?
+    // Set by "Hide": keeps the shelf dismissed on hover until the pointer has
+    // left the target area and returned — so the user can reach menu-bar /
+    // sketchybar items beside the notch without the shelf popping back open.
+    private var hoverSuppressed = false
 
     init(
         screen: NSScreen,
@@ -33,7 +37,7 @@ final class ShelfPanelController: NSObject {
             settings: settings,
             state: viewState,
             onExpand: { [weak self] in self?.expand() },
-            onCollapse: { [weak self] in self?.scheduleCollapse() }
+            onHide: { [weak self] in self?.hide() }
         )
         let host = ShelfHostingView(rootView: rootView, dropHandler: dropHandler)
         host.onDragEntered = { [weak self] in
@@ -49,10 +53,20 @@ final class ShelfPanelController: NSObject {
             self?.scheduleCollapse(delay: .seconds(0.8))
         }
         host.onPointerEntered = { [weak self] in
-            guard settings.expandOnPointerHover else { return }
-            self?.expand()
+            guard let self else { return }
+            // Suppressed by a prior "Hide" until the pointer leaves and returns.
+            guard !self.hoverSuppressed else { return }
+            // Passive hover only reveals the shelf when there is something to
+            // grab back out. An empty shelf is opened by a drag, not a hover.
+            guard !store.items.isEmpty || !store.pendingTransfers.isEmpty else { return }
+            self.expand()
         }
-        host.onPointerExited = { [weak self] in self?.scheduleCollapse() }
+        host.onPointerExited = { [weak self] in
+            guard let self else { return }
+            // Leaving the area re-arms hover: a later return may open again.
+            self.hoverSuppressed = false
+            self.scheduleCollapse(delay: .seconds(0.12))
+        }
 
         panel.contentView = host
         panel.backgroundColor = .clear
@@ -70,6 +84,7 @@ final class ShelfPanelController: NSObject {
         ]
         panel.animationBehavior = .none
         panel.orderFrontRegardless()
+
     }
 
     func expand() {
@@ -93,12 +108,30 @@ final class ShelfPanelController: NSObject {
         panel.orderOut(nil)
     }
 
+    /// Dismiss now and stay dismissed on hover until the pointer leaves the
+    /// target area and returns (see `hoverSuppressed`).
+    func hide() {
+        hoverSuppressed = true
+        viewState.isDropActive = false
+        collapse()
+    }
+
+    func setArmed(_ armed: Bool) {
+        guard viewState.isArmed != armed else { return }
+        viewState.isArmed = armed
+    }
+
     private func scheduleCollapse(delay: Duration = .seconds(1.1)) {
         collapseTask?.cancel()
         collapseTask = Task { [weak self] in
             try? await Task.sleep(for: delay)
-            guard !Task.isCancelled else { return }
-            self?.collapse()
+            guard !Task.isCancelled, let self else { return }
+            // A frame change during expand emits a spurious mouseExited even
+            // though the pointer is still over the shelf. Check against the
+            // stable expanded target frame (not the live, mid-animation panel
+            // frame) so a fast move into the target never flickers.
+            guard !self.geometry.expandedFrame.contains(NSEvent.mouseLocation) else { return }
+            self.collapse()
         }
     }
 
@@ -129,6 +162,10 @@ private final class ShelfPanel: NSPanel {
 final class ShelfPanelState: ObservableObject {
     @Published var isExpanded = false
     @Published var isDropActive = false
+    // True while a mouse button is held anywhere on the system — i.e. a drag
+    // could be in progress. The collapsed catch zone only renders its (faint,
+    // hit-testable) fill while armed, so an idle shelf is fully transparent.
+    @Published var isArmed = false
     let hasCameraHousing: Bool
 
     init(hasCameraHousing: Bool) {

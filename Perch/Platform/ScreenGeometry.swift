@@ -58,14 +58,23 @@ struct ShelfGeometry: Equatable, Sendable {
         let collapsedHeight: CGFloat
 
         if screen.hasCameraHousing {
-            collapsedWidth = max(150, (screen.cameraHousingWidth ?? 0) + 20)
-            collapsedHeight = max(34, screen.safeAreaTop + 8)
+            // Wide, shallow catch band centered under the notch. Width covers
+            // off-center drag paths (the empty middle of the menu bar, clear of
+            // the app menus at far-left and status items at far-right). Height
+            // stays close to the menu-bar band so it catches a dragged file a
+            // touch below the very top edge — before macOS's edge-drag gesture
+            // (Mission Control / Spaces) fires — without eating clicks on app
+            // content further down.
+            collapsedWidth = max(360, min(screen.frame.width * 0.42, 640))
+            collapsedHeight = screen.safeAreaTop + 34
         } else {
-            collapsedWidth = 154
-            collapsedHeight = 28
+            collapsedWidth = max(300, min(screen.frame.width * 0.32, 460))
+            collapsedHeight = 44
         }
 
-        let expandedWidth = min(540, max(280, screen.frame.width - 48))
+        // Keep the expanded panel at least as wide as the catch band so opening
+        // is a clean vertical unfurl (no sideways shrink that reads as lopsided).
+        let expandedWidth = max(collapsedWidth, min(660, max(360, screen.frame.width - 48)))
         let expandedHeight = min(286, max(220, screen.frame.height * 0.28))
         collapsedFrame = CGRect(
             x: centerX - collapsedWidth / 2,
@@ -73,11 +82,14 @@ struct ShelfGeometry: Equatable, Sendable {
             width: collapsedWidth,
             height: collapsedHeight
         )
+        // Bleed a few points above the screen's top edge so NSGlassEffectView's
+        // bright edge rim lands off-screen — leaving a clean, borderless top.
+        let topBleed: CGFloat = 4
         expandedFrame = CGRect(
             x: centerX - expandedWidth / 2,
             y: screen.frame.maxY - expandedHeight,
             width: expandedWidth,
-            height: expandedHeight
+            height: expandedHeight + topBleed
         )
     }
 }

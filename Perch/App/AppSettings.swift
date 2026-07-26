@@ -6,7 +6,6 @@ final class AppSettings: ObservableObject {
     private enum Key {
         static let autoRemoveAfterExport = "autoRemoveAfterExport"
         static let showOnAllDisplays = "showOnAllDisplays"
-        static let expandOnPointerHover = "expandOnPointerHover"
         static let retentionDays = "retentionDays"
     }
 
@@ -18,10 +17,6 @@ final class AppSettings: ObservableObject {
 
     @Published var showOnAllDisplays: Bool {
         didSet { defaults.set(showOnAllDisplays, forKey: Key.showOnAllDisplays) }
-    }
-
-    @Published var expandOnPointerHover: Bool {
-        didSet { defaults.set(expandOnPointerHover, forKey: Key.expandOnPointerHover) }
     }
 
     @Published var retentionDays: Int {
@@ -36,12 +31,10 @@ final class AppSettings: ObservableObject {
         defaults.register(defaults: [
             Key.autoRemoveAfterExport: false,
             Key.showOnAllDisplays: true,
-            Key.expandOnPointerHover: true,
             Key.retentionDays: 7,
         ])
         autoRemoveAfterExport = defaults.bool(forKey: Key.autoRemoveAfterExport)
         showOnAllDisplays = defaults.bool(forKey: Key.showOnAllDisplays)
-        expandOnPointerHover = defaults.bool(forKey: Key.expandOnPointerHover)
         retentionDays = max(1, defaults.integer(forKey: Key.retentionDays))
         refreshLaunchAtLogin()
     }

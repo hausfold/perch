@@ -9,6 +9,7 @@ final class ShelfWindowSystem {
     private var panels: [String: ShelfPanelController] = [:]
     private var cancellables: Set<AnyCancellable> = []
     private var screenObserver: NSObjectProtocol?
+    private var armTimer: Timer?
 
     init(store: ShelfStore, settings: AppSettings) {
         self.store = store
@@ -30,12 +31,28 @@ final class ShelfWindowSystem {
         ) { [weak self] _ in
             Task { @MainActor in self?.rebuildPanels() }
         }
+
+        // Arm the (invisible) drop catch zones only while a mouse button is
+        // held — i.e. a drag might be underway. Polling pressedMouseButtons
+        // needs no Accessibility/Input Monitoring permission, preserving the
+        // app's no-special-permission guarantee.
+        let timer = Timer(timeInterval: 0.06, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let armed = NSEvent.pressedMouseButtons != 0
+                self.panels.values.forEach { $0.setArmed(armed) }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        armTimer = timer
     }
 
     func stop() {
         if let screenObserver {
             NotificationCenter.default.removeObserver(screenObserver)
         }
+        armTimer?.invalidate()
+        armTimer = nil
         panels.values.forEach { $0.close() }
         panels.removeAll()
     }

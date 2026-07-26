@@ -7,7 +7,6 @@ struct SettingsView: View {
         Form {
             Section("Shelf") {
                 Toggle("Show a drop target on every display", isOn: $settings.showOnAllDisplays)
-                Toggle("Expand when the pointer reaches the target", isOn: $settings.expandOnPointerHover)
                 Toggle("Remove staged copies after a successful drag", isOn: $settings.autoRemoveAfterExport)
                 Stepper(
                     "Discard items older than \(settings.retentionDays) day\(settings.retentionDays == 1 ? "" : "s")",
