@@ -223,13 +223,13 @@ final class ShelfHostingView<Content: View>: NSHostingView<Content> {
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        guard dropHandler.canAccept(sender) else { return [] }
+        guard !isOwnExportDrag(sender), dropHandler.canAccept(sender) else { return [] }
         onDragEntered?()
         return .copy
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        dropHandler.canAccept(sender) ? .copy : []
+        !isOwnExportDrag(sender) && dropHandler.canAccept(sender) ? .copy : []
     }
 
     override func draggingExited(_ sender: NSDraggingInfo?) {
@@ -237,12 +237,21 @@ final class ShelfHostingView<Content: View>: NSHostingView<Content> {
     }
 
     override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        dropHandler.canAccept(sender)
+        !isOwnExportDrag(sender) && dropHandler.canAccept(sender)
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard !isOwnExportDrag(sender) else { return false }
         let accepted = dropHandler.accept(sender)
         onDropCompleted?()
         return accepted
+    }
+
+    /// True when this drag session originated from the shelf's own export view.
+    /// Dropping items straight back onto any shelf panel must not re-import them
+    /// as duplicates — the copies are already staged. Duplicates are only ever
+    /// created by dragging the same file in from outside (a nil/foreign source).
+    private func isOwnExportDrag(_ sender: NSDraggingInfo) -> Bool {
+        sender.draggingSource is DragSourceNSView
     }
 }
