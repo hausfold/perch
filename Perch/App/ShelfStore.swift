@@ -180,20 +180,6 @@ final class ShelfStore: ObservableObject {
         }
     }
 
-    func completeExport() {
-        if settings.autoRemoveAfterExport {
-            clear()
-        }
-    }
-
-    /// A single tile was dragged out — auto-remove drops only that item, never
-    /// the whole shelf (that is `completeExport()`, used by the drag-all handle).
-    func completeExport(of item: ShelfItem) {
-        if settings.autoRemoveAfterExport {
-            remove(item)
-        }
-    }
-
     func reveal(_ item: ShelfItem) {
         guard let url = item.fileURL(inside: repository.rootURL) else { return }
         NSWorkspace.shared.activateFileViewerSelecting([url])

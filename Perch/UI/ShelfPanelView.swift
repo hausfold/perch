@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ShelfPanelView: View {
     @ObservedObject var store: ShelfStore
@@ -162,13 +163,38 @@ struct ShelfPanelView: View {
         .contentShape(Capsule())
         .overlay {
             FileDragSourceView(
-                urls: store.exportedURLs,
-                onExportStarted: { state.isDropActive = true },
+                items: store.items.compactMap(exportItem(for:)),
+                onExportStarted: {
+                    state.isDropActive = true
+                    // Collapse every tile at once; the strip empties as the
+                    // stack lifts off. Each item is removed for real only as its
+                    // own copy lands; anything not exported springs back.
+                    state.draggingOutIDs = Set(store.items.map(\.id))
+                },
                 onExportEnded: { state.isDropActive = false },
-                onSuccessfulExport: { store.completeExport() }
+                onItemExportFinished: finishExport
             )
             .accessibilityLabel("Drag all \(store.items.count) items")
         }
+    }
+
+    /// Resolves a shelf item to something the drag source can vend by promise,
+    /// or nil when its staged copy can't be located.
+    private func exportItem(for item: ShelfItem) -> ExportItem? {
+        guard let url = item.fileURL(inside: store.repository.rootURL) else { return nil }
+        let fileType = item.contentTypeIdentifier
+            ?? (item.kind == .folder ? UTType.folder.identifier : UTType.data.identifier)
+        return ExportItem(id: item.id, url: url, fileType: fileType, fileName: item.displayName)
+    }
+
+    /// One dragged-out item's copy concluded: a confirmed copy removes it for
+    /// real (it is already collapsed, so no second snap); otherwise the tile
+    /// springs back. Never removes an item whose drop failed — that was the
+    /// -8058 data-loss bug.
+    private func finishExport(_ id: UUID, exported: Bool) {
+        state.draggingOutIDs.remove(id)
+        guard exported, let item = store.items.first(where: { $0.id == id }) else { return }
+        store.remove(item)
     }
 
     private var emptyState: some View {
@@ -199,18 +225,27 @@ struct ShelfPanelView: View {
     }
 
     private var itemStrip: some View {
+        // spacing 0: the inter-tile gap lives inside each FileTile's horizontal
+        // padding so it can collapse to zero along with the tile's width when
+        // that tile is dragged out — otherwise the fixed HStack spacing would
+        // leave a stranded gap where the exiting tile used to be.
         ScrollView(.horizontal) {
-            HStack(alignment: .top, spacing: 14) {
+            HStack(alignment: .top, spacing: 0) {
                 ForEach(store.items) { item in
                     FileTile(
                         item: item,
                         fileURL: item.fileURL(inside: store.repository.rootURL),
-                        onOpen: { store.open(item) },
+                        exportItems: exportItem(for: item).map { [$0] } ?? [],
+                        isExiting: state.draggingOutIDs.contains(item.id),
                         onReveal: { store.reveal(item) },
-                        onRemove: { store.remove(item) },
-                        onExportStarted: { state.isDropActive = true },
+                        onRemove: { withAnimation(Self.reflow) { store.remove(item) } },
+                        onOpen: { store.open(item) },
+                        onExportStarted: {
+                            state.isDropActive = true
+                            state.draggingOutIDs.insert(item.id)
+                        },
                         onExportEnded: { state.isDropActive = false },
-                        onSuccessfulExport: { store.completeExport(of: item) }
+                        onItemExportFinished: finishExport
                     )
                 }
                 ForEach(store.pendingTransfers) { transfer in
@@ -218,10 +253,16 @@ struct ShelfPanelView: View {
                 }
             }
             .padding(.vertical, 3)
+            .animation(Self.reflow, value: state.draggingOutIDs)
+            .animation(Self.reflow, value: store.items)
         }
         .scrollIndicators(.hidden)
         .frame(maxHeight: .infinity)
     }
+
+    /// Shared spring for tiles sliding in/out so a drag-out reflows the strip
+    /// instead of snap-shrinking it.
+    private static let reflow = Animation.snappy(duration: 0.32, extraBounce: 0.12)
 
     private func errorBanner(_ error: String) -> some View {
         HStack(spacing: 8) {
@@ -309,14 +350,37 @@ private struct ShelfHeaderButton: View {
 private struct FileTile: View {
     let item: ShelfItem
     let fileURL: URL?
-    let onOpen: () -> Void
+    let exportItems: [ExportItem]
+    // While true the tile is mid drag-out: it collapses to zero width so the
+    // neighbouring tiles slide in, but stays mounted so its FileDragSourceView
+    // survives to receive the drop result. See ShelfPanelState.draggingOutIDs.
+    var isExiting: Bool = false
     let onReveal: () -> Void
     let onRemove: () -> Void
+    let onOpen: () -> Void
     let onExportStarted: () -> Void
     let onExportEnded: () -> Void
-    let onSuccessfulExport: () -> Void
+    let onItemExportFinished: (UUID, Bool) -> Void
+
+    // Half the inter-tile gap on each side sums to the strip's 14pt spacing;
+    // living inside the tile means it collapses to zero with the tile on exit.
+    private static let sideInset: CGFloat = 7
 
     var body: some View {
+        card
+            .padding(.horizontal, isExiting ? 0 : Self.sideInset)
+            .frame(width: isExiting ? 0 : nil)
+            .scaleEffect(isExiting ? 0.6 : 1, anchor: .center)
+            .opacity(isExiting ? 0 : 1)
+            // Contain the shrinking tile so it never bleeds over its neighbours,
+            // but only while exiting — at rest the clip region is expanded so the
+            // remove badge can still overhang the corner. Parameterising one clip
+            // (rather than branching with `if`) keeps the subtree — and its live
+            // FileDragSourceView — mounted for the whole drag.
+            .clipShape(CollapseClip(collapsed: isExiting))
+    }
+
+    private var card: some View {
         VStack(spacing: 8) {
             ZStack(alignment: .topTrailing) {
                 VStack(spacing: 8) {
@@ -335,10 +399,10 @@ private struct FileTile: View {
                 .frame(width: 108)
                 .overlay {
                     FileDragSourceView(
-                        urls: fileURL.map { [$0] } ?? [],
+                        items: exportItems,
                         onExportStarted: onExportStarted,
                         onExportEnded: onExportEnded,
-                        onSuccessfulExport: onSuccessfulExport,
+                        onItemExportFinished: onItemExportFinished,
                         onOpen: onOpen
                     )
                     .accessibilityLabel("Drag \(item.displayName)")
@@ -381,6 +445,18 @@ private struct FileTile: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// A clip that tightens to the view's bounds only while `collapsed`, and
+/// otherwise expands well past them so nothing is cut at rest. Being a single
+/// parameterised `Shape` (not an `if`-branch), it never changes view identity —
+/// so the tile's live `FileDragSourceView` survives the whole drag session.
+private struct CollapseClip: Shape {
+    var collapsed: Bool
+
+    func path(in rect: CGRect) -> Path {
+        Path(collapsed ? rect : rect.insetBy(dx: -200, dy: -200))
     }
 }
 

@@ -4,16 +4,11 @@ import ServiceManagement
 @MainActor
 final class AppSettings: ObservableObject {
     private enum Key {
-        static let autoRemoveAfterExport = "autoRemoveAfterExport"
         static let showOnAllDisplays = "showOnAllDisplays"
         static let retentionDays = "retentionDays"
     }
 
     private let defaults: UserDefaults
-
-    @Published var autoRemoveAfterExport: Bool {
-        didSet { defaults.set(autoRemoveAfterExport, forKey: Key.autoRemoveAfterExport) }
-    }
 
     @Published var showOnAllDisplays: Bool {
         didSet { defaults.set(showOnAllDisplays, forKey: Key.showOnAllDisplays) }
@@ -29,11 +24,9 @@ final class AppSettings: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         defaults.register(defaults: [
-            Key.autoRemoveAfterExport: false,
             Key.showOnAllDisplays: true,
             Key.retentionDays: 7,
         ])
-        autoRemoveAfterExport = defaults.bool(forKey: Key.autoRemoveAfterExport)
         showOnAllDisplays = defaults.bool(forKey: Key.showOnAllDisplays)
         retentionDays = max(1, defaults.integer(forKey: Key.retentionDays))
         refreshLaunchAtLogin()
