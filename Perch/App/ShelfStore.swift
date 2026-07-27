@@ -120,7 +120,13 @@ final class ShelfStore: ObservableObject {
                 atDestination: batchDirectory,
                 options: [:],
                 operationQueue: promisedFileQueue
-            ) { [weak self] url, error in
+            ) { @Sendable [weak self] url, error in
+                // AppKit invokes this completion on `promisedFileQueue` (a
+                // background OperationQueue), NOT the main actor. Marking the
+                // closure @Sendable keeps it nonisolated so the Swift runtime
+                // does not assert main-actor isolation on entry (that assert
+                // was crashing the app on every promised drop). All UI/state
+                // access below hops to the main actor explicitly.
                 Task { [weak self] in
                     guard let self else { return }
                     if let error {
