@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import OSLog
+import UniformTypeIdentifiers
 
 @MainActor
 final class ShelfStore: ObservableObject {
@@ -193,6 +194,45 @@ final class ShelfStore: ObservableObject {
     func reveal(_ item: ShelfItem) {
         guard let url = item.fileURL(inside: repository.rootURL) else { return }
         NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    /// Double-click behaviour: preview quick-lookable content (images) in the
+    /// slim Quick Look panel rather than launching a heavyweight viewer app;
+    /// hand everything else to its default app.
+    ///
+    /// Quick Look runs via `qlmanage -p` in its own process on purpose: the
+    /// shelf lives on a non-activating, non-key panel that deliberately never
+    /// steals focus, so the in-process `QLPreviewPanel` (which demands a key
+    /// window + responder-chain controller) can't be driven without breaking
+    /// that design. The out-of-process previewer sidesteps all of it.
+    func open(_ item: ShelfItem) {
+        guard let url = item.fileURL(inside: repository.rootURL) else { return }
+        if shouldQuickLook(item) {
+            quickLook(url)
+        } else {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func shouldQuickLook(_ item: ShelfItem) -> Bool {
+        if item.kind == .image { return true }
+        return item.contentType?.conforms(to: .image) ?? false
+    }
+
+    private func quickLook(_ url: URL) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/qlmanage")
+        process.arguments = ["-p", url.path]
+        // qlmanage is chatty on both streams; keep the shelf's console clean.
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            // If Quick Look can't launch, fall back to the default app so a
+            // double-click never silently does nothing.
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func updateTransfer(_ id: UUID, phase: PendingTransfer.Phase) {

@@ -205,6 +205,7 @@ struct ShelfPanelView: View {
                     FileTile(
                         item: item,
                         fileURL: item.fileURL(inside: store.repository.rootURL),
+                        onOpen: { store.open(item) },
                         onReveal: { store.reveal(item) },
                         onRemove: { store.remove(item) },
                         onExportStarted: { state.isDropActive = true },
@@ -308,6 +309,7 @@ private struct ShelfHeaderButton: View {
 private struct FileTile: View {
     let item: ShelfItem
     let fileURL: URL?
+    let onOpen: () -> Void
     let onReveal: () -> Void
     let onRemove: () -> Void
     let onExportStarted: () -> Void
@@ -333,7 +335,8 @@ private struct FileTile: View {
                         urls: fileURL.map { [$0] } ?? [],
                         onExportStarted: onExportStarted,
                         onExportEnded: onExportEnded,
-                        onSuccessfulExport: onSuccessfulExport
+                        onSuccessfulExport: onSuccessfulExport,
+                        onOpen: onOpen
                     )
                     .accessibilityLabel("Drag \(item.displayName)")
                 }
@@ -360,6 +363,7 @@ private struct FileTile: View {
         }
         .foregroundStyle(.white)
         .contextMenu {
+            Button(item.kind == .image ? "Quick Look" : "Open", action: onOpen)
             Button("Show in Finder", action: onReveal)
             Button("Remove from Shelf", role: .destructive, action: onRemove)
         }
