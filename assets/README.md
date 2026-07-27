@@ -1,16 +1,16 @@
 # Visual assets
 
-`perch-icon-master.png` is the 1254×1254 source used to generate the native
-macOS app-icon slots. It was generated with OpenAI's built-in image generation
-tool from this prompt:
+Perch's mark is the family's paired cat-ears sitting over its own detail: two
+overlapping cards — the shelf. Drawn as flat geometry in the
+[nebelung](https://github.com/nebelhaus/nebelung) palette, graphite against the
+muted green accent, so it reads at 16 px and sits next to the rest of the family.
 
-> Create a refined native Mac utility icon for Perch, a temporary file shelf
-> that grows out of the MacBook camera notch. Use a dark graphite rounded-square
-> tile whose top-center camera-notch shape flows into a subtle glass tray holding
-> three overlapping document cards. Premium Apple-platform icon, dimensional
-> but restrained, clean geometric forms, quiet fog-gray palette with one muted
-> mauve/lavender accent, readable at 16 px. No text, watermark, device mockup,
-> desktop background, or tiny decorative detail.
+| file | what it is |
+|---|---|
+| `perch-icon-master.png` | 2048×2048 source for the native macOS app-icon slots — green mark on a dark graphite tile. |
+| `perch-square.png` | The square mark on graphite. Used for the web logo and social card. |
+| `perch-square-inverted.png` | The inverted variant — dark mark on a green tile. |
+| `perch-banner.png` | Wide wordmark banner (`perch` + mark) for the README header. |
 
 The files in `Perch/Assets.xcassets/AppIcon.appiconset` are mechanically scaled
-from the master. Keep the master rather than upscaling an icon slot.
+from `perch-icon-master.png`. Keep the master rather than upscaling an icon slot.
