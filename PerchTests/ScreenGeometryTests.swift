@@ -22,6 +22,14 @@ final class ScreenGeometryTests: XCTestCase {
         // glass rim lands off-screen.
         XCTAssertEqual(geometry.expandedFrame.maxY, screen.frame.maxY + 4)
         XCTAssertEqual(geometry.collapsedFrame.midX, screen.frame.midX)
+        // Expand only grows downward: the window keeps the catch-zone width and
+        // stays centered, so no sideways motion can kick a pointer/drag out.
+        XCTAssertEqual(geometry.expandedFrame.width, geometry.collapsedFrame.width)
+        XCTAssertEqual(geometry.expandedFrame.midX, screen.frame.midX)
+        // The visible glass is trimmed narrower than the window and drawn
+        // centered within it (1512 → min(540, 1512−48) = 540).
+        XCTAssertEqual(geometry.expandedContentWidth, 540)
+        XCTAssertLessThan(geometry.expandedContentWidth, geometry.expandedFrame.width)
     }
 
     func testNotchlessScreenGetsCompactCenteredFallback() {
@@ -57,5 +65,9 @@ final class ScreenGeometryTests: XCTestCase {
         XCTAssertLessThanOrEqual(geometry.expandedFrame.width, screen.frame.width - 48)
         XCTAssertGreaterThanOrEqual(geometry.expandedFrame.minX, screen.frame.minX)
         XCTAssertLessThanOrEqual(geometry.expandedFrame.maxX, screen.frame.maxX)
+        // The trimmed glass can never exceed the window it is centered in — on a
+        // display this narrow the catch band is the smaller of the two, so the
+        // content follows it down rather than overflowing.
+        XCTAssertLessThanOrEqual(geometry.expandedContentWidth, geometry.expandedFrame.width)
     }
 }

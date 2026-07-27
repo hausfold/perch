@@ -99,6 +99,11 @@ struct ShelfPanelView: View {
             ShelfBorderShape(radius: Self.shelfCornerRadius)
                 .stroke(.white.opacity(0.14), lineWidth: 1)
         }
+        // The window spans the full catch-zone width so expand only grows
+        // downward; the glass is trimmed to its reading width and centered,
+        // leaving transparent (click-through) margins on either side.
+        .frame(maxWidth: state.expandedContentWidth)
+        .frame(maxWidth: .infinity)
         .overlay(alignment: .bottom) {
             if let error = store.latestError {
                 errorBanner(error)

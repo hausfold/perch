@@ -22,7 +22,10 @@ final class ShelfPanelController: NSObject {
     ) {
         screenID = screen.perchIdentifier
         geometry = ShelfGeometry(screen: ScreenDescriptor(screen: screen))
-        viewState = ShelfPanelState(hasCameraHousing: geometry.hasCameraHousing)
+        viewState = ShelfPanelState(
+            hasCameraHousing: geometry.hasCameraHousing,
+            expandedContentWidth: geometry.expandedContentWidth
+        )
         panel = ShelfPanel(
             contentRect: geometry.collapsedFrame,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -173,9 +176,13 @@ final class ShelfPanelState: ObservableObject {
     // — never persisted; the ShelfItem stays valid throughout.
     @Published var draggingOutIDs: Set<UUID> = []
     let hasCameraHousing: Bool
+    // Width of the visible glass shelf, centered inside the wider (catch-zone
+    // width) window. See ShelfGeometry.expandedContentWidth.
+    let expandedContentWidth: CGFloat
 
-    init(hasCameraHousing: Bool) {
+    init(hasCameraHousing: Bool, expandedContentWidth: CGFloat) {
         self.hasCameraHousing = hasCameraHousing
+        self.expandedContentWidth = expandedContentWidth
     }
 }
 
