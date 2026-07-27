@@ -9,11 +9,6 @@
 # which is plain `swiftc` with no packages) — so the release artifact is the only
 # buildable-anywhere handle on the app. See ../nix/package.nix.
 #
-# BOOTSTRAP PLACEHOLDER: perch has not been released yet, so the pin below is a
-# stand-in and the release code path won't build until the first `bench release
-# perch` lands a v<date> tag (CI then rewrites both lines). The rice keeps
-# `nebelhaus.perch.enable = false` until then, so nothing forces this build.
-#
 # Hand-edit only to bootstrap a brand-new release line. `version` carries no
 # leading "v"; `sha256` is the release .zip's SHA-256 in hex (what `sha256sum`
 # prints — the same value the cask stores).

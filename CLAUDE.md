@@ -44,5 +44,6 @@ release ZIP**, not a from-source build:
   dev `Perch.app` from a source branch in your login session and overrides
   `prebuilt` at it, so a branch feel-tests without waiting on a release.
 
-Not released yet: `nix/release.nix` holds a bootstrap placeholder and the rice
-keeps `nebelhaus.perch.enable = false` until the first `bench release perch`.
+Released: `nix/release.nix` pins a real notarized release (CI rewrites it on
+every `bench release perch` tag) and the rice enables `nebelhaus.perch.enable`
+by default, like trill.
