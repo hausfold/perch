@@ -121,7 +121,7 @@ struct ShelfPanelView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Text(itemCountDescription)
-                .font(.callout.weight(.semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.9))
             Spacer(minLength: 8)
             if store.items.count > 1 {
@@ -151,9 +151,9 @@ struct ShelfPanelView: View {
     private var dragAllHandle: some View {
         HStack(spacing: 5) {
             Image(systemName: "square.stack.3d.up.fill")
-                .font(.footnote.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
             Text("Drag all \(store.items.count)")
-                .font(.callout.weight(.medium))
+                .font(.body.weight(.medium))
         }
         .foregroundStyle(.white.opacity(0.82))
         .padding(.horizontal, 12)
@@ -200,7 +200,7 @@ struct ShelfPanelView: View {
 
     private var itemStrip: some View {
         ScrollView(.horizontal) {
-            HStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 14) {
                 ForEach(store.items) { item in
                     FileTile(
                         item: item,
@@ -287,9 +287,9 @@ private struct ShelfHeaderButton: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: systemImage)
-                    .font(.footnote.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                 Text(title)
-                    .font(.callout.weight(.medium))
+                    .font(.body.weight(.medium))
             }
             .foregroundStyle(tint.opacity(hovering ? 1 : 0.82))
             .padding(.horizontal, 12)
@@ -315,19 +315,22 @@ private struct FileTile: View {
     let onSuccessfulExport: () -> Void
 
     var body: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 8) {
             ZStack(alignment: .topTrailing) {
-                VStack(spacing: 7) {
-                    icon
+                VStack(spacing: 8) {
+                    FilePreview(
+                        fileURL: fileURL,
+                        kind: item.kind,
+                        contentType: item.contentType,
+                        size: 62
+                    )
                     Text(item.displayName)
-                        .font(.subheadline)
-                        .lineLimit(2)
+                        .font(.callout)
+                        .lineLimit(2, reservesSpace: true)
                         .multilineTextAlignment(.center)
-                        .frame(width: 100)
+                        .frame(width: 104)
                 }
-                .padding(11)
-                .frame(width: 122, height: 132)
-                .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 16))
+                .frame(width: 108)
                 .overlay {
                     FileDragSourceView(
                         urls: fileURL.map { [$0] } ?? [],
@@ -338,25 +341,10 @@ private struct FileTile: View {
                     .accessibilityLabel("Drag \(item.displayName)")
                 }
 
-                Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill")
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, .black.opacity(0.65))
-                }
-                .buttonStyle(.plain)
-                .offset(x: 5, y: -5)
-                .accessibilityLabel("Remove \(item.displayName)")
+                removeButton
             }
 
-            if let byteCount = item.byteCount {
-                Text(ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text(item.kind == .folder ? "Folder" : "Item")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            sizeLabel
         }
         .foregroundStyle(.white)
         .contextMenu {
@@ -365,20 +353,30 @@ private struct FileTile: View {
         }
     }
 
-    private var icon: some View {
-        Group {
-            if let fileURL {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: fileURL.path))
-                    .resizable()
-                    .scaledToFit()
-            } else {
-                Image(systemName: "doc")
-                    .resizable()
-                    .scaledToFit()
-            }
+    private var removeButton: some View {
+        Button(action: onRemove) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 22))
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.white, .black.opacity(0.62))
+                .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
         }
-        .frame(width: 48, height: 48)
-        .accessibilityHidden(true)
+        .buttonStyle(.plain)
+        .contentShape(Circle())
+        .offset(x: 4, y: -4)
+        .accessibilityLabel("Remove \(item.displayName)")
+    }
+
+    @ViewBuilder private var sizeLabel: some View {
+        if let byteCount = item.byteCount {
+            Text(ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        } else {
+            Text(item.kind == .folder ? "Folder" : "Item")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -386,21 +384,25 @@ private struct PendingTile: View {
     let transfer: PendingTransfer
 
     var body: some View {
-        VStack(spacing: 10) {
-            ProgressView()
-                .controlSize(.small)
+        VStack(spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.white.opacity(0.06))
+                ProgressView()
+                    .controlSize(.small)
+            }
+            .frame(width: 62, height: 62)
             Text(transfer.displayName)
-                .font(.caption)
-                .lineLimit(2)
+                .font(.footnote)
+                .lineLimit(2, reservesSpace: true)
                 .multilineTextAlignment(.center)
+                .frame(width: 104)
             Text(phaseLabel)
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .foregroundStyle(.white)
-        .padding(10)
-        .frame(width: 114, height: 148)
-        .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 16))
+        .frame(width: 108)
         .accessibilityElement(children: .combine)
     }
 
