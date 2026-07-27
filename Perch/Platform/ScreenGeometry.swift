@@ -72,16 +72,18 @@ struct ShelfGeometry: Equatable, Sendable {
             collapsedHeight = 44
         }
 
-        // Keep the expanded panel at least as wide as the catch band so opening
-        // is a clean vertical unfurl (no sideways shrink that reads as lopsided),
-        // up to a comfortable 660 — but never wider than the display can hold:
-        // `usable` (a 24pt inset per side) is a hard ceiling, so the panel stays
-        // fully on-screen even on an unusually narrow display. On every real Mac
-        // `usable` far exceeds 660, so this cap changes nothing there.
+        // A comfortable reading width for the tile strip — deliberately a touch
+        // narrower than the catch band (roughly one tile unit trimmed off the
+        // old 660) so a dense shelf fills its rows more uniformly. `usable` (a
+        // 24pt inset per side) is a hard ceiling, so the panel stays fully
+        // on-screen even on an unusually narrow display.
         let usable = screen.frame.width - 48
-        let preferredWidth = max(collapsedWidth, min(660, max(360, usable)))
-        let expandedWidth = min(usable, preferredWidth)
-        let expandedHeight = min(286, max(220, screen.frame.height * 0.28))
+        let expandedWidth = min(usable, max(360, min(540, usable)))
+        // Size the panel to a single tile row plus the header and padding, not a
+        // tall fixed rectangle — otherwise the item strip's flexible height
+        // leaves dead space below the tiles. The camera housing reserves extra
+        // top padding (see ShelfPanelView), so a notch display needs more.
+        let expandedHeight: CGFloat = hasCameraHousing ? 244 : 220
         collapsedFrame = CGRect(
             x: centerX - collapsedWidth / 2,
             y: screen.frame.maxY - collapsedHeight,
