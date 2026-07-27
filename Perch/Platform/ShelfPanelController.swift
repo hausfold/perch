@@ -59,6 +59,15 @@ final class ShelfPanelController: NSObject {
             // Passive hover only reveals the shelf when there is something to
             // grab back out. An empty shelf is opened by a drag, not a hover.
             guard !store.items.isEmpty || !store.pendingTransfers.isEmpty else { return }
+            // Only expand when the pointer is inside the region the expanded
+            // shelf will actually cover. The collapsed catch zone is wider than
+            // the expanded frame (it has to be, to catch off-center *drag*
+            // paths), so a hover landing in the side band between the two would
+            // otherwise expand, immediately shrink the window out from under the
+            // stationary cursor (mouseExited → collapse → re-enter → …), and
+            // jitter. Drags are unaffected: they open via the drag path, not
+            // this hover, and keep the full wide catch zone.
+            guard self.geometry.expandedFrame.contains(NSEvent.mouseLocation) else { return }
             self.expand()
         }
         host.onPointerExited = { [weak self] in
