@@ -79,16 +79,19 @@ macOS rice — but it stands alone: it's a plain menu-bar app on any Mac.
 
 ## install
 
-Perch is a signed, Apple-notarized app that will ship on the nebelhaus Homebrew
-tap — exactly like [trill](https://github.com/nebelhaus/trill):
-
 ```sh
-# coming with the first release
+# Homebrew (nebelhaus tap)
 brew install --cask nebelhaus/tap/perch
 ```
 
-Until that first release lands you build it yourself (below); nebelhaus users can
-also feel-test a branch through the workshop's `bench try`.
+The app is signed with our Apple Developer ID and notarized by Apple, so the cask
+installs it and it opens straight away — no Gatekeeper prompt, no quarantine hack.
+(If you build or copy the app by hand instead of installing the cask, macOS may
+quarantine your copy; clear it with
+`xattr -dr com.apple.quarantine /Applications/Perch.app`.)
+
+Perch installs by default in the [nebelhaus](https://github.com/nebelhaus) rice
+too, but it stands alone — the cask above works on any Mac.
 
 ## build and run
 
