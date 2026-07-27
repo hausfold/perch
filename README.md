@@ -1,9 +1,7 @@
 <div align="center">
 
-<!-- identity mark — the notch tray with three cards (assets/perch-icon-master.png) -->
-<img src="./assets/perch-icon-master.png" alt="perch" width="150">
-
-# perch
+<!-- identity banner — green wordmark on graphite (assets/perch-banner.png) -->
+<img src="./assets/perch-banner.png" alt="perch" width="460">
 
 **drop it in the notch, drag it out anywhere**
 
