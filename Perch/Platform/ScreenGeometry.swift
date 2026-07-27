@@ -49,6 +49,13 @@ struct ScreenDescriptor: Equatable, Sendable {
 struct ShelfGeometry: Equatable, Sendable {
     let collapsedFrame: CGRect
     let expandedFrame: CGRect
+    // The visible glass shelf is drawn trimmed-and-centered to this width inside
+    // the (wider) expanded window. The window itself keeps the full catch-zone
+    // width so expand/collapse only ever changes height — growing straight down
+    // from the notch. A window that also shrank horizontally would retract its
+    // edge past a pointer/drag sitting in the side band, firing a spurious
+    // exit → collapse → re-enter jitter, and the sideways motion read as jank.
+    let expandedContentWidth: CGFloat
     let hasCameraHousing: Bool
 
     init(screen: ScreenDescriptor) {
@@ -76,9 +83,15 @@ struct ShelfGeometry: Equatable, Sendable {
         // narrower than the catch band (roughly one tile unit trimmed off the
         // old 660) so a dense shelf fills its rows more uniformly. `usable` (a
         // 24pt inset per side) is a hard ceiling, so the panel stays fully
-        // on-screen even on an unusually narrow display.
+        // on-screen even on an unusually narrow display. This sizes the *visible*
+        // glass, not the window: the window matches the catch-zone width (below)
+        // and the glass is centered within it.
         let usable = screen.frame.width - 48
-        let expandedWidth = min(usable, max(360, min(540, usable)))
+        let contentWidth = min(usable, max(360, min(540, usable)))
+        // Never wider than the catch band — the glass is trimmed *within* the
+        // window, so on a narrow display where the catch band is the smaller of
+        // the two, the content follows it down.
+        expandedContentWidth = min(contentWidth, collapsedWidth)
         // Size the panel to a single tile row plus the header and padding, not a
         // tall fixed rectangle — otherwise the item strip's flexible height
         // leaves dead space below the tiles. The camera housing reserves extra
@@ -92,11 +105,14 @@ struct ShelfGeometry: Equatable, Sendable {
         )
         // Bleed a few points above the screen's top edge so NSGlassEffectView's
         // bright edge rim lands off-screen — leaving a clean, borderless top.
+        // The window keeps the collapsed catch width so expand only grows the
+        // panel downward (never sideways); the visible glass is trimmed to
+        // expandedContentWidth inside it.
         let topBleed: CGFloat = 4
         expandedFrame = CGRect(
-            x: centerX - expandedWidth / 2,
+            x: centerX - collapsedWidth / 2,
             y: screen.frame.maxY - expandedHeight,
-            width: expandedWidth,
+            width: collapsedWidth,
             height: expandedHeight + topBleed
         )
     }

@@ -22,7 +22,10 @@ final class ShelfPanelController: NSObject {
     ) {
         screenID = screen.perchIdentifier
         geometry = ShelfGeometry(screen: ScreenDescriptor(screen: screen))
-        viewState = ShelfPanelState(hasCameraHousing: geometry.hasCameraHousing)
+        viewState = ShelfPanelState(
+            hasCameraHousing: geometry.hasCameraHousing,
+            expandedContentWidth: geometry.expandedContentWidth
+        )
         panel = ShelfPanel(
             contentRect: geometry.collapsedFrame,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -59,15 +62,6 @@ final class ShelfPanelController: NSObject {
             // Passive hover only reveals the shelf when there is something to
             // grab back out. An empty shelf is opened by a drag, not a hover.
             guard !store.items.isEmpty || !store.pendingTransfers.isEmpty else { return }
-            // Only expand when the pointer is inside the region the expanded
-            // shelf will actually cover. The collapsed catch zone is wider than
-            // the expanded frame (it has to be, to catch off-center *drag*
-            // paths), so a hover landing in the side band between the two would
-            // otherwise expand, immediately shrink the window out from under the
-            // stationary cursor (mouseExited → collapse → re-enter → …), and
-            // jitter. Drags are unaffected: they open via the drag path, not
-            // this hover, and keep the full wide catch zone.
-            guard self.geometry.expandedFrame.contains(NSEvent.mouseLocation) else { return }
             self.expand()
         }
         host.onPointerExited = { [weak self] in
@@ -182,9 +176,13 @@ final class ShelfPanelState: ObservableObject {
     // — never persisted; the ShelfItem stays valid throughout.
     @Published var draggingOutIDs: Set<UUID> = []
     let hasCameraHousing: Bool
+    // Width of the visible glass shelf, centered inside the wider (catch-zone
+    // width) window. See ShelfGeometry.expandedContentWidth.
+    let expandedContentWidth: CGFloat
 
-    init(hasCameraHousing: Bool) {
+    init(hasCameraHousing: Bool, expandedContentWidth: CGFloat) {
         self.hasCameraHousing = hasCameraHousing
+        self.expandedContentWidth = expandedContentWidth
     }
 }
 
