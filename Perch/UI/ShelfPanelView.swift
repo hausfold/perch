@@ -124,6 +124,9 @@ struct ShelfPanelView: View {
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.9))
             Spacer(minLength: 8)
+            if store.items.count > 1 {
+                dragAllHandle
+            }
             if !store.items.isEmpty {
                 ShelfHeaderButton(
                     title: "Clear",
@@ -139,6 +142,32 @@ struct ShelfPanelView: View {
                 action: onHide
             )
             .accessibilityHint("Dismisses the shelf until you move away and return")
+        }
+    }
+
+    // Grabs the whole shelf at once — the popular flow. Individual tiles drag
+    // only themselves; this stack handle is the "take everything" affordance,
+    // shown only when there is more than one item (with one, the tile is it).
+    private var dragAllHandle: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "square.stack.3d.up.fill")
+                .font(.footnote.weight(.semibold))
+            Text("Drag all \(store.items.count)")
+                .font(.callout.weight(.medium))
+        }
+        .foregroundStyle(.white.opacity(0.82))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(.white.opacity(0.08)))
+        .contentShape(Capsule())
+        .overlay {
+            FileDragSourceView(
+                urls: store.exportedURLs,
+                onExportStarted: { state.isDropActive = true },
+                onExportEnded: { state.isDropActive = false },
+                onSuccessfulExport: { store.completeExport() }
+            )
+            .accessibilityLabel("Drag all \(store.items.count) items")
         }
     }
 
@@ -176,12 +205,11 @@ struct ShelfPanelView: View {
                     FileTile(
                         item: item,
                         fileURL: item.fileURL(inside: store.repository.rootURL),
-                        allExportURLs: store.exportedURLs,
                         onReveal: { store.reveal(item) },
                         onRemove: { store.remove(item) },
                         onExportStarted: { state.isDropActive = true },
                         onExportEnded: { state.isDropActive = false },
-                        onSuccessfulExport: { store.completeExport() }
+                        onSuccessfulExport: { store.completeExport(of: item) }
                     )
                 }
                 ForEach(store.pendingTransfers) { transfer in
@@ -280,7 +308,6 @@ private struct ShelfHeaderButton: View {
 private struct FileTile: View {
     let item: ShelfItem
     let fileURL: URL?
-    let allExportURLs: [URL]
     let onReveal: () -> Void
     let onRemove: () -> Void
     let onExportStarted: () -> Void
@@ -303,12 +330,12 @@ private struct FileTile: View {
                 .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 16))
                 .overlay {
                     FileDragSourceView(
-                        urls: allExportURLs,
+                        urls: fileURL.map { [$0] } ?? [],
                         onExportStarted: onExportStarted,
                         onExportEnded: onExportEnded,
                         onSuccessfulExport: onSuccessfulExport
                     )
-                    .accessibilityLabel("Drag \(item.displayName) and all shelf items")
+                    .accessibilityLabel("Drag \(item.displayName)")
                 }
 
                 Button(action: onRemove) {
