@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import OSLog
+import UniformTypeIdentifiers
 
 @MainActor
 final class ShelfStore: ObservableObject {
@@ -13,6 +14,9 @@ final class ShelfStore: ObservableObject {
     private let pipeline: TransferPipeline
     private let settings: AppSettings
     private let logger = Logger(subsystem: "com.nebelhaus.perch", category: "Shelf")
+    // The live `qlmanage -p` preview, if any, so a new double-click can replace
+    // it instead of stacking another window on top.
+    private var quickLookProcess: Process?
 
     init(repository: StagingRepository, settings: AppSettings) {
         self.repository = repository
@@ -193,6 +197,75 @@ final class ShelfStore: ObservableObject {
     func reveal(_ item: ShelfItem) {
         guard let url = item.fileURL(inside: repository.rootURL) else { return }
         NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    /// Double-click behaviour: preview quick-lookable content (images) in the
+    /// slim Quick Look panel rather than launching a heavyweight viewer app;
+    /// hand everything else to its default app.
+    ///
+    /// Quick Look runs via `qlmanage -p` in its own process on purpose: the
+    /// shelf lives on a non-activating, non-key panel that deliberately never
+    /// steals focus, so the in-process `QLPreviewPanel` (which demands a key
+    /// window + responder-chain controller) can't be driven without breaking
+    /// that design. The out-of-process previewer sidesteps all of it.
+    func open(_ item: ShelfItem) {
+        guard let url = item.fileURL(inside: repository.rootURL) else { return }
+        if shouldQuickLook(item) {
+            quickLook(url)
+        } else {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func shouldQuickLook(_ item: ShelfItem) -> Bool {
+        if item.kind == .image { return true }
+        return item.contentType?.conforms(to: .image) ?? false
+    }
+
+    private func quickLook(_ url: URL) {
+        // Replace any preview already on screen. qlmanage lives only as long as
+        // its window, so terminating the last one stops double-clicks piling up
+        // a stack of Quick Look windows.
+        quickLookProcess?.terminate()
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/qlmanage")
+        process.arguments = ["-p", url.path]
+        // qlmanage is chatty on both streams; keep the shelf's console clean.
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            quickLookProcess = process
+            // Perch is an accessory app that never activates, so qlmanage's
+            // window opens behind whatever the user is focused on — looking
+            // like the double-click did nothing. Raise it by its pid once the
+            // window exists.
+            raiseQuickLookWindow(pid: process.processIdentifier)
+        } catch {
+            // If Quick Look can't launch, fall back to the default app so a
+            // double-click never silently does nothing.
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Bring the just-launched qlmanage preview to the front. The window is not
+    /// up the instant the process starts, so poll briefly for it to register as
+    /// a running app, then nudge it forward a couple of times to beat layout.
+    private func raiseQuickLookWindow(pid: pid_t, attempt: Int = 0) {
+        guard attempt < 15 else { return }
+        if let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated {
+            app.activate(options: [.activateAllWindows])
+            if attempt < 3 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+                    self?.raiseQuickLookWindow(pid: pid, attempt: attempt + 1)
+                }
+            }
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            self?.raiseQuickLookWindow(pid: pid, attempt: attempt + 1)
+        }
     }
 
     private func updateTransfer(_ id: UUID, phase: PendingTransfer.Phase) {
