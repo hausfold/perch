@@ -81,10 +81,17 @@ commit path.
 
 ### Copy versus move
 
-Imports copy; exports advertise `.copy`; successful export can optionally clear
-the staged copies. True move-original semantics are not inferred from modifier
-keys. If added later, it belongs in a new `ExportTransaction` boundary that
-records destination completion before deleting a source.
+Imports copy; exports advertise `.copy`. Dragging an item (or the whole stack)
+out removes it from the shelf, but only once the destination confirms it holds
+its own copy: exports are vended as **file promises** (`NSFilePromiseProvider`),
+so the receiver asks Perch to write the file into the location it chose, and the
+promise's completion handler is what records destination completion before the
+staged source is deleted. This is the `ExportTransaction` boundary — deleting on
+the raw drag-end instead raced the receiver's in-flight copy (Finder error
+-8058) and could drop the item even when its copy failed. A failed or refused
+drop keeps the item. The promise copy runs on a background queue, never main.
+
+True move-original semantics are still not inferred from modifier keys.
 
 ## Planned extensions that fit existing seams
 
@@ -92,5 +99,5 @@ records destination completion before deleting a source.
 - Byte progress: transfer event stream updating `PendingTransfer`.
 - Multiple named shelves: replace `ActiveShelf` with repository IDs.
 - Expiration while running: scheduler calling the existing prune operation.
-- Explicit move workflow: transactional exporter, never a change to importing.
+- Explicit move workflow: extend the promise `ExportTransaction`, never a change to importing.
 - Finder actions and share actions: commands over completed staged URLs.

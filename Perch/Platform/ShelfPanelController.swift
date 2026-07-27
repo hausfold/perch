@@ -166,6 +166,12 @@ final class ShelfPanelState: ObservableObject {
     // could be in progress. The collapsed catch zone only renders its (faint,
     // hit-testable) fill while armed, so an idle shelf is fully transparent.
     @Published var isArmed = false
+    // IDs of items currently being dragged out. Such a tile collapses to zero
+    // width (neighbours slide in) but stays mounted so its drag source lives to
+    // deliver the drop result: a successful copy removes the item for real, a
+    // cancel/drop-back-on-shelf springs it back. Purely ephemeral drag UI state
+    // — never persisted; the ShelfItem stays valid throughout.
+    @Published var draggingOutIDs: Set<UUID> = []
     let hasCameraHousing: Bool
 
     init(hasCameraHousing: Bool) {

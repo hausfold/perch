@@ -7,7 +7,6 @@ struct SettingsView: View {
         Form {
             Section("Shelf") {
                 Toggle("Show a drop target on every display", isOn: $settings.showOnAllDisplays)
-                Toggle("Remove staged copies after a successful drag", isOn: $settings.autoRemoveAfterExport)
                 Stepper(
                     "Discard items older than \(settings.retentionDays) day\(settings.retentionDays == 1 ? "" : "s")",
                     value: $settings.retentionDays,
@@ -31,7 +30,7 @@ struct SettingsView: View {
             }
 
             Section {
-                Text("Perch always stages a private copy and only offers copy operations when dragging out. Your original files are never moved or deleted.")
+                Text("Perch always stages a private copy and only offers copy operations when dragging out. Dragging an item out removes it from the shelf; your original files are never moved or deleted.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
