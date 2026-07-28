@@ -59,3 +59,29 @@ Perch requests **no** Accessibility, Input Monitoring, or Screen Recording
 permission, and has no Dock icon. It sees only what you drop on it.
 
 There is no telemetry. Nothing about your files is written to a log.
+
+## The one system setting perch needs
+
+Turn **off** System Settings ▸ Desktop & Dock ▸ *"Drag windows to top of screen
+to enter Mission Control"*, or equivalently:
+
+```sh
+defaults write com.apple.dock enterMissionControlByTopWindowDrag -bool false
+killall Dock
+```
+
+The Dock arms that top-screen-edge trigger for the whole duration of *any* drag
+session — files included, despite the key's name — and the band it watches is
+exactly where the notch catch zone lives. Overshoot the notch by a few points
+and the Dock takes the drag into Mission Control before perch ever sees a
+`draggingEntered:`.
+
+Perch cannot defend against this from inside the app. The Dock's edge monitor
+runs above every window level, so no panel can shadow it, and intercepting the
+drag would require a `CGEventTap` — an Accessibility grant perch deliberately
+refuses to ask for (see Permissions above). A system toggle is the honest fix,
+and it is reversible in the same place.
+
+The [nebelhaus](https://github.com/nebelhaus/nebelhaus) rice sets this for you
+whenever `nebelhaus.perch.enable` is on. Standalone cask installs should flip it
+by hand, once.
