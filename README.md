@@ -51,6 +51,12 @@ Gatekeeper prompt, no quarantine hack.
 Perch installs by default in the [nebelhaus](https://github.com/nebelhaus) rice,
 but it stands alone — the cask works on any Mac running macOS 14 or newer.
 
+Then turn **off** System Settings ▸ Desktop & Dock ▸ *"Drag windows to top of
+screen to enter Mission Control"*. macOS arms that top-edge trigger for the whole
+of any drag — files included — and it fires over the same band the notch shelf
+lives in, so without this the Dock steals the drop. The rice flips it for you;
+standalone installs do it once, by hand. ([why](docs/reference.md#the-one-system-setting-perch-needs))
+
 ## what it does
 
 - **a target that finds the notch** — the drop zone hugs the physical camera housing when a display has one, and falls back to a tidy top-center tray on notchless screens.

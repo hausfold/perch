@@ -69,9 +69,11 @@ struct ShelfGeometry: Equatable, Sendable {
             // off-center drag paths (the empty middle of the menu bar, clear of
             // the app menus at far-left and status items at far-right). Height
             // stays close to the menu-bar band so it catches a dragged file a
-            // touch below the very top edge — before macOS's edge-drag gesture
-            // (Mission Control / Spaces) fires — without eating clicks on app
-            // content further down.
+            // touch below the very top edge, without eating clicks on app
+            // content further down. Sizing alone cannot dodge the Dock's
+            // top-edge Mission Control trigger — that monitor runs above every
+            // window level, so it wins wherever the panel ends. Disabling it is
+            // a system setting; see docs/reference.md.
             collapsedWidth = max(360, min(screen.frame.width * 0.42, 640))
             collapsedHeight = screen.safeAreaTop + 34
         } else {
