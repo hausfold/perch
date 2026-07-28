@@ -194,7 +194,7 @@ final class ShelfPanelState: ObservableObject {
 
     /// Called with the items a drag left unaccounted for: nothing engaged their
     /// promise and nothing reported, so a destination read the staged file URL
-    /// directly. They leave the shelf like any other drag-out.
+    /// directly. They are already off the shelf; this settles their bytes.
     var onExportHandOff: ((Set<UUID>) -> Void)?
 
     init(hasCameraHousing: Bool, expandedContentWidth: CGFloat) {
@@ -203,7 +203,9 @@ final class ShelfPanelState: ObservableObject {
     }
 
     /// A drag ended on a `.copy`: give the destination a moment to engage the
-    /// promise, then hand off whatever it never asked for.
+    /// promise, then hand off whatever it never asked for. Invisible either way
+    /// — the items are lifted the instant the drop is accepted; this only
+    /// decides whether their staged bytes are deleted or detached.
     ///
     /// The timer lives here rather than on the drag source because the panel
     /// hides as the drag leaves the notch, tearing that view (and any timer it

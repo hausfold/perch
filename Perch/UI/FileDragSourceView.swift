@@ -10,12 +10,14 @@ import UniformTypeIdentifiers
 /// as "unexpected error -8058" and losing the item anyway. A promise inverts
 /// this: the destination asks *us* to write the file into its chosen location,
 /// and its completion handler tells us when — and whether — that copy finished.
-/// Only a confirmed copy removes the item; a failed or cancelled drop keeps it.
+/// The item leaves the shelf as soon as a destination accepts the drop, but its
+/// staged bytes only go once that copy is confirmed; a failed or cancelled drop
+/// puts the item back.
 ///
 /// The staged URL rides along on the same pasteboard (see
 /// `ExportPromiseProvider`) so receivers that don't speak promises can still
-/// take the drop. Those never report anything, so the shelf hands the item off
-/// on a timer instead — see `ShelfStore.handOff`.
+/// take the drop. Those never report anything, so their bytes are handed off on
+/// a timer instead — see `ShelfStore.handOff`.
 struct ExportItem: Identifiable, Equatable {
     let id: UUID
     /// The staged source copy to read from.
@@ -59,6 +61,11 @@ final class ExportPromiseProvider: NSFilePromiseProvider {
 
 /// What became of one item in a drag-out.
 enum ExportOutcome {
+    /// A destination took the drop. Nothing has read the file yet, but the
+    /// shelf lifts the item straight away — letting go is the gesture, and
+    /// waiting on the receiver to say so makes the shelf feel stuck. A `failed`
+    /// verdict below puts it back.
+    case accepted
     /// The destination asked us to fulfil its promise — the copy is underway.
     /// Only a receiver that speaks promises ever gets here, and its verdict
     /// (`copied` / `failed`) always follows, however long the copy takes.
@@ -150,17 +157,22 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
     ) {
         startedSession = false
         onExportEnded?()
-        // No copy will occur — cancel, Escape, an invalid target, or a drop
-        // straight back onto the shelf (refused by the own-export guard). Tell
-        // the shelf every promised item failed so a collapsed tile springs back.
+        // Reported inline rather than through `report`: this is the last moment
+        // the drag source is guaranteed to be alive — the panel hides as the
+        // drag leaves the notch and tears this view down — so nothing here may
+        // wait on a hop back to the main actor.
         //
-        // On a real .copy, don't pre-empt: a promise-aware receiver reports for
-        // itself below, and a receiver that took the plain file URL instead
-        // reports nothing at all — the shelf's grace timer hands those items off.
-        // See ShelfPanelState.startExportGrace.
-        guard !operation.contains(.copy) else { return }
+        // A .copy was taken by somebody: lift every item now. Which kind of
+        // receiver took it decides only what happens to the staged bytes, and
+        // that is settled later — by the promise reporting below, or by the
+        // shelf's grace timer (see ShelfPanelState.startExportGrace).
+        //
+        // Anything else means no copy will occur — cancel, Escape, an invalid
+        // target, or a drop straight back onto the shelf (refused by the
+        // own-export guard) — so the collapsed tiles spring back.
+        let outcome: ExportOutcome = operation.contains(.copy) ? .accepted : .failed
         for export in items {
-            report(export.id, .failed)
+            onItemExportFinished?(export.id, outcome)
         }
     }
 

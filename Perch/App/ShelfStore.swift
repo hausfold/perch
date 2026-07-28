@@ -17,6 +17,10 @@ final class ShelfStore: ObservableObject {
     // The live `qlmanage -p` preview, if any, so a new double-click can replace
     // it instead of stacking another window on top.
     private var quickLookProcess: Process?
+    // Items taken off the shelf by an accepted drop but not yet accounted for,
+    // with the slot each came from so a refused one lands back in place. Their
+    // staged bytes are still on disk — see `liftForExport`.
+    private var lifted: [UUID: (item: ShelfItem, index: Int)] = [:]
 
     init(repository: StagingRepository, settings: AppSettings) {
         self.repository = repository
@@ -171,22 +175,66 @@ final class ShelfStore: ObservableObject {
         }
     }
 
-    /// Drag-out to a destination that took the staged file URL directly instead
-    /// of asking for the promise — every terminal, most editors. Nothing ever
-    /// reports back, so the items leave the shelf on the drag's own terms, but
-    /// their bytes are only detached, not deleted: whatever received the drop is
-    /// still holding a path into them. See `StagingRepository.detach`.
-    func handOff(_ ids: Set<UUID>) {
-        let leaving = items.filter { ids.contains($0.id) }
-        guard !leaving.isEmpty else { return }
+    /// A drop was accepted: take the items off the shelf now, before anything
+    /// has read them.
+    ///
+    /// Letting go *is* the gesture — a shelf that keeps counting an item until
+    /// its receiver reports back reads as stuck, and the receiver may never
+    /// report at all. The staged bytes are untouched, so the destination can
+    /// still read them and `returnToShelf` can put a refused item back exactly where
+    /// it was. What finally happens to those bytes is settled by `confirmCopied`
+    /// (deleted) or `handOff` (detached).
+    func liftForExport(_ ids: Set<UUID>) {
+        for id in ids {
+            guard let index = items.firstIndex(where: { $0.id == id }) else { continue }
+            lifted[id] = (items[index], index)
+        }
+        items.removeAll { ids.contains($0.id) }
+        // The manifest drops them too: if Perch dies mid-export the bytes are
+        // still on disk and recovery re-adopts them — nothing is ever lost by
+        // lifting optimistically.
         do {
-            for item in leaving {
-                try repository.detach(item)
-            }
-            items.removeAll { ids.contains($0.id) }
             try repository.persist(items)
         } catch {
             report(error)
+        }
+    }
+
+    /// The destination refused the item or its copy failed — put it back where
+    /// it was. Never removes anything: that was the -8058 data-loss bug.
+    func returnToShelf(_ id: UUID) {
+        guard let entry = lifted.removeValue(forKey: id) else { return }
+        items.insert(entry.item, at: min(entry.index, items.count))
+        do {
+            try repository.persist(items)
+        } catch {
+            report(error)
+        }
+    }
+
+    /// The destination confirmed it holds its own copy — the staged one can go.
+    func confirmCopied(_ id: UUID) {
+        guard let entry = lifted.removeValue(forKey: id) else { return }
+        do {
+            try repository.remove(entry.item)
+        } catch {
+            report(error)
+        }
+    }
+
+    /// Drag-out to a destination that took the staged file URL directly instead
+    /// of asking for the promise — every terminal, most editors. Nothing ever
+    /// reports back, so nothing will ever confirm the copy: the bytes are
+    /// detached rather than deleted, because whatever received the drop is still
+    /// holding a path into them. See `StagingRepository.detach`.
+    func handOff(_ ids: Set<UUID>) {
+        for id in ids {
+            guard let entry = lifted.removeValue(forKey: id) else { continue }
+            do {
+                try repository.detach(entry.item)
+            } catch {
+                report(error)
+            }
         }
     }
 

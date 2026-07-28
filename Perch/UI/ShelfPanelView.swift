@@ -195,21 +195,24 @@ struct ShelfPanelView: View {
         return ExportItem(id: item.id, url: url, fileType: fileType, fileName: item.displayName)
     }
 
-    /// One dragged-out item's export progressed. A confirmed copy removes it for
-    /// real (it is already collapsed, so no second snap); a failure springs the
-    /// tile back — never remove an item whose drop failed, that was the -8058
-    /// data-loss bug. Items whose destination never engaged the promise at all
-    /// are handed off by the grace timer instead, not here.
+    /// One dragged-out item's export progressed. The item leaves the shelf the
+    /// moment a destination accepts it and only comes back if that destination
+    /// then refuses it — never the other way round, which was the -8058
+    /// data-loss bug. What becomes of the staged bytes is settled last: deleted
+    /// on a confirmed copy, detached by the grace timer for a destination that
+    /// took the plain file URL and reports nothing.
     private func finishExport(_ id: UUID, outcome: ExportOutcome) {
         switch outcome {
+        case .accepted:
+            store.liftForExport([id])
         case .promiseStarted:
             state.markPromiseEngaged(id)
         case .failed:
             state.finishExport(of: id)
+            store.returnToShelf(id)
         case .copied:
             state.finishExport(of: id)
-            guard let item = store.items.first(where: { $0.id == id }) else { return }
-            store.remove(item)
+            store.confirmCopied(id)
         }
     }
 
