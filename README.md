@@ -28,6 +28,8 @@ motion.
 No Dock icon. No Accessibility, Input Monitoring, or Screen Recording
 permission. It only ever sees what you choose to drop on it.
 
+📖 **[nebelhaus.com/perch](https://nebelhaus.com/perch)**
+
 ## why perch
 
 Shelf apps aren't new — Yoink, Dropover, and friends have carried the idea for
@@ -64,9 +66,9 @@ but it stands alone — the cask works on any Mac running macOS 14 or newer.
 
 ## more
 
+- [nebelhaus.com/perch](https://nebelhaus.com/perch) — the product page
 - [Reference](docs/reference.md) — building, where your staged files live, and the v1 product boundary
-- [Product requirements](PRD.md) · [Architecture](ARCHITECTURE.md)
-- [Architecture decisions](docs/architecture-decisions/)
+- [Architecture](ARCHITECTURE.md) · [Architecture decisions](docs/architecture-decisions/)
 
 ## the family
 
