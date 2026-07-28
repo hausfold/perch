@@ -11,6 +11,10 @@ import UniformTypeIdentifiers
 /// this: the destination asks *us* to write the file into its chosen location,
 /// and its completion handler tells us when — and whether — that copy finished.
 /// Only a confirmed copy removes the item; a failed or cancelled drop keeps it.
+///
+/// The staged URL rides along on the same pasteboard (see
+/// `ExportPromiseProvider`) so receivers that don't speak promises can still
+/// take the drop; those keep the item, since nothing confirms they're done.
 struct ExportItem: Identifiable, Equatable {
     let id: UUID
     /// The staged source copy to read from.
@@ -19,6 +23,37 @@ struct ExportItem: Identifiable, Equatable {
     let fileType: String
     /// Name written at the destination.
     let fileName: String
+}
+
+/// A file promise that *also* advertises the staged file URL.
+///
+/// A bare `NSFilePromiseProvider` only ever puts promise types on the drag
+/// pasteboard, and a receiver that never learned to consume promises — every
+/// terminal (Ghostty, Terminal.app), most text editors, browser file inputs —
+/// then sees nothing it can take, so the drag reads as un-droppable and the
+/// cursor never shows a drop hint. Appending `public.file-url` (after the
+/// promise types, so promise-aware receivers still prefer the promise) makes
+/// those receivers accept the drag and paste/read the staged path.
+final class ExportPromiseProvider: NSFilePromiseProvider {
+    override func writableTypes(for pasteboard: NSPasteboard) -> [NSPasteboard.PasteboardType] {
+        super.writableTypes(for: pasteboard) + [.fileURL]
+    }
+
+    override func writingOptions(
+        forType type: NSPasteboard.PasteboardType,
+        pasteboard: NSPasteboard
+    ) -> NSPasteboard.WritingOptions {
+        // The URL is known up front — write it eagerly. Only the promise types
+        // are lazily fulfilled.
+        type == .fileURL ? [] : super.writingOptions(forType: type, pasteboard: pasteboard)
+    }
+
+    override func pasteboardPropertyList(forType type: NSPasteboard.PasteboardType) -> Any? {
+        guard type == .fileURL, let export = userInfo as? ExportItem else {
+            return super.pasteboardPropertyList(forType: type)
+        }
+        return (export.url as NSURL).pasteboardPropertyList(forType: .fileURL)
+    }
 }
 
 struct FileDragSourceView: NSViewRepresentable {
@@ -54,6 +89,16 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
     var onOpen: (() -> Void)?
 
     private var startedSession = false
+    /// Items whose export verdict has already been delivered this session.
+    private var reportedIDs: Set<UUID> = []
+    /// Bumped per drag so a late fallback can tell it belongs to a session that
+    /// has since been replaced by a new drag.
+    private var sessionToken = 0
+
+    /// How long a `.copy` drop is given to fulfil its promise before the shelf
+    /// assumes the receiver took the plain file URL instead and springs the
+    /// tiles back.
+    private static let promiseGrace = Duration.seconds(2)
 
     override func mouseDown(with event: NSEvent) {
         startedSession = false
@@ -70,10 +115,12 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
     override func mouseDragged(with event: NSEvent) {
         guard !startedSession, !items.isEmpty else { return }
         startedSession = true
+        reportedIDs = []
+        sessionToken += 1
         onExportStarted?()
 
         let draggingItems = items.enumerated().map { index, export -> NSDraggingItem in
-            let provider = NSFilePromiseProvider(fileType: export.fileType, delegate: self)
+            let provider = ExportPromiseProvider(fileType: export.fileType, delegate: self)
             provider.userInfo = export
             let dragItem = NSDraggingItem(pasteboardWriter: provider)
             let icon = NSWorkspace.shared.icon(forFile: export.url.path)
@@ -109,9 +156,25 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
         // the shelf every promised item finished *without* export so a collapsed
         // tile springs back. On a real .copy the per-item promise completions
         // below deliver the verdict instead; don't pre-empt them here.
-        guard !operation.contains(.copy) else { return }
-        for export in items {
-            onItemExportFinished?(export.id, false)
+        guard operation.contains(.copy) else {
+            for export in items {
+                report(export.id, exported: false)
+            }
+            return
+        }
+        // A .copy that never fulfils a promise means the receiver read the plain
+        // file URL instead (a terminal pasting the path, an editor opening it).
+        // Nothing tells us it finished, and we must not delete a staged file
+        // something may still be pointing at — so after a grace period, spring
+        // the untouched tiles back and keep the items.
+        let token = sessionToken
+        let pending = items.map(\.id)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.promiseGrace)
+            guard let self, self.sessionToken == token else { return }
+            for id in pending {
+                self.report(id, exported: false)
+            }
         }
     }
 
@@ -157,8 +220,19 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
 
     private nonisolated func report(_ id: UUID, exported: Bool) {
         Task { @MainActor [weak self] in
-            self?.onItemExportFinished?(id, exported)
+            self?.deliver(id, exported: exported)
         }
+    }
+
+    /// The promise completion and the no-promise fallback can both fire for the
+    /// same item — a promise copy slower than the grace period springs its tile
+    /// back first and only then confirms. A confirmed export always gets
+    /// through; a "not exported" verdict only counts if nothing was reported
+    /// yet, so it can never cancel a real copy.
+    private func deliver(_ id: UUID, exported: Bool) {
+        let isFirst = reportedIDs.insert(id).inserted
+        guard exported || isFirst else { return }
+        onItemExportFinished?(id, exported)
     }
 
     override func resetCursorRects() {

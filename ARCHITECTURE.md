@@ -91,6 +91,14 @@ the raw drag-end instead raced the receiver's in-flight copy (Finder error
 -8058) and could drop the item even when its copy failed. A failed or refused
 drop keeps the item. The promise copy runs on a background queue, never main.
 
+The same pasteboard item also carries the staged `public.file-url`, after the
+promise types. Promise-blind receivers — terminals, most editors — otherwise see
+a drag with nothing they can take and refuse it outright (no drop cursor at
+all). They read the URL directly, which means nothing ever reports completion,
+so a `.copy` that fulfils no promise within a short grace period is treated as
+*not* exported: the tiles spring back and the items — and the staged files their
+paths point at — stay.
+
 True move-original semantics are still not inferred from modifier keys.
 
 ## Planned extensions that fit existing seams
