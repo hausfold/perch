@@ -82,14 +82,30 @@ commit path.
 ### Copy versus move
 
 Imports copy; exports advertise `.copy`. Dragging an item (or the whole stack)
-out removes it from the shelf, but only once the destination confirms it holds
-its own copy: exports are vended as **file promises** (`NSFilePromiseProvider`),
-so the receiver asks Perch to write the file into the location it chose, and the
-promise's completion handler is what records destination completion before the
-staged source is deleted. This is the `ExportTransaction` boundary — deleting on
-the raw drag-end instead raced the receiver's in-flight copy (Finder error
--8058) and could drop the item even when its copy failed. A failed or refused
-drop keeps the item. The promise copy runs on a background queue, never main.
+out removes it from the shelf the moment a destination accepts the drop —
+letting go is the gesture, and a shelf still counting the item reads as stuck.
+The item is *lifted*, not deleted: its staged bytes stay put, and a destination
+that then refuses it or fails its copy puts the item back in its old slot.
+
+Deleting those bytes is a separate step, and waits for the destination to
+confirm it holds its own copy: exports are vended as **file promises**
+(`NSFilePromiseProvider`), so the receiver asks Perch to write the file into the
+location it chose, and the promise's completion handler is what records
+destination completion before the staged source is deleted. This is the
+`ExportTransaction` boundary — deleting on the raw drag-end instead raced the
+receiver's in-flight copy (Finder error -8058) and could drop the item even when
+its copy failed. The promise copy runs on a background queue, never main.
+
+The same pasteboard item also carries the staged `public.file-url`, after the
+promise types. Promise-blind receivers — terminals, most editors — otherwise see
+a drag with nothing they can take and refuse it outright (no drop cursor at
+all). They read the URL directly and report nothing, so a `.copy` where no
+destination engaged the promise within a short grace period is a **hand-off**:
+the item is already off the shelf, and its container is *detached* rather than
+deleted — the receiver is holding a path into it. A detached container is never
+re-adopted as an item and is swept once its grace (10 minutes, so a pasted path
+stays live) has passed and a launch scans the root. Engaging the promise cancels the hand-off for that item, however long its
+copy runs, so a slow copy is never raced.
 
 True move-original semantics are still not inferred from modifier keys.
 

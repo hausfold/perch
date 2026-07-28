@@ -35,6 +35,13 @@ final class ShelfPanelController: NSObject {
         )
         super.init()
 
+        // Fires after the drag view — and often this panel's hosting view with
+        // it — is gone, so the store is reached from here rather than from the
+        // SwiftUI closures.
+        viewState.onExportHandOff = { [weak store] ids in
+            store?.handOff(ids)
+        }
+
         let rootView = ShelfPanelView(
             store: store,
             settings: settings,
@@ -180,9 +187,62 @@ final class ShelfPanelState: ObservableObject {
     // width) window. See ShelfGeometry.expandedContentWidth.
     let expandedContentWidth: CGFloat
 
+    // Items whose destination engaged the file promise. Their verdict is coming
+    // however long the copy takes, so the grace timer must not touch them.
+    private var promiseEngagedIDs: Set<UUID> = []
+    private var exportGraceTask: Task<Void, Never>?
+
+    /// Called with the items a drag left unaccounted for: nothing engaged their
+    /// promise and nothing reported, so a destination read the staged file URL
+    /// directly. They are already off the shelf; this settles their bytes.
+    var onExportHandOff: ((Set<UUID>) -> Void)?
+
     init(hasCameraHousing: Bool, expandedContentWidth: CGFloat) {
         self.hasCameraHousing = hasCameraHousing
         self.expandedContentWidth = expandedContentWidth
+    }
+
+    /// A drag ended on a `.copy`: give the destination a moment to engage the
+    /// promise, then hand off whatever it never asked for. Invisible either way
+    /// — the items are lifted the instant the drop is accepted; this only
+    /// decides whether their staged bytes are deleted or detached.
+    ///
+    /// The timer lives here rather than on the drag source because the panel
+    /// hides as the drag leaves the notch, tearing that view (and any timer it
+    /// held) down mid-flight; this state object outlives it.
+    @MainActor
+    func startExportGrace(after grace: Duration = .seconds(1)) {
+        exportGraceTask?.cancel()
+        exportGraceTask = Task { [weak self] in
+            try? await Task.sleep(for: grace)
+            guard !Task.isCancelled, let self else { return }
+            let unaccounted = self.draggingOutIDs.subtracting(self.promiseEngagedIDs)
+            guard !unaccounted.isEmpty else { return }
+            self.draggingOutIDs.subtract(unaccounted)
+            self.onExportHandOff?(unaccounted)
+        }
+    }
+
+    /// A new drag started — its tiles stay collapsed until this drag resolves.
+    @MainActor
+    func beginExport(of ids: Set<UUID>) {
+        exportGraceTask?.cancel()
+        exportGraceTask = nil
+        promiseEngagedIDs.subtract(ids)
+        draggingOutIDs.formUnion(ids)
+    }
+
+    @MainActor
+    func markPromiseEngaged(_ id: UUID) {
+        promiseEngagedIDs.insert(id)
+    }
+
+    /// A drag-out resolved for one item, either way — it is no longer collapsed
+    /// and no longer waiting on a promise.
+    @MainActor
+    func finishExport(of id: UUID) {
+        promiseEngagedIDs.remove(id)
+        draggingOutIDs.remove(id)
     }
 }
 

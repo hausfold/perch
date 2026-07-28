@@ -10,7 +10,14 @@ import UniformTypeIdentifiers
 /// as "unexpected error -8058" and losing the item anyway. A promise inverts
 /// this: the destination asks *us* to write the file into its chosen location,
 /// and its completion handler tells us when — and whether — that copy finished.
-/// Only a confirmed copy removes the item; a failed or cancelled drop keeps it.
+/// The item leaves the shelf as soon as a destination accepts the drop, but its
+/// staged bytes only go once that copy is confirmed; a failed or cancelled drop
+/// puts the item back.
+///
+/// The staged URL rides along on the same pasteboard (see
+/// `ExportPromiseProvider`) so receivers that don't speak promises can still
+/// take the drop. Those never report anything, so their bytes are handed off on
+/// a timer instead — see `ShelfStore.handOff`.
 struct ExportItem: Identifiable, Equatable {
     let id: UUID
     /// The staged source copy to read from.
@@ -21,14 +28,60 @@ struct ExportItem: Identifiable, Equatable {
     let fileName: String
 }
 
+/// A file promise that *also* advertises the staged file URL.
+///
+/// A bare `NSFilePromiseProvider` only ever puts promise types on the drag
+/// pasteboard, and a receiver that never learned to consume promises — every
+/// terminal (Ghostty, Terminal.app), most text editors, browser file inputs —
+/// then sees nothing it can take, so the drag reads as un-droppable and the
+/// cursor never shows a drop hint. Appending `public.file-url` (after the
+/// promise types, so promise-aware receivers still prefer the promise) makes
+/// those receivers accept the drag and paste/read the staged path.
+final class ExportPromiseProvider: NSFilePromiseProvider {
+    override func writableTypes(for pasteboard: NSPasteboard) -> [NSPasteboard.PasteboardType] {
+        super.writableTypes(for: pasteboard) + [.fileURL]
+    }
+
+    override func writingOptions(
+        forType type: NSPasteboard.PasteboardType,
+        pasteboard: NSPasteboard
+    ) -> NSPasteboard.WritingOptions {
+        // The URL is known up front — write it eagerly. Only the promise types
+        // are lazily fulfilled.
+        type == .fileURL ? [] : super.writingOptions(forType: type, pasteboard: pasteboard)
+    }
+
+    override func pasteboardPropertyList(forType type: NSPasteboard.PasteboardType) -> Any? {
+        guard type == .fileURL, let export = userInfo as? ExportItem else {
+            return super.pasteboardPropertyList(forType: type)
+        }
+        return (export.url as NSURL).pasteboardPropertyList(forType: .fileURL)
+    }
+}
+
+/// What became of one item in a drag-out.
+enum ExportOutcome {
+    /// A destination took the drop. Nothing has read the file yet, but the
+    /// shelf lifts the item straight away — letting go is the gesture, and
+    /// waiting on the receiver to say so makes the shelf feel stuck. A `failed`
+    /// verdict below puts it back.
+    case accepted
+    /// The destination asked us to fulfil its promise — the copy is underway.
+    /// Only a receiver that speaks promises ever gets here, and its verdict
+    /// (`copied` / `failed`) always follows, however long the copy takes.
+    case promiseStarted
+    /// The destination holds its own copy. The staged one may go.
+    case copied
+    /// Cancelled, refused, or the copy failed. The item stays on the shelf.
+    case failed
+}
+
 struct FileDragSourceView: NSViewRepresentable {
     let items: [ExportItem]
     let onExportStarted: () -> Void
     let onExportEnded: () -> Void
-    /// Fired on the main actor once a single item's destination copy concludes:
-    /// `true` — the receiver has its own copy, the shelf may delete the staged
-    /// one; `false` — cancelled / refused / failed, keep the item.
-    let onItemExportFinished: (UUID, Bool) -> Void
+    /// Fired on the main actor as a single item's export progresses.
+    let onItemExportFinished: (UUID, ExportOutcome) -> Void
     // Double-click to open. Optional: the drag-all stack handle reuses this
     // view purely to export, and has nothing single to open.
     var onOpen: (() -> Void)?
@@ -50,7 +103,7 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
     var items: [ExportItem] = []
     var onExportStarted: (() -> Void)?
     var onExportEnded: (() -> Void)?
-    var onItemExportFinished: ((UUID, Bool) -> Void)?
+    var onItemExportFinished: ((UUID, ExportOutcome) -> Void)?
     var onOpen: (() -> Void)?
 
     private var startedSession = false
@@ -73,7 +126,7 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
         onExportStarted?()
 
         let draggingItems = items.enumerated().map { index, export -> NSDraggingItem in
-            let provider = NSFilePromiseProvider(fileType: export.fileType, delegate: self)
+            let provider = ExportPromiseProvider(fileType: export.fileType, delegate: self)
             provider.userInfo = export
             let dragItem = NSDraggingItem(pasteboardWriter: provider)
             let icon = NSWorkspace.shared.icon(forFile: export.url.path)
@@ -104,14 +157,22 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
     ) {
         startedSession = false
         onExportEnded?()
-        // No copy will occur — cancel, Escape, an invalid target, or a drop
-        // straight back onto the shelf (refused by the own-export guard). Tell
-        // the shelf every promised item finished *without* export so a collapsed
-        // tile springs back. On a real .copy the per-item promise completions
-        // below deliver the verdict instead; don't pre-empt them here.
-        guard !operation.contains(.copy) else { return }
+        // Reported inline rather than through `report`: this is the last moment
+        // the drag source is guaranteed to be alive — the panel hides as the
+        // drag leaves the notch and tears this view down — so nothing here may
+        // wait on a hop back to the main actor.
+        //
+        // A .copy was taken by somebody: lift every item now. Which kind of
+        // receiver took it decides only what happens to the staged bytes, and
+        // that is settled later — by the promise reporting below, or by the
+        // shelf's grace timer (see ShelfPanelState.startExportGrace).
+        //
+        // Anything else means no copy will occur — cancel, Escape, an invalid
+        // target, or a drop straight back onto the shelf (refused by the
+        // own-export guard) — so the collapsed tiles spring back.
+        let outcome: ExportOutcome = operation.contains(.copy) ? .accepted : .failed
         for export in items {
-            onItemExportFinished?(export.id, false)
+            onItemExportFinished?(export.id, outcome)
         }
     }
 
@@ -145,19 +206,23 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
             completionHandler(CocoaError(.fileNoSuchFile))
             return
         }
+        // Tell the shelf a promise-aware receiver has engaged before the copy
+        // starts: that item now waits for the verdict below however long the
+        // copy runs, instead of being handed off as a plain-URL drop.
+        report(export.id, .promiseStarted)
         do {
             try FileManager.default.copyItem(at: export.url, to: url)
             completionHandler(nil)
-            report(export.id, exported: true)
+            report(export.id, .copied)
         } catch {
             completionHandler(error)
-            report(export.id, exported: false)
+            report(export.id, .failed)
         }
     }
 
-    private nonisolated func report(_ id: UUID, exported: Bool) {
+    private nonisolated func report(_ id: UUID, _ outcome: ExportOutcome) {
         Task { @MainActor [weak self] in
-            self?.onItemExportFinished?(id, exported)
+            self?.onItemExportFinished?(id, outcome)
         }
     }
 
