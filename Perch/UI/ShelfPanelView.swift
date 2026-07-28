@@ -172,11 +172,14 @@ struct ShelfPanelView: View {
                 onExportStarted: {
                     state.isDropActive = true
                     // Collapse every tile at once; the strip empties as the
-                    // stack lifts off. Each item is removed for real only as its
-                    // own copy lands; anything not exported springs back.
-                    state.draggingOutIDs = Set(store.items.map(\.id))
+                    // stack lifts off. Each item leaves for real only once its
+                    // destination is accounted for; a refused drop springs back.
+                    state.beginExport(of: Set(store.items.map(\.id)))
                 },
-                onExportEnded: { state.isDropActive = false },
+                onExportEnded: {
+                    state.isDropActive = false
+                    state.startExportGrace()
+                },
                 onItemExportFinished: finishExport
             )
             .accessibilityLabel("Drag all \(store.items.count) items")
@@ -192,14 +195,22 @@ struct ShelfPanelView: View {
         return ExportItem(id: item.id, url: url, fileType: fileType, fileName: item.displayName)
     }
 
-    /// One dragged-out item's copy concluded: a confirmed copy removes it for
-    /// real (it is already collapsed, so no second snap); otherwise the tile
-    /// springs back. Never removes an item whose drop failed — that was the
-    /// -8058 data-loss bug.
-    private func finishExport(_ id: UUID, exported: Bool) {
-        state.draggingOutIDs.remove(id)
-        guard exported, let item = store.items.first(where: { $0.id == id }) else { return }
-        store.remove(item)
+    /// One dragged-out item's export progressed. A confirmed copy removes it for
+    /// real (it is already collapsed, so no second snap); a failure springs the
+    /// tile back — never remove an item whose drop failed, that was the -8058
+    /// data-loss bug. Items whose destination never engaged the promise at all
+    /// are handed off by the grace timer instead, not here.
+    private func finishExport(_ id: UUID, outcome: ExportOutcome) {
+        switch outcome {
+        case .promiseStarted:
+            state.markPromiseEngaged(id)
+        case .failed:
+            state.finishExport(of: id)
+        case .copied:
+            state.finishExport(of: id)
+            guard let item = store.items.first(where: { $0.id == id }) else { return }
+            store.remove(item)
+        }
     }
 
     private var emptyState: some View {
@@ -247,9 +258,12 @@ struct ShelfPanelView: View {
                         onOpen: { store.open(item) },
                         onExportStarted: {
                             state.isDropActive = true
-                            state.draggingOutIDs.insert(item.id)
+                            state.beginExport(of: [item.id])
                         },
-                        onExportEnded: { state.isDropActive = false },
+                        onExportEnded: {
+                            state.isDropActive = false
+                            state.startExportGrace()
+                        },
                         onItemExportFinished: finishExport
                     )
                 }
@@ -365,7 +379,7 @@ private struct FileTile: View {
     let onOpen: () -> Void
     let onExportStarted: () -> Void
     let onExportEnded: () -> Void
-    let onItemExportFinished: (UUID, Bool) -> Void
+    let onItemExportFinished: (UUID, ExportOutcome) -> Void
 
     // Half the inter-tile gap on each side sums to the strip's 14pt spacing;
     // living inside the tile means it collapses to zero with the tile on exit.

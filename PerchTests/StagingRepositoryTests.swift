@@ -59,6 +59,40 @@ final class StagingRepositoryTests: XCTestCase {
         XCTAssertEqual(recovered.first?.displayName, "recovered.pdf")
     }
 
+    /// A drag-out whose destination read the file URL directly (a terminal that
+    /// pasted the path) leaves that path live: the item goes, the bytes stay.
+    func testDetachKeepsTheBytesButNeverReadoptsTheItem() throws {
+        let directory = try repository.allocateImportDirectory()
+        let url = directory.appending(path: "dragged.txt")
+        try Data("staged".utf8).write(to: url)
+        let item = try repository.item(forStagedURL: url)
+        try repository.persist([item])
+
+        try repository.detach(item)
+
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: url.path),
+            "whatever took the drop still points here"
+        )
+        XCTAssertTrue(repository.load().isEmpty, "and it never comes back as an item")
+    }
+
+    /// Detached bytes are kept while the path may still be used, not forever.
+    func testDetachedContainersAreSweptOnceTheirGraceHasPassed() throws {
+        let directory = try repository.allocateImportDirectory()
+        let url = directory.appending(path: "dragged.txt")
+        try Data("staged".utf8).write(to: url)
+        try repository.detach(try repository.item(forStagedURL: url))
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: -3600)],
+            ofItemAtPath: directory.appending(path: ".detached").path
+        )
+
+        let relaunched = try StagingRepository(rootURL: root)
+        XCTAssertTrue(relaunched.load().isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+    }
+
     func testRejectsPathOutsideStagingRoot() throws {
         let outside = FileManager.default.temporaryDirectory
             .appending(path: "outside-\(UUID().uuidString).txt")

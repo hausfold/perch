@@ -171,6 +171,25 @@ final class ShelfStore: ObservableObject {
         }
     }
 
+    /// Drag-out to a destination that took the staged file URL directly instead
+    /// of asking for the promise — every terminal, most editors. Nothing ever
+    /// reports back, so the items leave the shelf on the drag's own terms, but
+    /// their bytes are only detached, not deleted: whatever received the drop is
+    /// still holding a path into them. See `StagingRepository.detach`.
+    func handOff(_ ids: Set<UUID>) {
+        let leaving = items.filter { ids.contains($0.id) }
+        guard !leaving.isEmpty else { return }
+        do {
+            for item in leaving {
+                try repository.detach(item)
+            }
+            items.removeAll { ids.contains($0.id) }
+            try repository.persist(items)
+        } catch {
+            report(error)
+        }
+    }
+
     func clear() {
         do {
             try repository.removeAll()

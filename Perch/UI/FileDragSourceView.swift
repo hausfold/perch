@@ -14,7 +14,8 @@ import UniformTypeIdentifiers
 ///
 /// The staged URL rides along on the same pasteboard (see
 /// `ExportPromiseProvider`) so receivers that don't speak promises can still
-/// take the drop; those keep the item, since nothing confirms they're done.
+/// take the drop. Those never report anything, so the shelf hands the item off
+/// on a timer instead — see `ShelfStore.handOff`.
 struct ExportItem: Identifiable, Equatable {
     let id: UUID
     /// The staged source copy to read from.
@@ -56,14 +57,24 @@ final class ExportPromiseProvider: NSFilePromiseProvider {
     }
 }
 
+/// What became of one item in a drag-out.
+enum ExportOutcome {
+    /// The destination asked us to fulfil its promise — the copy is underway.
+    /// Only a receiver that speaks promises ever gets here, and its verdict
+    /// (`copied` / `failed`) always follows, however long the copy takes.
+    case promiseStarted
+    /// The destination holds its own copy. The staged one may go.
+    case copied
+    /// Cancelled, refused, or the copy failed. The item stays on the shelf.
+    case failed
+}
+
 struct FileDragSourceView: NSViewRepresentable {
     let items: [ExportItem]
     let onExportStarted: () -> Void
     let onExportEnded: () -> Void
-    /// Fired on the main actor once a single item's destination copy concludes:
-    /// `true` — the receiver has its own copy, the shelf may delete the staged
-    /// one; `false` — cancelled / refused / failed, keep the item.
-    let onItemExportFinished: (UUID, Bool) -> Void
+    /// Fired on the main actor as a single item's export progresses.
+    let onItemExportFinished: (UUID, ExportOutcome) -> Void
     // Double-click to open. Optional: the drag-all stack handle reuses this
     // view purely to export, and has nothing single to open.
     var onOpen: (() -> Void)?
@@ -85,20 +96,10 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
     var items: [ExportItem] = []
     var onExportStarted: (() -> Void)?
     var onExportEnded: (() -> Void)?
-    var onItemExportFinished: ((UUID, Bool) -> Void)?
+    var onItemExportFinished: ((UUID, ExportOutcome) -> Void)?
     var onOpen: (() -> Void)?
 
     private var startedSession = false
-    /// Items whose export verdict has already been delivered this session.
-    private var reportedIDs: Set<UUID> = []
-    /// Bumped per drag so a late fallback can tell it belongs to a session that
-    /// has since been replaced by a new drag.
-    private var sessionToken = 0
-
-    /// How long a `.copy` drop is given to fulfil its promise before the shelf
-    /// assumes the receiver took the plain file URL instead and springs the
-    /// tiles back.
-    private static let promiseGrace = Duration.seconds(2)
 
     override func mouseDown(with event: NSEvent) {
         startedSession = false
@@ -115,8 +116,6 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
     override func mouseDragged(with event: NSEvent) {
         guard !startedSession, !items.isEmpty else { return }
         startedSession = true
-        reportedIDs = []
-        sessionToken += 1
         onExportStarted?()
 
         let draggingItems = items.enumerated().map { index, export -> NSDraggingItem in
@@ -153,28 +152,15 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
         onExportEnded?()
         // No copy will occur — cancel, Escape, an invalid target, or a drop
         // straight back onto the shelf (refused by the own-export guard). Tell
-        // the shelf every promised item finished *without* export so a collapsed
-        // tile springs back. On a real .copy the per-item promise completions
-        // below deliver the verdict instead; don't pre-empt them here.
-        guard operation.contains(.copy) else {
-            for export in items {
-                report(export.id, exported: false)
-            }
-            return
-        }
-        // A .copy that never fulfils a promise means the receiver read the plain
-        // file URL instead (a terminal pasting the path, an editor opening it).
-        // Nothing tells us it finished, and we must not delete a staged file
-        // something may still be pointing at — so after a grace period, spring
-        // the untouched tiles back and keep the items.
-        let token = sessionToken
-        let pending = items.map(\.id)
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: Self.promiseGrace)
-            guard let self, self.sessionToken == token else { return }
-            for id in pending {
-                self.report(id, exported: false)
-            }
+        // the shelf every promised item failed so a collapsed tile springs back.
+        //
+        // On a real .copy, don't pre-empt: a promise-aware receiver reports for
+        // itself below, and a receiver that took the plain file URL instead
+        // reports nothing at all — the shelf's grace timer hands those items off.
+        // See ShelfPanelState.startExportGrace.
+        guard !operation.contains(.copy) else { return }
+        for export in items {
+            report(export.id, .failed)
         }
     }
 
@@ -208,31 +194,24 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
             completionHandler(CocoaError(.fileNoSuchFile))
             return
         }
+        // Tell the shelf a promise-aware receiver has engaged before the copy
+        // starts: that item now waits for the verdict below however long the
+        // copy runs, instead of being handed off as a plain-URL drop.
+        report(export.id, .promiseStarted)
         do {
             try FileManager.default.copyItem(at: export.url, to: url)
             completionHandler(nil)
-            report(export.id, exported: true)
+            report(export.id, .copied)
         } catch {
             completionHandler(error)
-            report(export.id, exported: false)
+            report(export.id, .failed)
         }
     }
 
-    private nonisolated func report(_ id: UUID, exported: Bool) {
+    private nonisolated func report(_ id: UUID, _ outcome: ExportOutcome) {
         Task { @MainActor [weak self] in
-            self?.deliver(id, exported: exported)
+            self?.onItemExportFinished?(id, outcome)
         }
-    }
-
-    /// The promise completion and the no-promise fallback can both fire for the
-    /// same item — a promise copy slower than the grace period springs its tile
-    /// back first and only then confirms. A confirmed export always gets
-    /// through; a "not exported" verdict only counts if nothing was reported
-    /// yet, so it can never cancel a real copy.
-    private func deliver(_ id: UUID, exported: Bool) {
-        let isFirst = reportedIDs.insert(id).inserted
-        guard exported || isFirst else { return }
-        onItemExportFinished?(id, exported)
     }
 
     override func resetCursorRects() {

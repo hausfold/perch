@@ -94,10 +94,14 @@ drop keeps the item. The promise copy runs on a background queue, never main.
 The same pasteboard item also carries the staged `public.file-url`, after the
 promise types. Promise-blind receivers — terminals, most editors — otherwise see
 a drag with nothing they can take and refuse it outright (no drop cursor at
-all). They read the URL directly, which means nothing ever reports completion,
-so a `.copy` that fulfils no promise within a short grace period is treated as
-*not* exported: the tiles spring back and the items — and the staged files their
-paths point at — stay.
+all). They read the URL directly and report nothing, so a `.copy` where no
+destination engaged the promise within a short grace period is a **hand-off**:
+the item leaves the shelf like any other drag-out, but its container is
+*detached* rather than deleted — the receiver is holding a path into it. A
+detached container is never re-adopted as an item and is swept once its grace
+(10 minutes, so a pasted path stays live) has passed and a launch scans the
+root. Engaging the promise cancels the hand-off for that item, however long its
+copy runs, so a slow copy is never raced.
 
 True move-original semantics are still not inferred from modifier keys.
 
