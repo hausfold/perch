@@ -389,6 +389,8 @@ private struct FileTile: View {
     // Half the inter-tile gap on each side sums to the strip's 14pt spacing;
     // living inside the tile means it collapses to zero with the tile on exit.
     private static let sideInset: CGFloat = 7
+    private static let tileWidth: CGFloat = 108
+    private static let previewSize: CGFloat = 96
 
     var body: some View {
         card
@@ -406,39 +408,43 @@ private struct FileTile: View {
 
     private var card: some View {
         VStack(spacing: 8) {
-            ZStack(alignment: .topTrailing) {
-                VStack(spacing: 8) {
-                    FilePreview(
-                        fileURL: fileURL,
-                        kind: item.kind,
-                        contentType: item.contentType,
-                        size: 62
-                    )
-                    Text(item.displayName)
-                        .font(.callout)
-                        .lineLimit(2, reservesSpace: true)
-                        .multilineTextAlignment(.center)
-                        .frame(width: 104)
-                }
-                .frame(width: 108)
-                .overlay {
-                    FileDragSourceView(
-                        items: exportItems,
-                        onExportStarted: onExportStarted,
-                        onExportEnded: onExportEnded,
-                        onItemExportFinished: onItemExportFinished,
-                        onOpen: onOpen
-                    )
-                    .accessibilityLabel("Drag \(item.displayName)")
-                }
-
-                removeButton
-            }
-            .overlay(alignment: .topLeading) {
-                pinButton
-            }
+            FilePreview(
+                fileURL: fileURL,
+                kind: item.kind,
+                contentType: item.contentType,
+                size: Self.previewSize
+            )
+            Text(item.displayName)
+                .font(.callout)
+                .lineLimit(2, reservesSpace: true)
+                .multilineTextAlignment(.center)
+                .frame(width: 104)
 
             sizeLabel
+        }
+        .frame(width: Self.tileWidth)
+        .overlay {
+            FileDragSourceView(
+                items: exportItems,
+                onExportStarted: onExportStarted,
+                onExportEnded: onExportEnded,
+                onItemExportFinished: onItemExportFinished,
+                onOpen: onOpen
+            )
+            .accessibilityLabel("Drag \(item.displayName)")
+        }
+        // The controls straddle the preview's corners instead of floating at
+        // the wider tile edges. Keeping this overlay above the drag source also
+        // leaves both buttons clickable across the full tile-sized grab area.
+        .overlay(alignment: .top) {
+            HStack(spacing: 0) {
+                pinButton
+                    .offset(x: -8, y: -8)
+                Spacer(minLength: 0)
+                removeButton
+                    .offset(x: 8, y: -8)
+            }
+            .frame(width: Self.previewSize)
         }
         .foregroundStyle(.white)
         .contextMenu {
@@ -475,7 +481,6 @@ private struct FileTile: View {
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
-        .offset(x: -4, y: -4)
         .help(item.isPinned ? "Unpin after repeated drops" : "Keep on shelf after dragging out")
         .accessibilityLabel(
             item.isPinned ? "Unpin \(item.displayName)" : "Pin \(item.displayName)"
@@ -497,7 +502,6 @@ private struct FileTile: View {
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
-        .offset(x: 4, y: -4)
         .accessibilityLabel("Remove \(item.displayName)")
     }
 
