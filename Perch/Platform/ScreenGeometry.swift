@@ -111,7 +111,10 @@ struct ShelfGeometry: Equatable, Sendable {
         // tall fixed rectangle — otherwise the item strip's flexible height
         // leaves dead space below the tiles. The camera housing reserves extra
         // top padding (see ShelfPanelView), so a notch display needs more.
-        let expandedHeight: CGFloat = hasCameraHousing ? 244 : 220
+        // The 96pt previews plus their corner badges need enough vertical room
+        // to remain fully inside the panel's clipping boundary. Notch displays
+        // still reserve the extra 24pt above the content for the housing.
+        let expandedHeight: CGFloat = hasCameraHousing ? 280 : 256
         collapsedFrame = CGRect(
             x: centerX - collapsedWidth / 2,
             y: screen.frame.maxY - collapsedHeight,

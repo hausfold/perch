@@ -275,7 +275,11 @@ struct ShelfPanelView: View {
                     PendingTile(transfer: transfer)
                 }
             }
-            .padding(.vertical, 3)
+            // The pin and remove badges straddle the thumbnail's top corners.
+            // ScrollView clips anything outside its content bounds, so reserve
+            // the full 8pt overhang plus a little room for their shadows.
+            .padding(.top, 11)
+            .padding(.bottom, 3)
             .animation(Self.reflow, value: state.draggingOutIDs)
             .animation(Self.reflow, value: store.items)
         }
