@@ -175,21 +175,40 @@ final class ShelfStore: ObservableObject {
         }
     }
 
-    /// A drop was accepted: take the items off the shelf now, before anything
-    /// has read them.
+    func setPinned(_ pinned: Bool, for item: ShelfItem) {
+        guard let index = items.firstIndex(where: { $0.id == item.id }),
+              items[index].isPinned != pinned
+        else {
+            return
+        }
+        items[index].isPinned = pinned
+        do {
+            try repository.persist(items)
+        } catch {
+            report(error)
+        }
+    }
+
+    /// A drop was accepted: take unpinned items off the shelf now, before
+    /// anything has read them. Pinned items deliberately stay available for
+    /// another drag and never enter the lifted/deletion transaction.
     ///
     /// Letting go *is* the gesture — a shelf that keeps counting an item until
     /// its receiver reports back reads as stuck, and the receiver may never
     /// report at all. The staged bytes are untouched, so the destination can
-    /// still read them and `returnToShelf` can put a refused item back exactly where
-    /// it was. What finally happens to those bytes is settled by `confirmCopied`
-    /// (deleted) or `handOff` (detached).
+    /// still read them and `returnToShelf` can put a refused item back exactly
+    /// where it was. What finally happens to those bytes is settled by
+    /// `confirmCopied` (deleted) or `handOff` (detached).
     func liftForExport(_ ids: Set<UUID>) {
         for id in ids {
-            guard let index = items.firstIndex(where: { $0.id == id }) else { continue }
+            guard let index = items.firstIndex(where: { $0.id == id }),
+                  !items[index].isPinned
+            else {
+                continue
+            }
             lifted[id] = (items[index], index)
         }
-        items.removeAll { ids.contains($0.id) }
+        items.removeAll { ids.contains($0.id) && !$0.isPinned }
         // The manifest drops them too: if Perch dies mid-export the bytes are
         // still on disk and recovery re-adopts them — nothing is ever lost by
         // lifting optimistically.

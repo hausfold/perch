@@ -17,6 +17,9 @@ struct ShelfItem: Codable, Identifiable, Hashable, Sendable {
     let contentTypeIdentifier: String?
     let byteCount: Int64?
     let addedAt: Date
+    /// A pinned item remains on the shelf after a successful drag-out so it can
+    /// be dropped into several destinations in quick succession.
+    var isPinned: Bool
 
     init(
         id: UUID = UUID(),
@@ -25,7 +28,8 @@ struct ShelfItem: Codable, Identifiable, Hashable, Sendable {
         kind: Kind,
         contentTypeIdentifier: String?,
         byteCount: Int64?,
-        addedAt: Date = Date()
+        addedAt: Date = Date(),
+        isPinned: Bool = false
     ) {
         self.id = id
         self.displayName = displayName
@@ -34,6 +38,35 @@ struct ShelfItem: Codable, Identifiable, Hashable, Sendable {
         self.contentTypeIdentifier = contentTypeIdentifier
         self.byteCount = byteCount
         self.addedAt = addedAt
+        self.isPinned = isPinned
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case displayName
+        case relativePath
+        case kind
+        case contentTypeIdentifier
+        case byteCount
+        case addedAt
+        case isPinned
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        relativePath = try container.decode(String.self, forKey: .relativePath)
+        kind = try container.decode(Kind.self, forKey: .kind)
+        contentTypeIdentifier = try container.decodeIfPresent(
+            String.self,
+            forKey: .contentTypeIdentifier
+        )
+        byteCount = try container.decodeIfPresent(Int64.self, forKey: .byteCount)
+        addedAt = try container.decode(Date.self, forKey: .addedAt)
+        // Manifests written before pinning existed have no key; they remain
+        // valid and restore as ordinary, unpinned items.
+        isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
     }
 
     var contentType: UTType? {

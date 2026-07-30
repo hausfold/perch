@@ -170,9 +170,11 @@ struct ShelfPanelView: View {
                 onExportStarted: {
                     state.isDropActive = true
                     // Collapse every tile at once; the strip empties as the
-                    // stack lifts off. Each item leaves for real only once its
-                    // destination is accounted for; a refused drop springs back.
-                    state.beginExport(of: Set(store.items.map(\.id)))
+                    // stack lifts off. Pinned tiles stay put and need no grace
+                    // bookkeeping because export never deletes or detaches them.
+                    state.beginExport(
+                        of: Set(store.items.lazy.filter { !$0.isPinned }.map(\.id))
+                    )
                 },
                 onExportEnded: {
                     state.isDropActive = false
@@ -253,13 +255,14 @@ struct ShelfPanelView: View {
                         item: item,
                         fileURL: item.fileURL(inside: store.repository.rootURL),
                         exportItems: exportItem(for: item).map { [$0] } ?? [],
-                        isExiting: state.draggingOutIDs.contains(item.id),
+                        isExiting: state.draggingOutIDs.contains(item.id) && !item.isPinned,
                         onReveal: { store.reveal(item) },
                         onRemove: { withAnimation(Self.reflow) { store.remove(item) } },
+                        onSetPinned: { store.setPinned($0, for: item) },
                         onOpen: { store.open(item) },
                         onExportStarted: {
                             state.isDropActive = true
-                            state.beginExport(of: [item.id])
+                            state.beginExport(of: item.isPinned ? [] : [item.id])
                         },
                         onExportEnded: {
                             state.isDropActive = false
@@ -377,6 +380,7 @@ private struct FileTile: View {
     var isExiting: Bool = false
     let onReveal: () -> Void
     let onRemove: () -> Void
+    let onSetPinned: (Bool) -> Void
     let onOpen: () -> Void
     let onExportStarted: () -> Void
     let onExportEnded: () -> Void
@@ -430,6 +434,9 @@ private struct FileTile: View {
 
                 removeButton
             }
+            .overlay(alignment: .topLeading) {
+                pinButton
+            }
 
             sizeLabel
         }
@@ -437,8 +444,47 @@ private struct FileTile: View {
         .contextMenu {
             Button(item.kind == .image ? "Quick Look" : "Open", action: onOpen)
             Button("Show in Finder", action: onReveal)
+            Divider()
+            Button(
+                item.isPinned ? "Unpin" : "Pin",
+                systemImage: item.isPinned ? "pin.slash" : "pin"
+            ) {
+                onSetPinned(!item.isPinned)
+            }
             Button("Remove from Shelf", role: .destructive, action: onRemove)
         }
+    }
+
+    private var pinButton: some View {
+        Button {
+            onSetPinned(!item.isPinned)
+        } label: {
+            Image(systemName: item.isPinned ? "pin.fill" : "pin")
+                .font(.system(size: 13, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.white.opacity(item.isPinned ? 1 : 0.72))
+                .frame(width: 24, height: 24)
+                .background(
+                    Circle().fill(
+                        item.isPinned
+                            ? Color.accentColor.opacity(0.88)
+                            : .black.opacity(0.62)
+                    )
+                )
+                .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Circle())
+        .offset(x: -4, y: -4)
+        .help(item.isPinned ? "Unpin after repeated drops" : "Keep on shelf after dragging out")
+        .accessibilityLabel(
+            item.isPinned ? "Unpin \(item.displayName)" : "Pin \(item.displayName)"
+        )
+        .accessibilityHint(
+            item.isPinned
+                ? "The item will leave the shelf after its next successful drag"
+                : "Keeps the item on the shelf after successful drags"
+        )
     }
 
     private var removeButton: some View {

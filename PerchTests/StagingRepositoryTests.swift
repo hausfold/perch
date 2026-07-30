@@ -48,6 +48,36 @@ final class StagingRepositoryTests: XCTestCase {
         XCTAssertEqual(repository.load(), [])
     }
 
+    func testManifestWrittenBeforePinningRestoresAsUnpinned() throws {
+        let id = UUID()
+        let directory = try repository.allocateImportDirectory()
+        let url = directory.appending(path: "legacy.txt")
+        try Data("legacy".utf8).write(to: url)
+        let relativePath = "\(directory.lastPathComponent)/legacy.txt"
+        let addedAt = Int64(Date().timeIntervalSince1970 * 1_000)
+        let manifest = """
+        {
+          "version": 1,
+          "items": [{
+            "id": "\(id.uuidString)",
+            "displayName": "legacy.txt",
+            "relativePath": "\(relativePath)",
+            "kind": "text",
+            "contentTypeIdentifier": "public.plain-text",
+            "byteCount": 6,
+            "addedAt": \(addedAt)
+          }],
+          "updatedAt": \(addedAt)
+        }
+        """
+        try Data(manifest.utf8).write(to: root.appending(path: "manifest.json"))
+
+        let restored = try XCTUnwrap(repository.load().first)
+
+        XCTAssertEqual(restored.id, id)
+        XCTAssertFalse(restored.isPinned)
+    }
+
     func testRecoversCompletedFileMissingFromManifest() throws {
         let directory = try repository.allocateImportDirectory()
         let url = directory.appending(path: "recovered.pdf")

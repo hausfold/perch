@@ -84,6 +84,50 @@ final class ShelfStoreExportTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: staged.path))
     }
 
+    func testAConfirmedCopyKeepsAPinnedItemReadyForAnotherDrag() throws {
+        try makeShelf()
+        let item = try stageItem()
+        let staged = try stagedURL(of: item)
+        store.setPinned(true, for: item)
+
+        store.liftForExport([item.id])
+        store.confirmCopied(item.id)
+
+        XCTAssertEqual(store.items.map(\.id), [item.id])
+        XCTAssertTrue(try XCTUnwrap(store.items.first).isPinned)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staged.path))
+    }
+
+    func testAPlainURLHandOffAlsoKeepsAPinnedItemReadyForAnotherDrag() throws {
+        try makeShelf()
+        let item = try stageItem()
+        let staged = try stagedURL(of: item)
+        store.setPinned(true, for: item)
+
+        store.liftForExport([item.id])
+        store.handOff([item.id])
+
+        XCTAssertEqual(store.items.map(\.id), [item.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staged.path))
+        XCTAssertEqual(repository.load().map(\.id), [item.id])
+    }
+
+    func testPinStateSurvivesRelaunchAndCanBeTurnedOff() throws {
+        try makeShelf()
+        let item = try stageItem()
+        store.setPinned(true, for: item)
+
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let restored = ShelfStore(repository: repository, settings: AppSettings(defaults: defaults))
+        restored.restore()
+        XCTAssertTrue(try XCTUnwrap(restored.items.first).isPinned)
+
+        restored.setPinned(false, for: item)
+        restored.liftForExport([item.id])
+
+        XCTAssertTrue(restored.items.isEmpty)
+    }
+
     /// A terminal pasted the path; nothing will ever confirm a copy, and the
     /// path has to keep resolving.
     func testAHandOffKeepsTheStagedBytesButNotTheItem() throws {
