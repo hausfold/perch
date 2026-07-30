@@ -170,9 +170,11 @@ struct ShelfPanelView: View {
                 onExportStarted: {
                     state.isDropActive = true
                     // Collapse every tile at once; the strip empties as the
-                    // stack lifts off. Each item leaves for real only once its
-                    // destination is accounted for; a refused drop springs back.
-                    state.beginExport(of: Set(store.items.map(\.id)))
+                    // stack lifts off. Pinned tiles stay put and need no grace
+                    // bookkeeping because export never deletes or detaches them.
+                    state.beginExport(
+                        of: Set(store.items.lazy.filter { !$0.isPinned }.map(\.id))
+                    )
                 },
                 onExportEnded: {
                     state.isDropActive = false
@@ -253,13 +255,14 @@ struct ShelfPanelView: View {
                         item: item,
                         fileURL: item.fileURL(inside: store.repository.rootURL),
                         exportItems: exportItem(for: item).map { [$0] } ?? [],
-                        isExiting: state.draggingOutIDs.contains(item.id),
+                        isExiting: state.draggingOutIDs.contains(item.id) && !item.isPinned,
                         onReveal: { store.reveal(item) },
                         onRemove: { withAnimation(Self.reflow) { store.remove(item) } },
+                        onSetPinned: { store.setPinned($0, for: item) },
                         onOpen: { store.open(item) },
                         onExportStarted: {
                             state.isDropActive = true
-                            state.beginExport(of: [item.id])
+                            state.beginExport(of: item.isPinned ? [] : [item.id])
                         },
                         onExportEnded: {
                             state.isDropActive = false
@@ -272,7 +275,11 @@ struct ShelfPanelView: View {
                     PendingTile(transfer: transfer)
                 }
             }
-            .padding(.vertical, 3)
+            // The pin and remove badges straddle the thumbnail's top corners.
+            // ScrollView clips anything outside its content bounds, so reserve
+            // the full 8pt overhang plus a little room for their shadows.
+            .padding(.top, 11)
+            .padding(.bottom, 3)
             .animation(Self.reflow, value: state.draggingOutIDs)
             .animation(Self.reflow, value: store.items)
         }
@@ -377,6 +384,7 @@ private struct FileTile: View {
     var isExiting: Bool = false
     let onReveal: () -> Void
     let onRemove: () -> Void
+    let onSetPinned: (Bool) -> Void
     let onOpen: () -> Void
     let onExportStarted: () -> Void
     let onExportEnded: () -> Void
@@ -385,6 +393,8 @@ private struct FileTile: View {
     // Half the inter-tile gap on each side sums to the strip's 14pt spacing;
     // living inside the tile means it collapses to zero with the tile on exit.
     private static let sideInset: CGFloat = 7
+    private static let tileWidth: CGFloat = 108
+    private static let previewSize: CGFloat = 96
 
     var body: some View {
         card
@@ -402,43 +412,88 @@ private struct FileTile: View {
 
     private var card: some View {
         VStack(spacing: 8) {
-            ZStack(alignment: .topTrailing) {
-                VStack(spacing: 8) {
-                    FilePreview(
-                        fileURL: fileURL,
-                        kind: item.kind,
-                        contentType: item.contentType,
-                        size: 62
-                    )
-                    Text(item.displayName)
-                        .font(.callout)
-                        .lineLimit(2, reservesSpace: true)
-                        .multilineTextAlignment(.center)
-                        .frame(width: 104)
-                }
-                .frame(width: 108)
-                .overlay {
-                    FileDragSourceView(
-                        items: exportItems,
-                        onExportStarted: onExportStarted,
-                        onExportEnded: onExportEnded,
-                        onItemExportFinished: onItemExportFinished,
-                        onOpen: onOpen
-                    )
-                    .accessibilityLabel("Drag \(item.displayName)")
-                }
-
-                removeButton
-            }
+            FilePreview(
+                fileURL: fileURL,
+                kind: item.kind,
+                contentType: item.contentType,
+                size: Self.previewSize
+            )
+            Text(item.displayName)
+                .font(.callout)
+                .lineLimit(2, reservesSpace: true)
+                .multilineTextAlignment(.center)
+                .frame(width: 104)
 
             sizeLabel
+        }
+        .frame(width: Self.tileWidth)
+        .overlay {
+            FileDragSourceView(
+                items: exportItems,
+                onExportStarted: onExportStarted,
+                onExportEnded: onExportEnded,
+                onItemExportFinished: onItemExportFinished,
+                onOpen: onOpen
+            )
+            .accessibilityLabel("Drag \(item.displayName)")
+        }
+        // The controls straddle the preview's corners instead of floating at
+        // the wider tile edges. Keeping this overlay above the drag source also
+        // leaves both buttons clickable across the full tile-sized grab area.
+        .overlay(alignment: .top) {
+            HStack(spacing: 0) {
+                pinButton
+                    .offset(x: -8, y: -8)
+                Spacer(minLength: 0)
+                removeButton
+                    .offset(x: 8, y: -8)
+            }
+            .frame(width: Self.previewSize)
         }
         .foregroundStyle(.white)
         .contextMenu {
             Button(item.kind == .image ? "Quick Look" : "Open", action: onOpen)
             Button("Show in Finder", action: onReveal)
+            Divider()
+            Button(
+                item.isPinned ? "Unpin" : "Pin",
+                systemImage: item.isPinned ? "pin.slash" : "pin"
+            ) {
+                onSetPinned(!item.isPinned)
+            }
             Button("Remove from Shelf", role: .destructive, action: onRemove)
         }
+    }
+
+    private var pinButton: some View {
+        Button {
+            onSetPinned(!item.isPinned)
+        } label: {
+            Image(systemName: item.isPinned ? "pin.fill" : "pin")
+                .font(.system(size: 13, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.white.opacity(item.isPinned ? 1 : 0.72))
+                .frame(width: 24, height: 24)
+                .background(
+                    Circle().fill(
+                        item.isPinned
+                            ? Color.accentColor.opacity(0.88)
+                            : .black.opacity(0.62)
+                    )
+                )
+                .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Circle())
+        .help(item.isPinned ? "Unpin after repeated drops" : "Keep on shelf after dragging out")
+        .accessibilityLabel(
+            item.isPinned ? "Unpin \(item.displayName)" : "Pin \(item.displayName)"
+        )
+        .accessibilityHint(
+            item.isPinned
+                ? "The item will leave the shelf after its next successful drag"
+                : "Keeps the item on the shelf after successful drags"
+        )
     }
 
     private var removeButton: some View {
@@ -451,7 +506,6 @@ private struct FileTile: View {
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
-        .offset(x: 4, y: -4)
         .accessibilityLabel("Remove \(item.displayName)")
     }
 

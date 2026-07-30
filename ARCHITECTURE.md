@@ -87,6 +87,11 @@ letting go is the gesture, and a shelf still counting the item reads as stuck.
 The item is *lifted*, not deleted: its staged bytes stay put, and a destination
 that then refuses it or fails its copy puts the item back in its old slot.
 
+A pinned item is the explicit exception: it never enters the lifted export
+transaction, so every destination receives a copy while the tile and staged
+bytes stay available for another drag. Pin state lives in the manifest and
+older manifests decode missing pin state as unpinned.
+
 Deleting those bytes is a separate step, and waits for the destination to
 confirm it holds its own copy: exports are vended as **file promises**
 (`NSFilePromiseProvider`), so the receiver asks Perch to write the file into the
