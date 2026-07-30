@@ -15,6 +15,10 @@ final class ScreenGeometryTests: XCTestCase {
 
         XCTAssertTrue(geometry.hasCameraHousing)
         XCTAssertEqual(screen.cameraHousingWidth, 168)
+        // The ember hangs under the housing, so its depth is the safe-area inset,
+        // and its landing strip spans the housing gap exactly.
+        XCTAssertEqual(geometry.topEdgeDepth, 32)
+        XCTAssertEqual(geometry.housingWidth, 168)
         // Wide catch band: 42% of the screen, clamped to [360, 640] (1512·0.42 = 635.04).
         XCTAssertEqual(geometry.collapsedFrame.width, 635.04, accuracy: 0.01)
         XCTAssertEqual(geometry.collapsedFrame.maxY, screen.frame.maxY)
@@ -47,6 +51,11 @@ final class ScreenGeometryTests: XCTestCase {
         // Compact centered fallback: 32% of the screen, clamped to [300, 460]
         // (1920·0.32 = 614.4 → 460), 44pt tall.
         XCTAssertEqual(geometry.collapsedFrame.size, CGSize(width: 460, height: 44))
+        // With no housing the ember hangs under the menu bar instead — the gap
+        // between the full frame and the visible frame (1180 − 1155) — and the
+        // landing strip has no housing width to match.
+        XCTAssertEqual(geometry.topEdgeDepth, 25)
+        XCTAssertEqual(geometry.housingWidth, 0)
         XCTAssertEqual(geometry.collapsedFrame.midX, screen.frame.midX)
         XCTAssertEqual(geometry.collapsedFrame.maxY, screen.frame.maxY)
     }

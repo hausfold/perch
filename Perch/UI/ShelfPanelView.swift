@@ -26,25 +26,31 @@ struct ShelfPanelView: View {
     }
 
     private var collapsedShelf: some View {
-        // A device with a real notch never renders the synthetic notch — the
-        // physical housing is the affordance. It gets the NotchEmber instead: a
-        // lit pip under the housing's chin, never anything over the housing or
-        // out in the menu-bar band beside it. On notchless displays the pill
-        // only appears once there is something staged to grab back out.
+        // No synthetic notch, on any display: the collapsed shelf draws nothing
+        // but the ember, hung under the camera housing where there is one and
+        // under the menu bar where there isn't (see ShelfGeometry.topEdgeDepth).
+        // An empty shelf shows nothing at all.
         //
         // The whole collapsed frame is made hit-testable with contentShape even
         // when it draws nothing: without it, SwiftUI's Color.clear reports no
         // hit, NSHostingView.hitTest returns nil, and AppKit never routes an
         // incoming drag here — so draggingEntered would never fire.
-        Group {
-            if state.hasCameraHousing {
-                emberLayer
-            } else if hasContent {
-                notchlessPill
-            } else {
-                catchZone
+        ZStack(alignment: .top) {
+            catchZone
+            if hasContent {
+                ShelfEmber(
+                    itemCount: store.items.count,
+                    isStaging: !store.pendingTransfers.isEmpty,
+                    isArmed: state.isArmed,
+                    housingWidth: state.housingWidth
+                )
+                // Clear of the top-edge furniture by a hair, so the ember hangs
+                // off it instead of being clipped behind it.
+                .padding(.top, state.topEdgeDepth + 4)
+                .transition(.opacity.combined(with: .scale(scale: 0.5)))
             }
         }
+        .animation(.snappy(duration: 0.3, extraBounce: 0.1), value: hasContent)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture(perform: onExpand)
@@ -62,41 +68,6 @@ struct ShelfPanelView: View {
 
     /// Lowest fill alpha that keeps the collapsed window a valid drop target.
     private let catchZoneAlpha = 0.005
-
-    private var emberLayer: some View {
-        ZStack(alignment: .top) {
-            catchZone
-            if hasContent {
-                NotchEmber(
-                    itemCount: store.items.count,
-                    isStaging: !store.pendingTransfers.isEmpty,
-                    isArmed: state.isArmed,
-                    housingWidth: state.housingWidth
-                )
-                // Clear of the housing's bottom edge by a hair, so the ember
-                // hangs off the notch instead of being clipped behind it.
-                .padding(.top, state.housingDepth + 4)
-                .transition(.opacity.combined(with: .scale(scale: 0.5)))
-            }
-        }
-        .animation(.snappy(duration: 0.3, extraBounce: 0.1), value: hasContent)
-    }
-
-    private var notchlessPill: some View {
-        ZStack(alignment: .bottom) {
-            Color.black
-            HStack(spacing: 5) {
-                Image(systemName: "tray.full.fill")
-                    .font(.caption2)
-                Text("\(store.items.count + store.pendingTransfers.count)")
-                    .font(.caption2.weight(.semibold))
-                    .contentTransition(.numericText())
-            }
-            .foregroundStyle(.white.opacity(0.85))
-            .padding(.bottom, 5)
-        }
-        .clipShape(.rect(bottomLeadingRadius: 12, bottomTrailingRadius: 12))
-    }
 
     // Square top corners so the panel reads as emerging from the top of the
     // screen; only the bottom corners are rounded.

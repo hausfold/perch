@@ -1,24 +1,28 @@
 import SwiftUI
 
-/// The notch-display counterpart to the notchless pill: a tiny sage ember tucked
-/// against the bottom edge of the camera housing, so a staged shelf is legible in
-/// peripheral vision without drawing any chrome. Nothing is ever painted over the
-/// housing itself — the ember hangs off its chin, reading as a light on the
-/// hardware rather than as UI.
+/// The collapsed shelf's only visible mark: a small sage ember tucked under
+/// whatever occupies the top edge of the display — the camera housing on a notch
+/// Mac, the menu bar on every other. Nothing is ever painted over the housing or
+/// out in the band beside it where status items live; the ember hangs off the
+/// chin, reading as a light on the hardware rather than as UI.
+///
+/// It signals *presence*, never an exact number — a pip per item up to `maxPips`
+/// and no further. To know precisely what is staged, open the shelf.
 ///
 /// Three states, all driven from state the shelf already tracks:
-///   * at rest    — one pip per staged item (past `maxPips`, one pip + a count)
+///   * at rest    — one pip per staged item
 ///   * on arrival — the pips flare white-hot and settle back over ~0.6s
-///   * armed      — the pips fuse into a landing strip exactly as wide as the
-///                  housing, so "you can drop here" only appears while a drag
-///                  could actually be in flight
-struct NotchEmber: View {
+///   * armed      — the pips fuse into a landing strip as wide as the housing, so
+///                  "you can drop here" only appears while a drag could be in
+///                  flight
+struct ShelfEmber: View {
     let itemCount: Int
     /// A transfer is still being staged — the ember breathes until it lands.
     let isStaging: Bool
     /// A mouse button is held somewhere on the system; see `ShelfPanelState.isArmed`.
     let isArmed: Bool
-    /// Width of the physical camera housing. The landing strip spans it exactly.
+    /// Width of the physical camera housing, or 0 on a notchless display, where
+    /// the landing strip falls back to its own width.
     let housingWidth: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -28,7 +32,10 @@ struct NotchEmber: View {
     /// camera would read as the system's recording indicator.
     private static let ember = Color(red: 0.671, green: 0.882, blue: 0.651)
     private static let pipSize: CGFloat = 5
-    private static let maxPips = 4
+    /// Past this the row stops growing. Presence is the signal, not the total.
+    private static let maxPips = 5
+    /// Strip width when there is no housing to match.
+    private static let notchlessStripWidth: CGFloat = 132
 
     /// 0 at rest, 1 at the peak of a new-item flare.
     @State private var flare: CGFloat = 0
@@ -66,21 +73,13 @@ struct NotchEmber: View {
             : .easeOut(duration: 0.25)
     }
 
-    @ViewBuilder private var pips: some View {
+    private var pips: some View {
         HStack(spacing: 4) {
-            if itemCount > Self.maxPips {
-                pip
-                Text("\(itemCount)")
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Self.ember.opacity(0.92))
-                    .contentTransition(.numericText())
-                    .shadow(color: Self.ember.opacity(0.45), radius: 3)
-            } else {
-                // max(_, 1): the shelf can have zero items while a transfer is
-                // still staging — that state is one breathing pip, not nothing.
-                ForEach(0 ..< max(itemCount, 1), id: \.self) { _ in pip }
-            }
+            // max(_, 1): the shelf can hold zero items while a transfer is still
+            // staging — that state is one breathing pip, not nothing.
+            ForEach(0 ..< min(max(itemCount, 1), Self.maxPips), id: \.self) { _ in pip }
         }
+        .animation(.snappy(duration: 0.26), value: itemCount)
     }
 
     private var pip: some View {
@@ -92,13 +91,16 @@ struct NotchEmber: View {
             .frame(width: Self.pipSize, height: Self.pipSize)
             .scaleEffect(1 + 0.55 * flare)
             .modifier(EmberGlow(flare: flare))
+            .transition(.opacity.combined(with: .scale(scale: 0.4)))
     }
 
     private var landingStrip: some View {
         Capsule()
             .fill(Self.ember.opacity(0.85))
-            // Fall back to a readable stub if the housing width is unknown.
-            .frame(width: housingWidth > 0 ? housingWidth : 120, height: 3)
+            .frame(
+                width: housingWidth > 0 ? housingWidth : Self.notchlessStripWidth,
+                height: 3
+            )
             .modifier(EmberGlow(flare: flare))
     }
 }

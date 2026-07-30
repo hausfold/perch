@@ -25,7 +25,7 @@ final class ShelfPanelController: NSObject {
         viewState = ShelfPanelState(
             hasCameraHousing: geometry.hasCameraHousing,
             expandedContentWidth: geometry.expandedContentWidth,
-            housingDepth: geometry.housingDepth,
+            topEdgeDepth: geometry.topEdgeDepth,
             housingWidth: geometry.housingWidth
         )
         panel = ShelfPanel(
@@ -188,9 +188,9 @@ final class ShelfPanelState: ObservableObject {
     // Width of the visible glass shelf, centered inside the wider (catch-zone
     // width) window. See ShelfGeometry.expandedContentWidth.
     let expandedContentWidth: CGFloat
-    // Geometry of the physical camera housing; see ShelfGeometry. Used to hang
-    // the collapsed NotchEmber under the housing's chin.
-    let housingDepth: CGFloat
+    // Top-edge geometry; see ShelfGeometry. Used to hang the collapsed ShelfEmber
+    // under the housing (or the menu bar, on a notchless display).
+    let topEdgeDepth: CGFloat
     let housingWidth: CGFloat
 
     // Items whose destination engaged the file promise. Their verdict is coming
@@ -206,12 +206,12 @@ final class ShelfPanelState: ObservableObject {
     init(
         hasCameraHousing: Bool,
         expandedContentWidth: CGFloat,
-        housingDepth: CGFloat = 0,
+        topEdgeDepth: CGFloat = 0,
         housingWidth: CGFloat = 0
     ) {
         self.hasCameraHousing = hasCameraHousing
         self.expandedContentWidth = expandedContentWidth
-        self.housingDepth = housingDepth
+        self.topEdgeDepth = topEdgeDepth
         self.housingWidth = housingWidth
     }
 
