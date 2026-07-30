@@ -24,7 +24,9 @@ final class ShelfPanelController: NSObject {
         geometry = ShelfGeometry(screen: ScreenDescriptor(screen: screen))
         viewState = ShelfPanelState(
             hasCameraHousing: geometry.hasCameraHousing,
-            expandedContentWidth: geometry.expandedContentWidth
+            expandedContentWidth: geometry.expandedContentWidth,
+            topEdgeDepth: geometry.topEdgeDepth,
+            housingWidth: geometry.housingWidth
         )
         panel = ShelfPanel(
             contentRect: geometry.collapsedFrame,
@@ -186,6 +188,10 @@ final class ShelfPanelState: ObservableObject {
     // Width of the visible glass shelf, centered inside the wider (catch-zone
     // width) window. See ShelfGeometry.expandedContentWidth.
     let expandedContentWidth: CGFloat
+    // Top-edge geometry; see ShelfGeometry. Used to hang the collapsed ShelfEmber
+    // under the housing (or the menu bar, on a notchless display).
+    let topEdgeDepth: CGFloat
+    let housingWidth: CGFloat
 
     // Items whose destination engaged the file promise. Their verdict is coming
     // however long the copy takes, so the grace timer must not touch them.
@@ -197,9 +203,16 @@ final class ShelfPanelState: ObservableObject {
     /// directly. They are already off the shelf; this settles their bytes.
     var onExportHandOff: ((Set<UUID>) -> Void)?
 
-    init(hasCameraHousing: Bool, expandedContentWidth: CGFloat) {
+    init(
+        hasCameraHousing: Bool,
+        expandedContentWidth: CGFloat,
+        topEdgeDepth: CGFloat = 0,
+        housingWidth: CGFloat = 0
+    ) {
         self.hasCameraHousing = hasCameraHousing
         self.expandedContentWidth = expandedContentWidth
+        self.topEdgeDepth = topEdgeDepth
+        self.housingWidth = housingWidth
     }
 
     /// A drag ended on a `.copy`: give the destination a moment to engage the

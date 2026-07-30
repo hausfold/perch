@@ -57,9 +57,22 @@ struct ShelfGeometry: Equatable, Sendable {
     // exit → collapse → re-enter jitter, and the sideways motion read as jank.
     let expandedContentWidth: CGFloat
     let hasCameraHousing: Bool
+    // Depth of whatever occupies the top edge: the camera housing where there is
+    // one, otherwise the menu bar. The collapsed ember hangs just under it on
+    // either kind of display — never over the housing, and never out in the band
+    // beside or behind it where status items live. An auto-hidden menu bar
+    // measures 0, which lands the ember on the screen edge, as it should.
+    let topEdgeDepth: CGFloat
+    // Width of the physical camera housing, which the ember's armed landing strip
+    // spans exactly. 0 on a notchless display, where the strip sizes itself.
+    let housingWidth: CGFloat
 
     init(screen: ScreenDescriptor) {
         hasCameraHousing = screen.hasCameraHousing
+        topEdgeDepth = screen.hasCameraHousing
+            ? screen.safeAreaTop
+            : max(0, screen.frame.maxY - screen.visibleFrame.maxY)
+        housingWidth = screen.cameraHousingWidth ?? 0
         let centerX = screen.frame.midX
         let collapsedWidth: CGFloat
         let collapsedHeight: CGFloat
