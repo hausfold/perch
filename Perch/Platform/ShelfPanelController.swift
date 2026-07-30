@@ -8,6 +8,7 @@ final class ShelfPanelController: NSObject {
     private let panel: ShelfPanel
     private let geometry: ShelfGeometry
     private let viewState: ShelfPanelState
+    private let theme: ShelfTheme
     private var collapseTask: Task<Void, Never>?
     // Set by "Hide": keeps the shelf dismissed on hover until the pointer has
     // left the target area and returned — so the user can reach menu-bar /
@@ -18,9 +19,11 @@ final class ShelfPanelController: NSObject {
         screen: NSScreen,
         store: ShelfStore,
         settings: AppSettings,
+        theme: ShelfTheme,
         dropHandler: ShelfDropHandler
     ) {
         screenID = screen.perchIdentifier
+        self.theme = theme
         geometry = ShelfGeometry(screen: ScreenDescriptor(screen: screen))
         viewState = ShelfPanelState(
             hasCameraHousing: geometry.hasCameraHousing,
@@ -47,6 +50,7 @@ final class ShelfPanelController: NSObject {
         let rootView = ShelfPanelView(
             store: store,
             settings: settings,
+            theme: theme,
             state: viewState,
             onExpand: { [weak self] in self?.expand() },
             onHide: { [weak self] in self?.hide() }
@@ -102,6 +106,9 @@ final class ShelfPanelController: NSObject {
     func expand() {
         collapseTask?.cancel()
         guard !viewState.isExpanded else { return }
+        // Cheapest moment to notice the rice changed underneath us: the panel is
+        // about to become visible and nothing is mid-drag. Two small file reads.
+        theme.refresh()
         viewState.isExpanded = true
         panel.hasShadow = true
         animate(to: geometry.expandedFrame, duration: 0.28)

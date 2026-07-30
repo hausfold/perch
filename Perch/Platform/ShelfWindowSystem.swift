@@ -5,15 +5,17 @@ import Combine
 final class ShelfWindowSystem {
     private let store: ShelfStore
     private let settings: AppSettings
+    private let theme: ShelfTheme
     private let dropHandler: ShelfDropHandler
     private var panels: [String: ShelfPanelController] = [:]
     private var cancellables: Set<AnyCancellable> = []
     private var screenObserver: NSObjectProtocol?
     private var armTimer: Timer?
 
-    init(store: ShelfStore, settings: AppSettings) {
+    init(store: ShelfStore, settings: AppSettings, theme: ShelfTheme) {
         self.store = store
         self.settings = settings
+        self.theme = theme
         dropHandler = ShelfDropHandler(store: store)
 
         settings.$showOnAllDisplays
@@ -86,6 +88,7 @@ final class ShelfWindowSystem {
                 screen: screen,
                 store: store,
                 settings: settings,
+                theme: theme,
                 dropHandler: dropHandler
             )
             panels[controller.screenID] = controller

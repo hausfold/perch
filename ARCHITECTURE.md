@@ -65,6 +65,22 @@ packages, cloud providers, and coordinated reads under one API. The pending
 model already separates phases, so a later provider-specific progress source
 does not require a model rewrite.
 
+### Following the rice theme
+
+The shelf paints from a `RicePalette` — one of four compiled-in nebelung
+variants, or any `role → "#hex"` file in `~/.config/perch/themes/`, which shadows
+a built-in of the same name. `~/.config/perch/config.json` names the palette per
+polarity and the macOS appearance picks the half; `ShelfTheme` re-resolves on
+launch, on the light/dark switch, and as the shelf opens, and publishes through
+the environment so every panel and tile repaints together. Perch's own settings
+stay in `UserDefaults` — the rice writes only the theme.
+
+Both paths sit outside the app container, which costs one read-only
+home-relative sandbox exception and forces two details: the real home comes from
+`getpwuid` (inside the sandbox `NSHomeDirectory()` is the container), and the
+rice must drop **real files**, since the sandbox resolves a symlink into
+`/nix/store` before it checks the path and denies it. See ADR 0002.
+
 ### Name collisions
 
 Every logical import owns a UUID directory. The user-visible filename remains
