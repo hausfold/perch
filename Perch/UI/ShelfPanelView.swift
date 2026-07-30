@@ -27,7 +27,9 @@ struct ShelfPanelView: View {
 
     private var collapsedShelf: some View {
         // A device with a real notch never renders the synthetic notch — the
-        // physical housing is the affordance. On notchless displays the pill
+        // physical housing is the affordance. It gets the NotchEmber instead: a
+        // lit pip under the housing's chin, never anything over the housing or
+        // out in the menu-bar band beside it. On notchless displays the pill
         // only appears once there is something staged to grab back out.
         //
         // The whole collapsed frame is made hit-testable with contentShape even
@@ -35,16 +37,12 @@ struct ShelfPanelView: View {
         // hit, NSHostingView.hitTest returns nil, and AppKit never routes an
         // incoming drag here — so draggingEntered would never fire.
         Group {
-            if !state.hasCameraHousing && hasContent {
+            if state.hasCameraHousing {
+                emberLayer
+            } else if hasContent {
                 notchlessPill
             } else {
-                // A non-opaque window derives its draggable/clickable region
-                // from rendered alpha: fully transparent pixels are treated as
-                // click-through and never receive draggingEntered. So while a
-                // drag might be underway (armed) the catch zone is filled at the
-                // lowest alpha that still registers as a drop target; when idle
-                // it is fully transparent — nothing to see, nothing to catch.
-                Color.black.opacity(state.isArmed ? catchZoneAlpha : 0)
+                catchZone
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -52,8 +50,37 @@ struct ShelfPanelView: View {
         .onTapGesture(perform: onExpand)
     }
 
+    // A non-opaque window derives its draggable/clickable region from rendered
+    // alpha: fully transparent pixels are treated as click-through and never
+    // receive draggingEntered. So while a drag might be underway (armed) the
+    // catch zone is filled at the lowest alpha that still registers as a drop
+    // target; when idle it is fully transparent — nothing to see, nothing to
+    // catch (bar the ember itself, whose lit pixels are their own tap target).
+    private var catchZone: some View {
+        Color.black.opacity(state.isArmed ? catchZoneAlpha : 0)
+    }
+
     /// Lowest fill alpha that keeps the collapsed window a valid drop target.
     private let catchZoneAlpha = 0.005
+
+    private var emberLayer: some View {
+        ZStack(alignment: .top) {
+            catchZone
+            if hasContent {
+                NotchEmber(
+                    itemCount: store.items.count,
+                    isStaging: !store.pendingTransfers.isEmpty,
+                    isArmed: state.isArmed,
+                    housingWidth: state.housingWidth
+                )
+                // Clear of the housing's bottom edge by a hair, so the ember
+                // hangs off the notch instead of being clipped behind it.
+                .padding(.top, state.housingDepth + 4)
+                .transition(.opacity.combined(with: .scale(scale: 0.5)))
+            }
+        }
+        .animation(.snappy(duration: 0.3, extraBounce: 0.1), value: hasContent)
+    }
 
     private var notchlessPill: some View {
         ZStack(alignment: .bottom) {

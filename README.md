@@ -60,6 +60,7 @@ standalone installs do it once, by hand. ([why](docs/reference.md#the-one-system
 ## what it does
 
 - **a target that finds the notch** — the drop zone hugs the physical camera housing when a display has one, and falls back to a tidy top-center tray on notchless screens.
+- **you can see it's holding something** — a staged shelf lights a small sage ember under the camera housing: one pip per item, a flare as each one lands, and while a drag is in flight the pips fuse into a landing strip as wide as the notch. notchless screens get the same signal as a counted pill.
 - **it never touches your originals** — every dropped item is *copied* into a private, collision-proof staging area. drop two files with the same name from different folders and both survive. nothing on disk is moved, renamed, or modified, ever.
 - **it handles the awkward producers** — Photos exports, Safari images, and other apps that hand over files lazily (AppKit "file promises") go down their own import path, so they land correctly instead of arriving empty.
 - **it stays responsive** — imports run off the main thread with a two-at-a-time limit, and iCloud placeholders are downloaded explicitly. drop a multi-gigabyte file and the shelf keeps animating.

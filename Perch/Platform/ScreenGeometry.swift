@@ -57,9 +57,17 @@ struct ShelfGeometry: Equatable, Sendable {
     // exit → collapse → re-enter jitter, and the sideways motion read as jank.
     let expandedContentWidth: CGFloat
     let hasCameraHousing: Bool
+    // Depth and width of the physical camera housing. The collapsed indicator is
+    // tucked directly under the housing's bottom edge (never over it, and never
+    // out in the menu-bar band beside it, where status items live), and its armed
+    // landing strip spans the housing exactly. Both are 0 on a notchless display.
+    let housingDepth: CGFloat
+    let housingWidth: CGFloat
 
     init(screen: ScreenDescriptor) {
         hasCameraHousing = screen.hasCameraHousing
+        housingDepth = screen.hasCameraHousing ? screen.safeAreaTop : 0
+        housingWidth = screen.cameraHousingWidth ?? 0
         let centerX = screen.frame.midX
         let collapsedWidth: CGFloat
         let collapsedHeight: CGFloat
