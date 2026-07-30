@@ -12,6 +12,7 @@ struct FilePreview: View {
     let contentType: UTType?
     let size: CGFloat
 
+    @Environment(\.rice) private var rice
     @State private var thumbnail: NSImage?
 
     var body: some View {
@@ -24,14 +25,14 @@ struct FilePreview: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                     .overlay {
                         RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(.white.opacity(0.14), lineWidth: 1)
+                            .strokeBorder(rice.wash(0.14), lineWidth: 1)
                     }
             } else {
                 fileIcon
             }
         }
         .frame(width: size, height: size)
-        .shadow(color: .black.opacity(0.28), radius: 3, y: 1)
+        .shadow(color: rice.shadow(0.28), radius: 3, y: 1)
         .accessibilityHidden(true)
         .task(id: fileURL?.path) { await loadThumbnail() }
     }

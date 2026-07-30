@@ -26,11 +26,14 @@ struct ShelfEmber: View {
     let housingWidth: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.rice) private var rice
 
-    /// Perch's mark green (`#abe1a6`) — deliberately the muted sage of the app
-    /// icon and not a saturated green, which at this size and this close to the
-    /// camera would read as the system's recording indicator.
-    private static let ember = Color(red: 0.671, green: 0.882, blue: 0.651)
+    /// The palette's green — `#abe1a6` under stock nebelung, which is perch's
+    /// mark green: deliberately the muted sage of the app icon and not a
+    /// saturated green, which at this size and this close to the camera would
+    /// read as the system's recording indicator. A latte rice swaps in its own
+    /// green, which is darker for the same reason, against a bright desktop.
+    private var ember: Color { rice.green }
     private static let pipSize: CGFloat = 5
     /// Past this the row stops growing. Presence is the signal, not the total.
     private static let maxPips = 5
@@ -84,24 +87,26 @@ struct ShelfEmber: View {
 
     private var pip: some View {
         Circle()
-            .fill(Self.ember)
-            // The flare's white-hot core, layered over the sage rather than
-            // interpolated into it so the resting colour is always exact.
-            .overlay { Circle().fill(.white).opacity(0.85 * flare) }
+            .fill(ember)
+            // The flare's hot core, layered over the sage rather than
+            // interpolated into it so the resting colour is always exact. It
+            // burns towards the palette's brightest neutral, so on a latte it
+            // reads as a flash rather than as a hole punched in the pip.
+            .overlay { Circle().fill(rice.isLight ? rice.crust : .white).opacity(0.85 * flare) }
             .frame(width: Self.pipSize, height: Self.pipSize)
             .scaleEffect(1 + 0.55 * flare)
-            .modifier(EmberGlow(flare: flare))
+            .modifier(EmberGlow(flare: flare, ember: ember))
             .transition(.opacity.combined(with: .scale(scale: 0.4)))
     }
 
     private var landingStrip: some View {
         Capsule()
-            .fill(Self.ember.opacity(0.85))
+            .fill(ember.opacity(0.85))
             .frame(
                 width: housingWidth > 0 ? housingWidth : Self.notchlessStripWidth,
                 height: 3
             )
-            .modifier(EmberGlow(flare: flare))
+            .modifier(EmberGlow(flare: flare, ember: ember))
     }
 }
 
@@ -110,12 +115,11 @@ struct ShelfEmber: View {
 /// and the strip glow identically.
 private struct EmberGlow: ViewModifier {
     var flare: CGFloat
-
-    private static let ember = Color(red: 0.671, green: 0.882, blue: 0.651)
+    var ember: Color
 
     func body(content: Content) -> some View {
         content
-            .shadow(color: Self.ember.opacity(0.5 + 0.4 * flare), radius: 3 + 5 * flare)
-            .shadow(color: Self.ember.opacity(0.2 + 0.3 * flare), radius: 8 + 10 * flare)
+            .shadow(color: ember.opacity(0.5 + 0.4 * flare), radius: 3 + 5 * flare)
+            .shadow(color: ember.opacity(0.2 + 0.3 * flare), radius: 8 + 10 * flare)
     }
 }

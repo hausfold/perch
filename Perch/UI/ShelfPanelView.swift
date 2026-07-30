@@ -5,10 +5,15 @@ import UniformTypeIdentifiers
 struct ShelfPanelView: View {
     @ObservedObject var store: ShelfStore
     @ObservedObject var settings: AppSettings
+    @ObservedObject var theme: ShelfTheme
     @ObservedObject var state: ShelfPanelState
 
     let onExpand: () -> Void
     let onHide: () -> Void
+
+    /// The palette this pass paints with. Published down the tree as well, for
+    /// the tiles and the ember, which observe nothing else.
+    private var rice: RicePalette { theme.palette }
 
     var body: some View {
         ZStack {
@@ -23,6 +28,11 @@ struct ShelfPanelView: View {
         .animation(.snappy(duration: 0.24, extraBounce: 0.08), value: state.isExpanded)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Perch file shelf")
+        .environment(\.rice, rice)
+        // AppKit's own furniture inside the panel — the staging spinner, the
+        // tile context menus — follows the color scheme rather than our palette,
+        // so a latte rice must not leave dark controls behind on a light shelf.
+        .preferredColorScheme(rice.isLight ? .light : .dark)
     }
 
     private var collapsedShelf: some View {
@@ -82,7 +92,7 @@ struct ShelfPanelView: View {
             // flattens it with the tint so the shelfShape clip actually rounds
             // the bottom (clipShape alone does not reshape an NSGlassEffectView).
             GlassBackground(cornerRadius: 0)
-            Color.black.opacity(0.42)
+            rice.base.opacity(rice.panelTintOpacity)
 
             content
                 .padding(.horizontal, 18)
@@ -95,7 +105,7 @@ struct ShelfPanelView: View {
             // Sides + bottom only — no line across the top, so the panel reads
             // as continuous with the screen edge it grows from.
             ShelfBorderShape(radius: Self.shelfCornerRadius)
-                .stroke(.white.opacity(0.14), lineWidth: 1)
+                .stroke(rice.wash(0.14), lineWidth: 1)
         }
         // The window spans the full catch-zone width so expand only grows
         // downward; the glass is trimmed to its reading width and centered,
@@ -126,7 +136,7 @@ struct ShelfPanelView: View {
         HStack(spacing: 8) {
             Text(itemCountDescription)
                 .font(.body.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(rice.text)
             Spacer(minLength: 8)
             if store.items.count > 1 {
                 dragAllHandle
@@ -135,7 +145,7 @@ struct ShelfPanelView: View {
                 ShelfHeaderButton(
                     title: "Clear",
                     systemImage: "trash",
-                    tint: Color(red: 1, green: 0.42, blue: 0.42),
+                    tint: rice.red,
                     action: { store.clear() }
                 )
                 .accessibilityHint("Deletes every staged copy")
@@ -159,10 +169,10 @@ struct ShelfPanelView: View {
             Text("Drag all \(store.items.count)")
                 .font(.body.weight(.medium))
         }
-        .foregroundStyle(.white.opacity(0.82))
+        .foregroundStyle(rice.text.opacity(0.82))
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Capsule().fill(.white.opacity(0.08)))
+        .background(Capsule().fill(rice.wash(0.08)))
         .contentShape(Capsule())
         .overlay {
             FileDragSourceView(
@@ -226,12 +236,12 @@ struct ShelfPanelView: View {
             Text("Drop here")
                 .font(.title3.weight(.semibold))
         }
-        .foregroundStyle(.white.opacity(state.isDropActive ? 0.9 : 0.5))
+        .foregroundStyle(state.isDropActive ? rice.text : rice.overlay0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
             RoundedRectangle(cornerRadius: 18)
                 .strokeBorder(
-                    .white.opacity(state.isDropActive ? 0.35 : 0.12),
+                    rice.wash(state.isDropActive ? 0.35 : 0.12),
                     style: StrokeStyle(lineWidth: 1.5, dash: [6, 5])
                 )
                 .padding(6)
@@ -305,9 +315,9 @@ struct ShelfPanelView: View {
             .buttonStyle(.plain)
         }
         .font(.caption)
-        .foregroundStyle(.white)
+        .foregroundStyle(rice.onAccent)
         .padding(10)
-        .background(.red.opacity(0.88), in: RoundedRectangle(cornerRadius: 12))
+        .background(rice.red.opacity(0.88), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var itemCountDescription: String {
@@ -347,9 +357,12 @@ private struct ShelfBorderShape: Shape {
 private struct ShelfHeaderButton: View {
     let title: String
     let systemImage: String
-    var tint: Color = .white
+    /// nil means "the palette's label color" — only the destructive button
+    /// names a tint of its own.
+    var tint: Color?
     let action: () -> Void
 
+    @Environment(\.rice) private var rice
     @State private var hovering = false
 
     var body: some View {
@@ -360,11 +373,11 @@ private struct ShelfHeaderButton: View {
                 Text(title)
                     .font(.body.weight(.medium))
             }
-            .foregroundStyle(tint.opacity(hovering ? 1 : 0.82))
+            .foregroundStyle((tint ?? rice.text).opacity(hovering ? 1 : 0.82))
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
-                Capsule().fill(.white.opacity(hovering ? 0.16 : 0.08))
+                Capsule().fill(rice.wash(hovering ? 0.16 : 0.08))
             )
             .contentShape(Capsule())
         }
@@ -389,6 +402,8 @@ private struct FileTile: View {
     let onExportStarted: () -> Void
     let onExportEnded: () -> Void
     let onItemExportFinished: (UUID, ExportOutcome) -> Void
+
+    @Environment(\.rice) private var rice
 
     // Half the inter-tile gap on each side sums to the strip's 14pt spacing;
     // living inside the tile means it collapses to zero with the tile on exit.
@@ -450,7 +465,7 @@ private struct FileTile: View {
             }
             .frame(width: Self.previewSize)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(rice.text)
         .contextMenu {
             Button(item.kind == .image ? "Quick Look" : "Open", action: onOpen)
             Button("Show in Finder", action: onReveal)
@@ -472,16 +487,19 @@ private struct FileTile: View {
             Image(systemName: item.isPinned ? "pin.fill" : "pin")
                 .font(.system(size: 13, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.white.opacity(item.isPinned ? 1 : 0.72))
+                // Pinned wears the palette's green — the shelf's own mark color,
+                // the same one the ember burns — rather than the system accent,
+                // which is the one color on the panel the rice doesn't pick.
+                .foregroundStyle(item.isPinned ? rice.onAccent : rice.text.opacity(0.72))
                 .frame(width: 24, height: 24)
                 .background(
                     Circle().fill(
                         item.isPinned
-                            ? Color.accentColor.opacity(0.88)
-                            : .black.opacity(0.62)
+                            ? rice.green.opacity(0.88)
+                            : rice.crust.opacity(0.62)
                     )
                 )
-                .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+                .shadow(color: rice.shadow(0.4), radius: 2, y: 1)
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
@@ -501,8 +519,8 @@ private struct FileTile: View {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 22))
                 .symbolRenderingMode(.palette)
-                .foregroundStyle(.white, .black.opacity(0.62))
-                .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+                .foregroundStyle(rice.text, rice.crust.opacity(0.62))
+                .shadow(color: rice.shadow(0.4), radius: 2, y: 1)
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
@@ -513,11 +531,11 @@ private struct FileTile: View {
         if let byteCount = item.byteCount {
             Text(ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(rice.subtext0)
         } else {
             Text(item.kind == .folder ? "Folder" : "Item")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(rice.subtext0)
         }
     }
 }
@@ -537,11 +555,13 @@ private struct CollapseClip: Shape {
 private struct PendingTile: View {
     let transfer: PendingTransfer
 
+    @Environment(\.rice) private var rice
+
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(.white.opacity(0.06))
+                    .fill(rice.wash(0.06))
                 ProgressView()
                     .controlSize(.small)
             }
@@ -553,9 +573,9 @@ private struct PendingTile: View {
                 .frame(width: 104)
             Text(phaseLabel)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(rice.subtext0)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(rice.text)
         .frame(width: 108)
         .accessibilityElement(children: .combine)
     }

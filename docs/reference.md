@@ -40,6 +40,31 @@ without renaming your file. The manifest records only **staged relative paths**
 and file metadata; original source paths are never persisted, and never logged.
 Clearing an item deletes its whole import directory.
 
+## Colors
+
+The shelf paints from a nebelung palette. Four variants are built in — the
+default `nebelung` pair and their high-contrast counterparts — and the one in use
+follows macOS Light/Dark:
+
+```text
+~/.config/perch/
+  config.json          { "themeDark": "nebelung", "themeLight": "nebelung-latte" }
+  themes/<name>.json   flat "role": "#hex" map — a nebelung *.hex.json verbatim
+```
+
+A file in `themes/` **shadows** a built-in of the same name, so a palette bump
+lands without a new release, and any Catppuccin-shaped palette drops in under its
+own name. Perch reads seven roles — `base`, `crust`, `overlay0`, `text`,
+`subtext0`, `green`, `red` — and ignores the rest; a missing or malformed file
+falls back to built-in nebelung rather than failing.
+
+On a [nebelhaus](https://github.com/nebelhaus/nebelhaus) rice all of this is
+written for you from `nebelhaus.theme.flavor` / `.contrast`; standalone installs
+can write the two files by hand or ignore them entirely. Perch has no theme
+picker: colors come from the rice, everything else from Settings.
+
+Changes are picked up the next time the shelf opens — no relaunch.
+
 ## The product boundary (v1)
 
 v1 deliberately stages copies and exports copies.
@@ -57,6 +82,10 @@ the UI model. The current design leaves that door open on purpose.
 
 Perch requests **no** Accessibility, Input Monitoring, or Screen Recording
 permission, and has no Dock icon. It sees only what you drop on it.
+
+It is sandboxed, with one read-only exception: `~/.config/perch/`, where the
+theme above lives. That is the only path Perch opens that a drag or a file picker
+didn't hand it, and it is never written.
 
 There is no telemetry. Nothing about your files is written to a log.
 

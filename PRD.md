@@ -20,6 +20,8 @@ collect several items and then drag the group to one destination.
 - Per-item pinning for repeated drag-out copies without removing the staged item.
 - Reduced-motion support, keyboard-readable labels, and no content in logs.
 - Settings for login, display behavior, hover behavior, retention, and clearing.
+- A palette that follows the rice's nebelung variant and macOS Light/Dark, read
+  from `~/.config/perch/` and never written.
 
 ## Acceptance checks
 
