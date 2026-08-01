@@ -63,16 +63,12 @@ struct ShelfGeometry: Equatable, Sendable {
     // beside or behind it where status items live. An auto-hidden menu bar
     // measures 0, which lands the ember on the screen edge, as it should.
     let topEdgeDepth: CGFloat
-    // Width of the physical camera housing, which the ember's armed landing strip
-    // spans exactly. 0 on a notchless display, where the strip sizes itself.
-    let housingWidth: CGFloat
 
     init(screen: ScreenDescriptor) {
         hasCameraHousing = screen.hasCameraHousing
         topEdgeDepth = screen.hasCameraHousing
             ? screen.safeAreaTop
             : max(0, screen.frame.maxY - screen.visibleFrame.maxY)
-        housingWidth = screen.cameraHousingWidth ?? 0
         let centerX = screen.frame.midX
         let collapsedWidth: CGFloat
         let collapsedHeight: CGFloat

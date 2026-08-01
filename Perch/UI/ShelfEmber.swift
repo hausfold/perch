@@ -9,21 +9,17 @@ import SwiftUI
 /// It signals *presence*, never an exact number — a pip per item up to `maxPips`
 /// and no further. To know precisely what is staged, open the shelf.
 ///
-/// Three states, all driven from state the shelf already tracks:
+/// Two states, both driven from state the shelf already tracks:
 ///   * at rest    — one pip per staged item
 ///   * on arrival — the pips flare white-hot and settle back over ~0.6s
-///   * armed      — the pips fuse into a landing strip as wide as the housing, so
-///                  "you can drop here" only appears while a drag could be in
-///                  flight
+///
+/// The mark never reacts to a mouse button being held: the shelf arms its
+/// (invisible) catch zone on every system-wide drag, and turning that into
+/// visible motion made the ember twitch on any click anywhere on screen.
 struct ShelfEmber: View {
     let itemCount: Int
     /// A transfer is still being staged — the ember breathes until it lands.
     let isStaging: Bool
-    /// A mouse button is held somewhere on the system; see `ShelfPanelState.isArmed`.
-    let isArmed: Bool
-    /// Width of the physical camera housing, or 0 on a notchless display, where
-    /// the landing strip falls back to its own width.
-    let housingWidth: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.rice) private var rice
@@ -37,8 +33,6 @@ struct ShelfEmber: View {
     private static let pipSize: CGFloat = 5
     /// Past this the row stops growing. Presence is the signal, not the total.
     private static let maxPips = 5
-    /// Strip width when there is no housing to match.
-    private static let notchlessStripWidth: CGFloat = 132
 
     /// 0 at rest, 1 at the peak of a new-item flare.
     @State private var flare: CGFloat = 0
@@ -46,26 +40,19 @@ struct ShelfEmber: View {
     @State private var breathing = false
 
     var body: some View {
-        ZStack {
-            if isArmed {
-                landingStrip
-            } else {
-                pips
+        pips
+            .opacity(isStaging && breathing ? 0.42 : 1)
+            .animation(breathAnimation, value: breathing)
+            .onChange(of: itemCount) { previous, current in
+                // Only a landing flares; items leaving the shelf just fade a pip out.
+                guard current > previous, !reduceMotion else { return }
+                withAnimation(.easeOut(duration: 0.1)) { flare = 1 }
+                withAnimation(.easeOut(duration: 0.6).delay(0.1)) { flare = 0 }
             }
-        }
-        .animation(.snappy(duration: 0.22), value: isArmed)
-        .opacity(isStaging && breathing ? 0.42 : 1)
-        .animation(breathAnimation, value: breathing)
-        .onChange(of: itemCount) { previous, current in
-            // Only a landing flares; items leaving the shelf just fade a pip out.
-            guard current > previous, !reduceMotion else { return }
-            withAnimation(.easeOut(duration: 0.1)) { flare = 1 }
-            withAnimation(.easeOut(duration: 0.6).delay(0.1)) { flare = 0 }
-        }
-        .onChange(of: isStaging, initial: true) { _, staging in
-            breathing = staging && !reduceMotion
-        }
-        .accessibilityLabel(itemCount == 1 ? "1 item staged" : "\(itemCount) items staged")
+            .onChange(of: isStaging, initial: true) { _, staging in
+                breathing = staging && !reduceMotion
+            }
+            .accessibilityLabel(itemCount == 1 ? "1 item staged" : "\(itemCount) items staged")
     }
 
     /// A single toggle animated `repeatForever` oscillates for as long as the
@@ -98,21 +85,10 @@ struct ShelfEmber: View {
             .modifier(EmberGlow(flare: flare, ember: ember))
             .transition(.opacity.combined(with: .scale(scale: 0.4)))
     }
-
-    private var landingStrip: some View {
-        Capsule()
-            .fill(ember.opacity(0.85))
-            .frame(
-                width: housingWidth > 0 ? housingWidth : Self.notchlessStripWidth,
-                height: 3
-            )
-            .modifier(EmberGlow(flare: flare, ember: ember))
-    }
 }
 
 /// Two stacked shadows — a tight core and a wide bloom — so the ember looks lit
-/// rather than drawn. Both widen with the flare. Kept as one modifier so the pip
-/// and the strip glow identically.
+/// rather than drawn. Both widen with the flare.
 private struct EmberGlow: ViewModifier {
     var flare: CGFloat
     var ember: Color
