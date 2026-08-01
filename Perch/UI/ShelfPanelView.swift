@@ -50,9 +50,7 @@ struct ShelfPanelView: View {
             if hasContent {
                 ShelfEmber(
                     itemCount: store.items.count,
-                    isStaging: !store.pendingTransfers.isEmpty,
-                    isArmed: state.isArmed,
-                    housingWidth: state.housingWidth
+                    isStaging: !store.pendingTransfers.isEmpty
                 )
                 // Clear of the top-edge furniture by a hair, so the ember hangs
                 // off it instead of being clipped behind it.
