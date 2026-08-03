@@ -18,6 +18,8 @@ which tool reads which file is [`.agents/README.md`](./.agents/README.md).
 - Persist relative staged paths only; never persist or log original paths.
 - A visible `ShelfItem` must point at a completed staged representation.
 - Keep display/window code out of importing and persistence.
+- Licensing is offline: no network call, no entitlement, no file outside the
+  container. The free-tier cap is decided before staging, never mid-drag.
 
 ## Build
 

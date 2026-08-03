@@ -13,6 +13,10 @@ final class ShelfStore: ObservableObject {
 
     private let pipeline: TransferPipeline
     private let settings: AppSettings
+    /// Admission policy, not display: the free tier caps how many tiles the
+    /// shelf holds, and that decision has to happen before staging starts so a
+    /// refused item is never copied and then thrown away.
+    private let license: LicenseStore
     private let logger = Logger(subsystem: "com.nebelhaus.perch", category: "Shelf")
     // The live `qlmanage -p` preview, if any, so a new double-click can replace
     // it instead of stacking another window on top.
@@ -22,10 +26,39 @@ final class ShelfStore: ObservableObject {
     // staged bytes are still on disk — see `liftForExport`.
     private var lifted: [UUID: (item: ShelfItem, index: Int)] = [:]
 
-    init(repository: StagingRepository, settings: AppSettings) {
+    init(
+        repository: StagingRepository,
+        settings: AppSettings,
+        license: LicenseStore = .shared
+    ) {
         self.repository = repository
         self.settings = settings
+        self.license = license
         pipeline = TransferPipeline(repository: repository)
+    }
+
+    // MARK: - Free-tier admission
+    //
+    // Decided here, before a single byte is staged. An item that doesn't fit is
+    // never copied, so nothing is written and then deleted, and the original —
+    // which perch never touches anyway — stays exactly where it was.
+
+    /// How many of `count` incoming items the current license lets on.
+    private func admissible(_ count: Int) -> Int {
+        LicenseStore.admissible(
+            requested: count,
+            onShelf: items.count + pendingTransfers.count,
+            capacity: license.capacity
+        )
+    }
+
+    /// Trim an incoming batch to what fits, telling the shelf's strip about
+    /// whatever didn't.
+    private func admit<T>(_ incoming: [T]) -> [T] {
+        let room = admissible(incoming.count)
+        guard room < incoming.count else { return incoming }
+        license.noteCapReached(refused: incoming.count - room)
+        return Array(incoming.prefix(room))
     }
 
     var exportedURLs: [URL] {
@@ -39,7 +72,7 @@ final class ShelfStore: ObservableObject {
     }
 
     func importFileURLs(_ urls: [URL]) {
-        for url in urls {
+        for url in admit(urls) {
             let transferID = UUID()
             pendingTransfers.append(
                 PendingTransfer(
@@ -68,6 +101,7 @@ final class ShelfStore: ObservableObject {
     }
 
     func importText(_ text: String, suggestedName: String = "Text.txt") {
+        guard admit([text]).count == 1 else { return }
         let transferID = UUID()
         pendingTransfers.append(
             PendingTransfer(id: transferID, displayName: suggestedName, phase: .copying)
@@ -87,6 +121,7 @@ final class ShelfStore: ObservableObject {
     }
 
     func importImage(_ image: NSImage) {
+        guard admit([image]).count == 1 else { return }
         let transferID = UUID()
         pendingTransfers.append(
             PendingTransfer(id: transferID, displayName: "Image.png", phase: .copying)
@@ -102,6 +137,10 @@ final class ShelfStore: ObservableObject {
     }
 
     func beginPromisedImports(_ receivers: [NSFilePromiseReceiver]) {
+        // Trim before asking the source for anything: an unadmitted promise is
+        // one we never ask the other app to write, so the cap costs no work on
+        // either side of the drag.
+        let receivers = admit(receivers)
         guard !receivers.isEmpty else { return }
         let batchID = UUID()
         let batchDirectory: URL

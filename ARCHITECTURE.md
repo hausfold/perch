@@ -8,6 +8,10 @@
 4. A manifest never contains an absolute source path.
 5. Every exported dragging session advertises copy only.
 6. Display topology is replaceable without touching storage or import logic.
+7. Licensing is offline: it adds no network call, no entitlement, and no file
+   outside the container.
+8. The free-tier cap is decided before staging starts, so a refused item is
+   never copied and no drag is interrupted.
 
 ## Boundaries
 
@@ -16,9 +20,13 @@ NSDraggingDestination
         │
         ▼
 ShelfDropHandler ── distinguishes promises / file URLs / images / links / text
-        │
+        │              (a .nebelhauslicense is a key, not cargo — it goes to
+        │               LicenseStore and is never staged)
         ▼
 ShelfStore ─────── main-actor state, pending/completed/error transitions
+        │           admission is checked here, before any bytes are copied
+        │
+        ├── LicenseStore ────── offline Ed25519 verify, CalVer coverage, the cap
         │
         ├── TransferPipeline ── bounded background work, iCloud + coordination
         │
@@ -99,6 +107,32 @@ receipts ever stop being readable from inside the container. The poll is the
 app's only network call and the only reason it holds
 `com.apple.security.network.client`; a Settings toggle stops it, and DEBUG builds
 never run it. See ADR 0003.
+
+### Knowing whether this Mac paid
+
+`LicenseStore` verifies a `.nebelhauslicense` — a small signed JSON blob — with
+CryptoKit against an Ed25519 public key baked into the app, and stores the file
+verbatim in the container's defaults. There is no activation call, no sign-in,
+and nothing to revoke: licensing adds no network traffic and no entitlement, so
+the update poll above stays the app's only network call. The signature covers a
+canonical fixed-order `key=value` payload rather than the JSON, because the
+signer (a Worker) and the verifier (this app) share no code and JSON
+canonicalization is where that kind of pair silently drifts apart.
+
+Entitlement is a date comparison: a license covers builds stamped on or before
+`purchased + 1 year`, so `bench release` needs no version bookkeeping and a
+build a license covered keeps working forever. A build with no CalVer date — an
+Xcode build, or a `bench try` branch build — stays covered rather than reading
+as lapsed.
+
+Unlicensed, the shelf holds three tiles. Admission is computed in `ShelfStore`
+against `items + pendingTransfers` **before** staging begins, so an item that
+doesn't fit is never copied and no drag is interrupted; a batch is trimmed
+rather than refused wholesale. The ask appears only once a drop has actually hit
+the ceiling, on the same bottom strip the release nudge uses, and outranks it
+while both are live. Until the public key constant is filled in, `canSell` is
+false and there is no cap at all — a paywall with no purchasable door is worse
+than no paywall. See ADR 0004.
 
 ### Name collisions
 
