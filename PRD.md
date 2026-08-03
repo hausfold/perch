@@ -22,6 +22,9 @@ collect several items and then drag the group to one destination.
 - Settings for login, display behavior, hover behavior, retention, and clearing.
 - A palette that follows the rice's nebelung variant and macOS Light/Dark, read
   from `~/.config/perch/` and never written.
+- A passive release nudge that names the right next step for *this* install
+  (rice, Homebrew, Nix, drag-install), is dismissible per version, and never
+  installs anything itself.
 
 ## Acceptance checks
 
@@ -34,6 +37,8 @@ collect several items and then drag the group to one destination.
 7. Drag any one tile to Finder; every completed item is offered and originals
    remain present.
 8. Enable auto-remove; cancelled drags keep the shelf, successful copies clear it.
+9. With a newer release published, the open shelf offers this install's own
+   update step; dismissing it silences that version and no other.
 
 ## Deferred without refactor
 

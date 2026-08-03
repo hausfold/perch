@@ -81,6 +81,25 @@ home-relative sandbox exception and forces two details: the real home comes from
 rice must drop **real files**, since the sandbox resolves a symlink into
 `/nix/store` before it checks the path and denies it. See ADR 0002.
 
+### Knowing there is a new release
+
+`UpdateCheck` asks GitHub for the latest tag hourly (and on wake), compares it to
+this build's CalVer, and — if it is newer and not already dismissed — pins a
+strip along the bottom of the expanded shelf plus a row in the menu bar menu.
+Dismissal is per version, so waving one release away still surfaces the next.
+
+It never installs anything. Perch is sandboxed, so it cannot replace its own
+bundle in `/Applications` and a `brew` spawned from here would inherit the same
+sandbox; instead the button copies this install's command (`haus update`,
+`brew upgrade --cask perch`, `nix flake update perch`) or opens the release page.
+Which of those it offers comes from `InstallKind`, resolved from the bundle path
+plus two out-of-band receipts — the rice's `perch.installed-from` marker and
+brew's Caskroom directory — with the rice's theme drop as a third signal if the
+receipts ever stop being readable from inside the container. The poll is the
+app's only network call and the only reason it holds
+`com.apple.security.network.client`; a Settings toggle stops it, and DEBUG builds
+never run it. See ADR 0003.
+
 ### Name collisions
 
 Every logical import owns a UUID directory. The user-visible filename remains

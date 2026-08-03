@@ -7,6 +7,10 @@ struct ShelfPanelView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var theme: ShelfTheme
     @ObservedObject var state: ShelfPanelState
+    /// The shelf is perch's only window, so it is also where a pending release
+    /// gets to say so. Observed rather than owned: one check feeds every panel
+    /// (one per display) and the menu bar item.
+    @ObservedObject var update: UpdateCheck = .shared
 
     let onExpand: () -> Void
     let onHide: () -> Void
@@ -119,15 +123,28 @@ struct ShelfPanelView: View {
         }
     }
 
-    @ViewBuilder private var content: some View {
-        if hasContent {
-            VStack(spacing: 10) {
+    private var content: some View {
+        VStack(spacing: 10) {
+            if hasContent {
                 header
                 itemStrip
+            } else {
+                emptyState
             }
-        } else {
-            emptyState
+            if showsUpdateStrip {
+                UpdateStrip(check: update)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(.snappy(duration: 0.28), value: showsUpdateStrip)
+    }
+
+    /// The nudge is the lowest-priority thing on the shelf: it yields to a drag
+    /// in progress (the empty shelf is a drop target then, not a noticeboard)
+    /// and to an error, which occupies the same bottom edge.
+    private var showsUpdateStrip: Bool {
+        guard !state.isDropActive, store.latestError == nil else { return false }
+        return update.pendingVersion != nil || update.statusNote != nil
     }
 
     private var header: some View {
@@ -321,6 +338,91 @@ struct ShelfPanelView: View {
     private var itemCountDescription: String {
         let count = store.items.count
         return count == 1 ? "1 item" : "\(count) items"
+    }
+}
+
+/// The shelf's update surface — pounce pins a palette row, trill shows a
+/// sidebar card, perch gets one quiet strip along the bottom of the open shelf.
+///
+/// Two shapes share the slot: a pending release (version, this install's next
+/// step, the button), and the transient answer to a menu-bar "Check for
+/// Updates…" that found nothing — which would otherwise be a menu item with no
+/// visible effect.
+///
+/// The button never installs anything: perch is sandboxed, so every cohort gets
+/// its command copied or the release page opened (see UpdateCheck). The ✕
+/// dismisses this version only — the next release asks again.
+private struct UpdateStrip: View {
+    @ObservedObject var check: UpdateCheck
+
+    @Environment(\.rice) private var rice
+
+    var body: some View {
+        if let pending = check.pendingVersion {
+            row {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.body)
+                    .foregroundStyle(rice.green)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Perch \(pending) is out")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(rice.text)
+                    // The note (a copied command) takes over from the standing
+                    // hint while it's live.
+                    Text(check.statusNote ?? check.installKind.actionHint)
+                        .font(.caption)
+                        .foregroundStyle(rice.subtext0)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Button {
+                    check.performUpdate()
+                } label: {
+                    Text(check.installKind.buttonLabel)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(rice.onAccent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(rice.green.opacity(0.88)))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                dismissButton { check.dismiss() }
+                    .help("Dismiss until the next release")
+            }
+        } else if let note = check.statusNote {
+            row {
+                Image(systemName: "checkmark.circle")
+                    .font(.callout)
+                    .foregroundStyle(rice.overlay0)
+                Text(note)
+                    .font(.caption)
+                    .foregroundStyle(rice.subtext0)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                dismissButton { check.clearNote() }
+            }
+        }
+    }
+
+    private func dismissButton(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(rice.overlay0)
+                .frame(width: 20, height: 20)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Dismiss")
+    }
+
+    private func row<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        HStack(spacing: 8) { content() }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(rice.wash(0.07), in: RoundedRectangle(cornerRadius: 10))
+            .accessibilityElement(children: .contain)
     }
 }
 

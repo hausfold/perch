@@ -5,6 +5,7 @@ import SwiftUI
 struct PerchApp: App {
     @NSApplicationDelegateAdaptor(PerchAppDelegate.self) private var appDelegate
     @StateObject private var runtime = AppRuntime.shared
+    @StateObject private var update = UpdateCheck.shared
 
     var body: some Scene {
         MenuBarExtra {
@@ -19,6 +20,22 @@ struct PerchApp: App {
                 Button("Clear Shelf", role: .destructive) {
                     runtime.store.clear()
                 }
+            }
+
+            Divider()
+            // The shelf's update strip is only visible while the shelf is open,
+            // so the menu carries the same nudge for anyone who never opens it.
+            // Both entries open the shelf too: that is where the answer to a
+            // check — and the confirmation that a command was copied — lands.
+            if let pending = update.pendingVersion {
+                Button("Perch \(pending) is available…") {
+                    update.performUpdate()
+                    runtime.windowSystem.toggleShelfOnPointerScreen()
+                }
+            }
+            Button("Check for Updates…") {
+                update.checkForUpdates(userInitiated: true)
+                runtime.windowSystem.toggleShelfOnPointerScreen()
             }
 
             Divider()
