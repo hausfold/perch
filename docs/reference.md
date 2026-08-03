@@ -89,6 +89,32 @@ didn't hand it, and it is never written.
 
 There is no telemetry. Nothing about your files is written to a log.
 
+Perch makes exactly one kind of network call: an hourly unauthenticated GET to
+`api.github.com` for perch's own latest release tag, so the shelf can tell you a
+new version is out. It carries nothing but an IP and a user-agent, downloads no
+file, and Settings ▸ Updates switches it off. That is what
+`com.apple.security.network.client` is for.
+
+## Updating
+
+When a newer release exists, the open shelf grows a strip along its bottom edge
+("Perch 2026.08.05 is out") and the menu bar menu grows a matching row. `✕`
+dismisses that version — the next release asks again.
+
+Perch never installs the update itself: being sandboxed, it cannot replace its
+own bundle in `/Applications`, and it would rather tell you the truth than fail
+quietly. So the button does whatever *your* install needs — it knows which one
+you have:
+
+| installed by | the button does |
+| --- | --- |
+| the nebelhaus rice | copies `haus update` |
+| Homebrew | copies `brew upgrade --cask perch` |
+| a Nix store path | copies `nix flake update perch` |
+| dragging the release ZIP | opens the release page |
+
+See [ADR 0003](architecture-decisions/0003-update-nudge-without-self-update.md).
+
 ## The one system setting perch needs
 
 Turn **off** System Settings ▸ Desktop & Dock ▸ *"Drag windows to top of screen

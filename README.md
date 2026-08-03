@@ -36,7 +36,7 @@ Shelf apps aren't new — Yoink, Dropover, and friends have carried the idea for
 years. Perch's angle is **dependability and restraint**:
 
 - **copies, not moves** — a shelf that *moves* your only copy can delete it before the destination finished reading it. Perch stages copies and exports copies, so an interrupted drag never loses data.
-- **minimal permissions, no surveillance** — no Accessibility, no input taps, no screen reading, no Dock icon, no telemetry. nothing about your files is ever written to a log.
+- **minimal permissions, no surveillance** — no Accessibility, no input taps, no screen reading, no Dock icon, no telemetry. nothing about your files is ever written to a log. the only network call it makes is an hourly look at perch's own release tag, and Settings turns that off.
 - **native and calm** — one sandbox-friendly menu-bar app in the [nebelung](https://github.com/nebelhaus/nebelung) fog-grey palette, which follows your rice's flavor and contrast and swaps with macOS Light/Dark.
 
 ## install
@@ -67,6 +67,7 @@ standalone installs do it once, by hand. ([why](docs/reference.md#the-one-system
 - **it survives a relaunch** — completed items are written to an atomic manifest. quit and reopen and your pile is still there; startup even recovers files whose manifest write got interrupted.
 - **pin it for repeat drops** — pin a tile and it stays on the shelf after a successful drag, ready to drop into several destinations in quick succession. the pin survives relaunch; unpinning restores the usual one-and-done behavior.
 - **it drags out as a group, and clears the shelf** — grab any tile and every completed item comes with it, advertised as a copy. Once a destination accepts the drop, the item leaves the shelf; a refused or cancelled drag springs the tiles back. Your original files are never touched — only Perch's staged copies move.
+- **it tells you when there's a newer perch** — a quiet strip along the bottom of the open shelf, and a row in the menu bar menu. it knows how *you* installed perch, so the button copies the right command (`haus update`, `brew upgrade --cask perch`, `nix flake update perch`) or opens the release page — perch is sandboxed and never swaps its own bytes behind your back. dismissing a version dismisses that version, not the feature.
 - **it follows you around** — one panel per display, tracking Space, fullscreen, and Stage Manager changes with public AppKit behavior. on Tahoe it wears `NSGlassEffectView`; older systems get an AppKit material fallback.
 
 > "Perch" is a working title. Product naming is deliberately kept separate from

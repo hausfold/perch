@@ -30,6 +30,7 @@ final class AppRuntime: ObservableObject {
         NSApp.setActivationPolicy(.accessory)
         store.restore()
         windowSystem.start()
+        UpdateCheck.shared.start()
     }
 
     func openSettings() {
