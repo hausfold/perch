@@ -148,6 +148,18 @@ entries, and scans two-level UUID containers for completed but uncommitted
 files. Promise callbacks and ordinary copies converge on the same `ShelfItem`
 commit path.
 
+Recovery is a fallback, never an overwrite. It invents a fresh UUID, a fresh
+`addedAt` and an unpinned item for every file it adopts, so a manifest that
+*exists but could not be read* must never be written back over — "unreadable"
+and "absent" are separate outcomes in `load()`, and only the absent one lets
+recovery persist. The manifest is written
+`.completeFileProtectionUntilFirstUserAuthentication`: encrypted at rest, but
+guaranteed readable for the whole login session. It was previously
+`.completeFileProtectionUnlessOpen`, which is unreadable once closed until the
+Mac is next unlocked — so a shelf reloaded after a lock read as empty, recovered
+every file under a new identity, and wrote that over the real manifest, silently
+losing what was pinned.
+
 ### Copy versus move
 
 Imports copy; exports advertise `.copy`. Dragging an item (or the whole stack)
