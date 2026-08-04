@@ -47,7 +47,7 @@ no input taps, and no screen reading. A licensing phone-home would spend it.
   `MARKETING_VERSION`. No version bookkeeping, no server opinion, and `bench
   release` is untouched end-to-end. A build a license covered keeps working
   forever — coverage is a fact about two dates.
-- **The free tier is a working shelf capped at three tiles**, not a trial timer.
+- **The free tier is a working shelf capped at two tiles**, not a trial timer.
   Perch's value is habitual, so a cap lets light use stay free forever and
   converts exactly the people who have just felt the ceiling. It is also the
   only honest shape under the sandbox: trial state lives in a container the user
@@ -59,7 +59,7 @@ no input taps, and no screen reading. A licensing phone-home would spend it.
   copies). A batch is trimmed, not refused: five files onto an empty free shelf
   fills it rather than doing nothing.
 - **The ask appears only after a drop actually hit the ceiling.** An unlicensed
-  shelf under three tiles never sees a word about buying. The strip reuses ADR
+  shelf under two tiles never sees a word about buying. The strip reuses ADR
   0003's surface at the bottom of the open shelf and outranks the release nudge
   when both are live, because it answers something the user just did.
 - **The cap and the ability to honour a license are one switch.** Until the
@@ -67,6 +67,10 @@ no input taps, and no screen reading. A licensing phone-home would spend it.
   no cap and no License pane at all. A capped shelf with no purchasable license
   would be a paywall with no door: it would take the free shelf away from
   everyone already using perch and offer them nothing to do about it.
+
+The runbook for the day that switch is flipped — minting the keypair, the exact
+signing contract the Worker must honour, and what to verify before and after —
+is [`docs/going-paid.md`](../going-paid.md).
 
 ## Consequences
 

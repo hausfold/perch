@@ -125,7 +125,7 @@ build a license covered keeps working forever. A build with no CalVer date — a
 Xcode build, or a `bench try` branch build — stays covered rather than reading
 as lapsed.
 
-Unlicensed, the shelf holds three tiles. Admission is computed in `ShelfStore`
+Unlicensed, the shelf holds two tiles. Admission is computed in `ShelfStore`
 against `items + pendingTransfers` **before** staging begins, so an item that
 doesn't fit is never copied and no drag is interrupted; a batch is trimmed
 rather than refused wholesale. The ask appears only once a drop has actually hit

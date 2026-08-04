@@ -451,7 +451,7 @@ private struct UpdateStrip: View {
 /// The free tier's one moment of friction, and the whole marketing funnel.
 ///
 /// It appears only after a drop actually hit the ceiling — an unlicensed shelf
-/// under three tiles never sees it, which is the point: light use stays free
+/// under two tiles never sees it, which is the point: light use stays free
 /// and unbothered forever, and the ask arrives exactly when someone has just
 /// demonstrated they want more than the free shelf gives.
 ///

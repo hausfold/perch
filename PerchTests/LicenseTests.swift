@@ -203,16 +203,25 @@ final class LicenseTests: XCTestCase {
 
     // MARK: - The free-tier cap
 
-    func testTheFreeShelfAdmitsUpToThree() {
+    /// Pinned against `freeTierCapacity` rather than a literal, so moving the
+    /// product knob doesn't need the arithmetic re-derived by hand — the shape
+    /// of the rule is what's under test, not the number.
+    func testTheFreeShelfFillsToItsCapAndNoFurther() {
         let cap = LicenseStore.freeTierCapacity
         XCTAssertEqual(LicenseStore.admissible(requested: 1, onShelf: 0, capacity: cap), 1)
-        XCTAssertEqual(LicenseStore.admissible(requested: 3, onShelf: 0, capacity: cap), 3)
-        // The classic case: three on the shelf, a fourth dropped.
-        XCTAssertEqual(LicenseStore.admissible(requested: 1, onShelf: 3, capacity: cap), 0)
-        // A partial batch is admitted, not refused wholesale — dropping five
+        XCTAssertEqual(LicenseStore.admissible(requested: cap, onShelf: 0, capacity: cap), cap)
+        // The classic case: a full free shelf, one more dropped.
+        XCTAssertEqual(LicenseStore.admissible(requested: 1, onShelf: cap, capacity: cap), 0)
+        // A partial batch is admitted, not refused wholesale — dropping a pile
         // onto an empty free shelf fills it rather than doing nothing.
-        XCTAssertEqual(LicenseStore.admissible(requested: 5, onShelf: 0, capacity: cap), 3)
-        XCTAssertEqual(LicenseStore.admissible(requested: 5, onShelf: 2, capacity: cap), 1)
+        XCTAssertEqual(LicenseStore.admissible(requested: cap + 5, onShelf: 0, capacity: cap), cap)
+        XCTAssertEqual(LicenseStore.admissible(requested: cap + 5, onShelf: cap - 1, capacity: cap), 1)
+    }
+
+    /// The knob itself: a free tier of zero would be a hard paywall wearing a
+    /// free tier's clothes, and the plan says this only ever moves looser.
+    func testTheFreeTierIsAWorkingShelfNotAZero() {
+        XCTAssertGreaterThanOrEqual(LicenseStore.freeTierCapacity, 1)
     }
 
     /// A licensed shelf has no ceiling at all.

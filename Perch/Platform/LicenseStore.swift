@@ -4,7 +4,7 @@ import os
 // MARK: - LicenseStore
 //
 // Owns the app's licensing state and the one rule the free tier enforces: an
-// unlicensed shelf holds three tiles.
+// unlicensed shelf holds two tiles.
 //
 // **Why a cap and not a trial timer.** Perch's value is habitual — the third
 // week is when you stop reaching for a Downloads window. A timer converts on a
@@ -34,7 +34,7 @@ final class LicenseStore: ObservableObject {
     ///
     /// A product knob, not a code knob: watch conversion before moving it, and
     /// only ever move it *looser*. Tightening a free tier reads as a rug-pull.
-    nonisolated static let freeTierCapacity = 3
+    nonisolated static let freeTierCapacity = 2
 
     /// Where the store buys a license. Same page the README points at.
     nonisolated static let purchaseURL = URL(string: "https://nebelhaus.com/perch")!
@@ -178,9 +178,9 @@ final class LicenseStore: ObservableObject {
     /// How many of `requested` new items fit. Pure, so the suite can pin the
     /// arithmetic without a shelf.
     ///
-    /// Counts pending transfers as occupied: three files still staging have
-    /// already claimed their slots, and admitting a fourth because they haven't
-    /// landed yet would let the cap be walked past by dropping fast.
+    /// Counts pending transfers as occupied: files still staging have already
+    /// claimed their slots, and admitting more because they haven't landed yet
+    /// would let the cap be walked past by dropping fast.
     nonisolated static func admissible(requested: Int, onShelf: Int, capacity: Int?) -> Int {
         guard let capacity else { return requested }
         return max(0, min(requested, capacity - onShelf))
