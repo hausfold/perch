@@ -48,6 +48,78 @@ final class StagingRepositoryTests: XCTestCase {
         XCTAssertEqual(repository.load(), [])
     }
 
+    // MARK: - The manifest has to be readable, and unreadable must not mean gone
+    //
+    // These two pin the fix for a bug that showed up as "flaky tests": the
+    // manifest was written with `.completeFileProtectionUnlessOpen`, which makes
+    // a file unreadable once closed until the Mac is next unlocked. Every test
+    // that round-tripped a persisted manifest failed inside that window, and the
+    // one test that wrote a manifest by hand (without the protection class)
+    // passed — which is what identified it. In the real app the same window
+    // meant: shelf reloads, manifest reads as absent, recovery re-adopts every
+    // staged file with a new UUID and no pin state, and writes that back over
+    // the real manifest. Pins gone, permanently.
+
+    /// The class perch writes with must be readable for a whole login session.
+    func testTheManifestIsNotWrittenWithALockedFileProtectionClass() {
+        XCTAssertTrue(StagingRepository.manifestWriteOptions.contains(.atomic))
+        XCTAssertFalse(
+            StagingRepository.manifestWriteOptions.contains(.completeFileProtectionUnlessOpen),
+            "unreadable after a lock — perch reloads its shelf long after one"
+        )
+        XCTAssertFalse(
+            StagingRepository.manifestWriteOptions.contains(.completeFileProtection),
+            "unreadable while the screen is locked, same problem"
+        )
+        XCTAssertTrue(
+            StagingRepository.manifestWriteOptions
+                .contains(.completeFileProtectionUntilFirstUserAuthentication),
+            "still encrypted at rest, just not against its own app"
+        )
+    }
+
+    /// The safety net, for any other reason a read might fail — a bad sector, a
+    /// half-written file, a manifest from a newer perch. Recovery may rebuild
+    /// the shelf in memory, but it must never write its guess over the truth.
+    func testAnUnreadableManifestIsNeverOverwrittenByRecovery() throws {
+        let directory = try repository.allocateImportDirectory()
+        let url = directory.appending(path: "pinned.txt")
+        try Data("staged".utf8).write(to: url)
+        var item = try repository.item(forStagedURL: url)
+        item.isPinned = true
+        try repository.persist([item])
+
+        // Whatever made it unreadable — here, bytes that will not decode.
+        let manifestURL = root.appending(path: "manifest.json")
+        let corrupt = Data("this is not a manifest".utf8)
+        try corrupt.write(to: manifestURL)
+
+        // The shelf still comes up: the file on disk is adopted so the user
+        // isn't shown an empty shelf...
+        let loaded = repository.load()
+        XCTAssertEqual(loaded.count, 1)
+
+        // ...but the manifest is left exactly as it was found, so nothing about
+        // the real item — its id, its pin, when it arrived — was destroyed by a
+        // read that might succeed next time.
+        XCTAssertEqual(try Data(contentsOf: manifestURL), corrupt)
+    }
+
+    /// The ordinary case still writes back: an absent manifest is a fresh
+    /// shelf, and recovery is exactly what should populate it.
+    func testAnAbsentManifestIsStillWrittenByRecovery() throws {
+        let directory = try repository.allocateImportDirectory()
+        try Data("staged".utf8).write(to: directory.appending(path: "found.txt"))
+
+        XCTAssertEqual(repository.load().count, 1)
+
+        let manifestURL = root.appending(path: "manifest.json")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: manifestURL.path))
+        // And it round-trips: the id recovery invented is the id a relaunch sees.
+        let relaunched = try StagingRepository(rootURL: root)
+        XCTAssertEqual(relaunched.load().map(\.id), repository.load().map(\.id))
+    }
+
     func testManifestWrittenBeforePinningRestoresAsUnpinned() throws {
         let id = UUID()
         let directory = try repository.allocateImportDirectory()

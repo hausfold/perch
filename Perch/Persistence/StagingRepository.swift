@@ -59,13 +59,11 @@ final class StagingRepository: @unchecked Sendable {
     func load() -> [ShelfItem] {
         lock.withLock {
             cleanupUnusableContainers()
+            let read = readManifest()
             let decoded: [ShelfItem]
-            if let data = try? Data(contentsOf: manifestURL),
-               let manifest = try? JSONDecoder.perch.decode(ShelfManifest.self, from: data),
-               manifest.version <= ShelfManifest.currentVersion {
-                decoded = manifest.items
-            } else {
-                decoded = []
+            switch read {
+            case let .items(items): decoded = items
+            case .absent, .unreadable: decoded = []
             }
 
             let existing = decoded.filter { item in
@@ -78,8 +76,19 @@ final class StagingRepository: @unchecked Sendable {
             }
             let recovered = recoverUntrackedFiles(excluding: Set(existing.map(\.relativePath)))
             let result = (existing + recovered).sorted { $0.addedAt < $1.addedAt }
-            if result != decoded {
-                try? persistUnlocked(result)
+
+            // A manifest we could not read is the one case where recovery must
+            // NOT write back. Recovery invents a fresh UUID, a fresh `addedAt`
+            // and an unpinned item for every file it adopts, so rewriting here
+            // would replace a manifest that is merely unreadable *right now*
+            // with a strictly worse one — losing pins and identities that are
+            // still perfectly intact on disk. Better a shelf that rebuilt
+            // itself for one launch than a manifest destroyed forever.
+            guard case .unreadable = read else {
+                if result != decoded {
+                    try? persistUnlocked(result)
+                }
+                return result
             }
             return result
         }
@@ -201,9 +210,51 @@ final class StagingRepository: @unchecked Sendable {
         return retained
     }
 
+    /// How the manifest hits the disk.
+    ///
+    /// **Not `.completeFileProtectionUnlessOpen`.** That class makes a file
+    /// unreadable once it has been closed until the Mac is next unlocked — and
+    /// perch is an accessory app that stays running for weeks and reloads its
+    /// shelf on restore. A manifest written before a lock and read after one
+    /// came back as "no manifest", which sent `load()` down the recovery path:
+    /// every staged file re-adopted with a brand-new UUID, no pin state, a new
+    /// `addedAt` — and then written back over the real manifest. The shelf
+    /// silently forgot what was pinned and re-dated everything on it.
+    ///
+    /// `.completeFileProtectionUntilFirstUserAuthentication` keeps the manifest
+    /// encrypted at rest (a powered-off Mac, before the first unlock after
+    /// boot) while guaranteeing it is readable for the whole of a login
+    /// session — which is exactly the window in which perch runs.
+    static let manifestWriteOptions: Data.WritingOptions = [
+        .atomic,
+        .completeFileProtectionUntilFirstUserAuthentication,
+    ]
+
+    /// The three outcomes of reading the manifest. "Unreadable" is deliberately
+    /// distinct from "absent": an absent manifest means a fresh shelf and
+    /// recovery may write one, while an unreadable one means the truth is still
+    /// on disk and must not be overwritten by a guess. Collapsing the two is
+    /// what turned a transient read failure into permanent data loss.
+    private enum ManifestRead {
+        case items([ShelfItem])
+        case absent
+        case unreadable
+    }
+
+    private func readManifest() -> ManifestRead {
+        guard fileManager.fileExists(atPath: manifestURL.path) else { return .absent }
+        guard let data = try? Data(contentsOf: manifestURL) else { return .unreadable }
+        guard let manifest = try? JSONDecoder.perch.decode(ShelfManifest.self, from: data),
+              manifest.version <= ShelfManifest.currentVersion
+        else {
+            return .unreadable
+        }
+        return .items(manifest.items)
+    }
+
     private func persistUnlocked(_ items: [ShelfItem]) throws {
         let data = try JSONEncoder.perch.encode(ShelfManifest(items: items))
-        try data.write(to: manifestURL, options: [.atomic, .completeFileProtectionUnlessOpen])
+        try data.write(to: manifestURL, options: Self.manifestWriteOptions)
     }
 
     private func recoverUntrackedFiles(excluding knownPaths: Set<String>) -> [ShelfItem] {
