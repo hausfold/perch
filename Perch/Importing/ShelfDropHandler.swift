@@ -4,9 +4,11 @@ import UniformTypeIdentifiers
 @MainActor
 final class ShelfDropHandler {
     private let store: ShelfStore
+    private let license: LicenseStore
 
-    init(store: ShelfStore) {
+    init(store: ShelfStore, license: LicenseStore = .shared) {
         self.store = store
+        self.license = license
     }
 
     var registeredTypes: [NSPasteboard.PasteboardType] {
@@ -52,7 +54,18 @@ final class ShelfDropHandler {
             forClasses: [NSURL.self],
             options: [.urlReadingFileURLsOnly: true]
         ) as? [URL], !urls.isEmpty {
-            store.importFileURLs(urls)
+            // Activating perch by dropping your license on the shelf is the
+            // most perch way imaginable to activate perch — and it is
+            // sandbox-legal, because a dropped file is a file the user handed
+            // us. A license is consumed, never staged: it is a key, not cargo.
+            let licenses = urls.filter(LicenseStore.isLicenseFile)
+            for url in licenses {
+                license.importLicense(from: url)
+            }
+            let cargo = urls.filter { !LicenseStore.isLicenseFile($0) }
+            if !cargo.isEmpty {
+                store.importFileURLs(cargo)
+            }
             return true
         }
 

@@ -11,6 +11,9 @@ struct ShelfPanelView: View {
     /// gets to say so. Observed rather than owned: one check feeds every panel
     /// (one per display) and the menu bar item.
     @ObservedObject var update: UpdateCheck = .shared
+    /// Same reasoning as `update`: one entitlement feeds every panel, and the
+    /// free-tier ceiling is announced on the same bottom strip.
+    @ObservedObject var license: LicenseStore = .shared
 
     let onExpand: () -> Void
     let onHide: () -> Void
@@ -131,12 +134,26 @@ struct ShelfPanelView: View {
             } else {
                 emptyState
             }
-            if showsUpdateStrip {
-                UpdateStrip(check: update)
+            // One slot, two tenants. The cap note wins when both are live: it
+            // is the answer to something the user just did, while the release
+            // nudge has been waiting patiently and can wait another minute.
+            if showsLicenseStrip {
+                LicenseStrip(license: license)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if showsUpdateStrip {
+                UpdateStrip(check: update, license: license)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(.snappy(duration: 0.28), value: showsUpdateStrip)
+        .animation(.snappy(duration: 0.28), value: showsLicenseStrip)
+    }
+
+    /// The free-tier ceiling, announced only after a drop actually hit it —
+    /// perch never nags an unlicensed shelf that is under the cap.
+    private var showsLicenseStrip: Bool {
+        guard !state.isDropActive, store.latestError == nil else { return false }
+        return license.capNote != nil
     }
 
     /// The nudge is the lowest-priority thing on the shelf: it yields to a drag
@@ -354,6 +371,7 @@ struct ShelfPanelView: View {
 /// dismisses this version only — the next release asks again.
 private struct UpdateStrip: View {
     @ObservedObject var check: UpdateCheck
+    @ObservedObject var license: LicenseStore
 
     @Environment(\.rice) private var rice
 
@@ -368,8 +386,12 @@ private struct UpdateStrip: View {
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(rice.text)
                     // The note (a copied command) takes over from the standing
-                    // hint while it's live.
-                    Text(check.statusNote ?? check.installKind.actionHint)
+                    // hint while it's live. A release outside the update year
+                    // outranks both: taking it would drop this Mac to the free
+                    // tier, so say so before the button is pressed, not after.
+                    Text(check.statusNote
+                        ?? license.renewalHint(forRelease: pending)
+                        ?? check.installKind.actionHint)
                         .font(.caption)
                         .foregroundStyle(rice.subtext0)
                         .lineLimit(1)
@@ -415,6 +437,76 @@ private struct UpdateStrip: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Dismiss")
+    }
+
+    private func row<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        HStack(spacing: 8) { content() }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(rice.wash(0.07), in: RoundedRectangle(cornerRadius: 10))
+            .accessibilityElement(children: .contain)
+    }
+}
+
+/// The free tier's one moment of friction, and the whole marketing funnel.
+///
+/// It appears only after a drop actually hit the ceiling — an unlicensed shelf
+/// under two tiles never sees it, which is the point: light use stays free
+/// and unbothered forever, and the ask arrives exactly when someone has just
+/// demonstrated they want more than the free shelf gives.
+///
+/// So the copy states a fact and makes an offer. It does not scold, it does not
+/// imply anything was lost (nothing was — perch only ever copies, and the items
+/// that didn't fit are untouched where they came from), and the ✕ makes it go
+/// away without buying anything.
+private struct LicenseStrip: View {
+    @ObservedObject var license: LicenseStore
+
+    @Environment(\.rice) private var rice
+
+    var body: some View {
+        if let note = license.capNote {
+            row {
+                Image(systemName: "tray.full")
+                    .font(.body)
+                    .foregroundStyle(rice.green)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(note)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(rice.text)
+                        .lineLimit(1)
+                    Text("Perch is $19 once — unlimited tiles, a year of updates, yours forever.")
+                        .font(.caption)
+                        .foregroundStyle(rice.subtext0)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Button {
+                    NSWorkspace.shared.open(LicenseStore.purchaseURL)
+                    license.clearCapNote()
+                } label: {
+                    Text("Get Perch")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(rice.onAccent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(rice.green.opacity(0.88)))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                Button {
+                    license.clearCapNote()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(rice.overlay0)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss")
+            }
+        }
     }
 
     private func row<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
