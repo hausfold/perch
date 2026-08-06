@@ -55,6 +55,33 @@ public struct RefusedItem: Codable, Sendable, Equatable {
     }
 }
 
+/// One item of the Mac's shelf as shown to a paired phone: enough to list,
+/// order, and decide whether it can be fetched.
+public struct RemoteEntry: Codable, Sendable, Equatable, Identifiable {
+    public let id: UUID
+    public let displayName: String
+    public let kindHint: String
+    public let contentTypeIdentifier: String?
+    public let byteCount: Int64?
+    public let addedAt: Date
+
+    public init(
+        id: UUID,
+        displayName: String,
+        kindHint: String,
+        contentTypeIdentifier: String?,
+        byteCount: Int64?,
+        addedAt: Date
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.kindHint = kindHint
+        self.contentTypeIdentifier = contentTypeIdentifier
+        self.byteCount = byteCount
+        self.addedAt = addedAt
+    }
+}
+
 /// Every control message that can appear on the wire. JSON with a `t`
 /// discriminator so a foreign or future peer fails loudly, not quietly.
 public enum WireMessage: Sendable, Equatable {
@@ -74,6 +101,14 @@ public enum WireMessage: Sendable, Equatable {
     case itemFailed(itemID: UUID, reason: String)
     case bye
 
+    // The reverse direction: a paired phone browsing, pulling from, and
+    // pruning the Mac's shelf. Always phone-initiated — the Mac never dials.
+    case shelfListRequest
+    case shelfList(entries: [RemoteEntry])
+    case fetchItem(itemID: UUID)
+    case removeItem(itemID: UUID)
+    case removeAck(itemID: UUID)
+
     case failure(code: FailureCode, message: String)
 
     public enum FailureCode: String, Codable, Sendable {
@@ -91,6 +126,7 @@ extension WireMessage: Codable {
         case version, deviceID, deviceName, publicKey, auth
         case macID, macName, nonce, reason
         case transferID, items, itemIDs, refused, itemID
+        case entries
         case code, message
     }
 
@@ -98,6 +134,7 @@ extension WireMessage: Codable {
         case pairRequest, pairResponse, pairConfirm, pairStored, pairRefused
         case hello, helloAck
         case offer, accept, itemDone, stored, itemFailed, bye
+        case shelfListRequest, shelfList, fetchItem, removeItem, removeAck
         case failure
     }
 
@@ -158,6 +195,16 @@ extension WireMessage: Codable {
             )
         case .bye:
             self = .bye
+        case .shelfListRequest:
+            self = .shelfListRequest
+        case .shelfList:
+            self = try .shelfList(entries: container.decode([RemoteEntry].self, forKey: .entries))
+        case .fetchItem:
+            self = try .fetchItem(itemID: container.decode(UUID.self, forKey: .itemID))
+        case .removeItem:
+            self = try .removeItem(itemID: container.decode(UUID.self, forKey: .itemID))
+        case .removeAck:
+            self = try .removeAck(itemID: container.decode(UUID.self, forKey: .itemID))
         case .failure:
             self = try .failure(
                 code: container.decode(FailureCode.self, forKey: .code),
@@ -220,6 +267,20 @@ extension WireMessage: Codable {
             try container.encode(reason, forKey: .reason)
         case .bye:
             try container.encode(Tag.bye, forKey: .t)
+        case .shelfListRequest:
+            try container.encode(Tag.shelfListRequest, forKey: .t)
+        case let .shelfList(entries):
+            try container.encode(Tag.shelfList, forKey: .t)
+            try container.encode(entries, forKey: .entries)
+        case let .fetchItem(itemID):
+            try container.encode(Tag.fetchItem, forKey: .t)
+            try container.encode(itemID, forKey: .itemID)
+        case let .removeItem(itemID):
+            try container.encode(Tag.removeItem, forKey: .t)
+            try container.encode(itemID, forKey: .itemID)
+        case let .removeAck(itemID):
+            try container.encode(Tag.removeAck, forKey: .t)
+            try container.encode(itemID, forKey: .itemID)
         case let .failure(code, message):
             try container.encode(Tag.failure, forKey: .t)
             try container.encode(code, forKey: .code)
