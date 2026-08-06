@@ -141,7 +141,7 @@ while both are live. Until the public key constant is filled in, `canSell` is
 false and there is no cap at all — a paywall with no purchasable door is worse
 than no paywall. See ADR 0004.
 
-### Arrivals from a paired iPhone
+### One shelf, two windows onto it
 
 The iOS companion (`PerchIOS/` + `PerchShare/`, sharing `PerchWire/` and the
 staging layout via `PerchMobileCore/`) is a shelf of its own: a share stages a
@@ -154,6 +154,21 @@ dot-directory on the shelf's volume, are digest-verified, and enter the shelf
 through the same admission-first, atomic-commit path as a drag. Pairing lives
 in the Keychain; revoking a device deletes its row. The wire protocol, the
 pairing ceremony, and the no-relay stance are ADR 0005.
+
+The same session runs the other way. The Mac never dials a phone — a phone is
+asleep, off-network, or behind a lock screen most of the time — so "shared and
+in sync" means the phone *asks*: `shelfListRequest` → `shelfList`, `fetchItem`
+→ an offer followed by the same chunk stream a delivery uses, `removeItem` →
+`removeAck`. `MobileReceiver` answers all three from `ShelfStore` (digesting
+off the main actor; folders are refused with a stated reason, because the wire
+carries one file per item). The phone polls every few seconds while it is in
+the foreground and the Mac is visible, on top of pull-to-refresh — no push, no
+background wake, nothing to keep alive. A fetch is a **copy**: the item stays
+on the shelf until someone removes it from either end, and removals from the
+phone go through the shelf's ordinary `remove`. Pulled files land in a
+`MacInbox` container, deliberately *not* the phone's shelf root — anything in
+there is an outbox entry and would be delivered straight back — and are handed
+to the system share sheet, which is what "save this" means on iOS.
 
 ### Name collisions
 
@@ -224,7 +239,7 @@ True move-original semantics are still not inferred from modifier keys.
 - Expiration while running: scheduler calling the existing prune operation.
 - Explicit move workflow: extend the promise `ExportTransaction`, never a change to importing.
 - Finder actions and share actions: commands over completed staged URLs.
-- Mac→phone direction: a `send shelf to phone` is a new offer flow over the
-  same session layer, never a new transport.
+- Push from the Mac (a phone that learns of a new tile without asking): needs a
+  wake path — a relay or a notification — not a change to the wire.
 - An opt-in encrypted relay for delivery while both devices are away: slots
   into the outbox's `waiting → delivered` states without a model rewrite.

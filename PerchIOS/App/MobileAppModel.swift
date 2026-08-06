@@ -26,11 +26,22 @@ final class MobileAppModel: ObservableObject {
         case failed(String)
     }
 
+    /// A file just pulled off the Mac, on its way to the share sheet.
+    struct IncomingFile: Identifiable {
+        let id = UUID()
+        let url: URL
+    }
+
     @Published private(set) var items: [ShelfItem] = []
     @Published private(set) var deliveries: [UUID: MobileShelf.Delivery] = [:]
     @Published private(set) var presence: MacPresence = .none
     @Published private(set) var pairingPhase: PairingPhase = .idle
     @Published private(set) var isFlushing = false
+    /// What the Mac's shelf holds, as of the last sync.
+    @Published private(set) var remoteItems: [RemoteEntry] = []
+    @Published private(set) var isSyncing = false
+    @Published private(set) var fetching: Set<UUID> = []
+    @Published var incoming: IncomingFile?
     @Published var notice: String?
 
     let shelf: MobileShelf?
@@ -40,6 +51,11 @@ final class MobileAppModel: ObservableObject {
     /// Bumped when the user cancels, so a lingering pairing task can't write
     /// state (or worse, store a pairing) after being abandoned.
     private var pairingAttempt = 0
+    /// The foreground poll. The Mac never dials a phone, so "shared and in
+    /// sync" has to mean the phone asks — often enough to feel live, rarely
+    /// enough to stay invisible.
+    private var syncTask: Task<Void, Never>?
+    private static let syncInterval = Duration.seconds(5)
 
     init() {
         shelf = try? MobileShelf()
@@ -54,7 +70,9 @@ final class MobileAppModel: ObservableObject {
     func becameActive() {
         refresh()
         shelf?.pruneReceipts()
+        MobileRemote.pruneInbox()
         startBrowsing()
+        startSyncing()
         // Automated end-to-end runs stage and pair from the environment —
         // there is no finger to do it.
         #if DEBUG
@@ -72,6 +90,8 @@ final class MobileAppModel: ObservableObject {
 
     func becameInactive() {
         browser.stop()
+        syncTask?.cancel()
+        syncTask = nil
     }
 
     func refresh() {
@@ -87,6 +107,17 @@ final class MobileAppModel: ObservableObject {
         case let (mac?, _?):
             presence = .nearby(name: mac.name)
         }
+        // An away Mac's shelf is unknowable, not empty-but-stale: showing the
+        // last list would invite taps that can only fail.
+        if case .nearby = presence {} else {
+            remoteItems = []
+        }
+    }
+
+    /// The paired Mac's endpoint if the live browser can see it right now.
+    private var macEndpoint: NWEndpoint? {
+        guard let mac = pairing.pairedMac() else { return nil }
+        return discovered.first(where: { $0.macID == mac.id })?.endpoint
     }
 
     private func startBrowsing() {
@@ -96,10 +127,22 @@ final class MobileAppModel: ObservableObject {
                 discovered = macs
                 let wasAway = if case .away = presence { true } else { false }
                 refresh()
-                // The Mac just walked in and things are waiting — deliver.
+                // The Mac just walked in and things are waiting — deliver, and
+                // find out what it has been holding while we were apart.
                 if wasAway, case .nearby = presence {
                     await flush()
+                    await syncRemote()
                 }
+            }
+        }
+    }
+
+    private func startSyncing() {
+        guard syncTask == nil else { return }
+        syncTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.syncRemote()
+                try? await Task.sleep(for: MobileAppModel.syncInterval)
             }
         }
     }
@@ -193,6 +236,9 @@ final class MobileAppModel: ObservableObject {
         switch await MobileDelivery.flush(shelf: shelf, pairing: pairing) {
         case let .delivered(count):
             notice = count == 1 ? "1 item is on your Mac." : "\(count) items are on your Mac."
+            // What just left the phone is now the Mac's; show it there rather
+            // than making the user wait for the next poll to believe it.
+            await syncRemote()
         case let .waiting(count, reason):
             if let reason {
                 notice = reason
@@ -203,6 +249,70 @@ final class MobileAppModel: ObservableObject {
             }
         case .nothingWaiting, .notPaired:
             break
+        }
+    }
+
+    // MARK: - The Mac's half of the shelf
+
+    /// Asks the Mac what it is holding. Cheap and silent by design: it runs on
+    /// a timer, so an away Mac or an in-flight sync must cost nothing and say
+    /// nothing.
+    func syncRemote(announceFailure: Bool = false) async {
+        guard pairing.pairedMac() != nil else {
+            remoteItems = []
+            return
+        }
+        guard !isSyncing else { return }
+        guard let endpoint = macEndpoint else {
+            remoteItems = []
+            if announceFailure, case let .away(name) = presence {
+                notice = "\(name) isn't on this network right now."
+            }
+            return
+        }
+        isSyncing = true
+        defer { isSyncing = false }
+        do {
+            remoteItems = try await MobileRemote.list(pairing: pairing, endpoint: endpoint)
+        } catch {
+            if announceFailure {
+                notice = error.localizedDescription
+            }
+        }
+    }
+
+    /// Pulls one item down and hands it to the share sheet — the phone's only
+    /// honest "save": iOS has no shelf of its own to drop it on.
+    func fetch(_ entry: RemoteEntry) async {
+        guard !fetching.contains(entry.id) else { return }
+        guard entry.kindHint != ShelfItem.Kind.folder.rawValue else {
+            notice = "Folders can't be pulled to a phone yet."
+            return
+        }
+        fetching.insert(entry.id)
+        defer { fetching.remove(entry.id) }
+        do {
+            let url = try await MobileRemote.fetch(
+                entry,
+                pairing: pairing,
+                endpoint: macEndpoint
+            )
+            incoming = IncomingFile(url: url)
+        } catch {
+            notice = error.localizedDescription
+        }
+    }
+
+    /// Swiping an item away on the phone takes it off the Mac's shelf too —
+    /// one shelf, two windows onto it.
+    func removeRemote(_ entry: RemoteEntry) async {
+        let previous = remoteItems
+        remoteItems.removeAll { $0.id == entry.id }
+        do {
+            try await MobileRemote.remove(entry, pairing: pairing, endpoint: macEndpoint)
+        } catch {
+            notice = error.localizedDescription
+            remoteItems = previous
         }
     }
 

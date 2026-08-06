@@ -99,6 +99,50 @@ public enum WirePairingClient {
     }
 }
 
+/// The hello exchange that opens every phone-initiated session, after which
+/// the connection is sealed in both directions.
+///
+/// Deliveries and shelf browsing share it: the Mac never dials, so *every*
+/// conversation starts here, and a session is free to do both.
+public enum WireSession {
+    public static func open(
+        to endpoint: NWEndpoint,
+        deviceID: UUID,
+        deviceKey: Data
+    ) async throws -> WireConnection {
+        let connection = WireConnection(to: endpoint)
+        do {
+            try await connection.start()
+            let phoneNonce = WireCrypto.randomSecret(16)
+            try await connection.sendPlaintext(.hello(
+                version: WireProtocol.version,
+                deviceID: deviceID,
+                nonce: phoneNonce
+            ))
+            let ack = try await connection.receivePlaintextMessage()
+            guard case let .helloAck(_, macNonce) = ack else {
+                if case let .failure(_, message) = ack {
+                    throw WireClientError.peerFailure(message)
+                }
+                throw WireClientError.unexpectedReply
+            }
+            let keys = WireCrypto.sessionKeys(
+                deviceKey: SymmetricKey(data: deviceKey),
+                phoneNonce: phoneNonce,
+                macNonce: macNonce
+            )
+            await connection.secure(
+                send: FrameCryptor(key: keys.phoneToMac),
+                receive: FrameCryptor(key: keys.macToPhone)
+            )
+            return connection
+        } catch {
+            await connection.cancel()
+            throw error
+        }
+    }
+}
+
 /// One item the phone wants to deliver.
 public struct OutgoingItem: Sendable {
     public let offered: OfferedItem
@@ -129,33 +173,12 @@ public enum WireTransferClient {
         onEvent: @Sendable (TransferEvent) async -> Void
     ) async throws {
         guard !items.isEmpty else { return }
-        let connection = WireConnection(to: endpoint)
-        defer { Task { await connection.cancel() } }
-        try await connection.start()
-
-        let phoneNonce = WireCrypto.randomSecret(16)
-        try await connection.sendPlaintext(.hello(
-            version: WireProtocol.version,
+        let connection = try await WireSession.open(
+            to: endpoint,
             deviceID: deviceID,
-            nonce: phoneNonce
-        ))
-        let ack = try await connection.receivePlaintextMessage()
-        guard case let .helloAck(_, macNonce) = ack else {
-            if case let .failure(_, message) = ack {
-                throw WireClientError.peerFailure(message)
-            }
-            throw WireClientError.unexpectedReply
-        }
-
-        let keys = WireCrypto.sessionKeys(
-            deviceKey: SymmetricKey(data: deviceKey),
-            phoneNonce: phoneNonce,
-            macNonce: macNonce
+            deviceKey: deviceKey
         )
-        await connection.secure(
-            send: FrameCryptor(key: keys.phoneToMac),
-            receive: FrameCryptor(key: keys.macToPhone)
-        )
+        defer { Task { await connection.cancel() } }
 
         let transferID = UUID()
         try await connection.send(.control(.offer(
@@ -173,7 +196,9 @@ public enum WireTransferClient {
         for item in items where acceptedSet.contains(item.offered.id) {
             await onEvent(.sending(itemID: item.offered.id))
             do {
-                try await stream(item, over: connection, onEvent: onEvent)
+                try await WireStreaming.send(item, over: connection) { sent, total in
+                    await onEvent(.progress(itemID: item.offered.id, sent: sent, of: total))
+                }
             } catch let error as WireClientError {
                 await onEvent(.failed(itemID: item.offered.id, reason: error.localizedDescription))
                 throw error
@@ -191,30 +216,5 @@ public enum WireTransferClient {
             }
         }
         try await connection.send(.control(.bye))
-    }
-
-    private static func stream(
-        _ item: OutgoingItem,
-        over connection: WireConnection,
-        onEvent: @Sendable (TransferEvent) async -> Void
-    ) async throws {
-        guard let handle = FileHandle(forReadingAtPath: item.fileURL.path) else {
-            throw WireClientError.fileUnreadable(item.offered.displayName)
-        }
-        defer { try? handle.close() }
-        var offset: Int64 = 0
-        while true {
-            guard let data = try handle.read(upToCount: WireProtocol.chunkSize),
-                  !data.isEmpty
-            else {
-                break
-            }
-            try await connection.send(.chunk(itemID: item.offered.id, offset: offset, data: data))
-            offset += Int64(data.count)
-            await onEvent(.progress(itemID: item.offered.id, sent: offset, of: item.offered.byteCount))
-        }
-        guard offset == item.offered.byteCount else {
-            throw WireClientError.fileUnreadable(item.offered.displayName)
-        }
     }
 }

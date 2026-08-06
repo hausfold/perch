@@ -24,6 +24,30 @@ final class WireProtocolTests: XCTestCase {
         XCTAssertEqual(decoded, .control(message))
     }
 
+    func testReverseDirectionMessagesRoundtrip() throws {
+        let itemID = UUID()
+        let messages: [WireMessage] = [
+            .shelfListRequest,
+            .shelfList(entries: [RemoteEntry(
+                id: itemID,
+                displayName: "note.txt",
+                kindHint: "text",
+                contentTypeIdentifier: "public.plain-text",
+                byteCount: 42,
+                addedAt: Date(timeIntervalSince1970: 1_700_000_000)
+            )]),
+            .fetchItem(itemID: itemID),
+            .removeItem(itemID: itemID),
+            .removeAck(itemID: itemID),
+        ]
+        for message in messages {
+            XCTAssertEqual(
+                try WirePayload.decoded(from: WirePayload.control(message).encoded()),
+                .control(message)
+            )
+        }
+    }
+
     func testChunkPayloadRoundtrip() throws {
         let itemID = UUID()
         let bytes = Data((0..<1024).map { UInt8($0 % 251) })

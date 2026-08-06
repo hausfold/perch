@@ -96,6 +96,124 @@ final class WireLoopbackTests: XCTestCase {
         }
     }
 
+    /// The reverse direction end to end: the phone lists the Mac's shelf,
+    /// pulls one item down byte-for-byte, and prunes another off it.
+    func testPhoneListsFetchesAndRemovesFromTheMacShelf() async throws {
+        let identity = MacIdentity(id: UUID(), name: "Loopback Mac")
+        let delegate = LoopbackDelegate(
+            identity: identity,
+            spool: spoolDirectory,
+            shelf: shelfDirectory,
+            pairingSecret: nil
+        )
+        let server = WireServer(delegate: delegate)
+        try server.start(identity: identity)
+        defer { server.stop() }
+        let port = try XCTUnwrap(waitForPort(server))
+        let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: port)!)
+
+        let offer = PairingOffer(
+            macID: identity.id,
+            macName: identity.name,
+            secret: WireCrypto.randomSecret()
+        )
+        delegate.setPairingSecret(offer.secret)
+        let deviceID = UUID()
+        let mac = try await WirePairingClient.pair(
+            offer: offer,
+            endpoint: endpoint,
+            deviceID: deviceID,
+            deviceName: "Test iPhone"
+        ) { _ in true }
+
+        // Two things on the Mac's shelf, one of them big enough to span many
+        // chunk frames.
+        let noteURL = shelfDirectory.appending(path: "note.txt")
+        try Data("dragged onto the notch".utf8).write(to: noteURL)
+        var big = Data(capacity: 2 << 20)
+        for index in 0..<(2 << 20) {
+            big.append(UInt8(truncatingIfNeeded: index &* 17))
+        }
+        let bigURL = shelfDirectory.appending(path: "reverse.bin")
+        try big.write(to: bigURL)
+        let noteID = UUID()
+        let bigID = UUID()
+        delegate.place(noteURL, id: noteID)
+        delegate.place(bigURL, id: bigID)
+
+        let client = try await WireRemoteClient.connect(
+            to: endpoint,
+            deviceID: deviceID,
+            deviceKey: mac.deviceKey
+        )
+
+        let listed = try await client.list()
+        XCTAssertEqual(Set(listed.map(\.id)), [noteID, bigID])
+        XCTAssertEqual(listed.first(where: { $0.id == bigID })?.byteCount, Int64(big.count))
+
+        let inbox = spoolDirectory.appending(path: "inbox")
+        let fetched = try await client.fetch(bigID, into: inbox)
+        XCTAssertEqual(fetched.lastPathComponent, "reverse.bin")
+        XCTAssertEqual(try Data(contentsOf: fetched), big)
+        // Fetching is a copy: the Mac still holds it.
+        XCTAssertEqual(delegate.served().count, 2)
+
+        try await client.remove(noteID)
+        XCTAssertEqual(delegate.served().map(\.id), [bigID])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: noteURL.path))
+        // The same session keeps working after a removal.
+        let afterRemoval = try await client.list()
+        XCTAssertEqual(afterRemoval.map(\.id), [bigID])
+
+        await client.close()
+    }
+
+    /// A fetch for something the Mac no longer has must come back as a stated
+    /// failure, not a hung phone waiting on bytes that will never arrive.
+    func testFetchingAVanishedItemFails() async throws {
+        let identity = MacIdentity(id: UUID(), name: "Loopback Mac")
+        let delegate = LoopbackDelegate(
+            identity: identity,
+            spool: spoolDirectory,
+            shelf: shelfDirectory,
+            pairingSecret: nil
+        )
+        let server = WireServer(delegate: delegate)
+        try server.start(identity: identity)
+        defer { server.stop() }
+        let port = try XCTUnwrap(waitForPort(server))
+        let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: port)!)
+
+        let offer = PairingOffer(
+            macID: identity.id,
+            macName: identity.name,
+            secret: WireCrypto.randomSecret()
+        )
+        delegate.setPairingSecret(offer.secret)
+        let deviceID = UUID()
+        let mac = try await WirePairingClient.pair(
+            offer: offer,
+            endpoint: endpoint,
+            deviceID: deviceID,
+            deviceName: "Test iPhone"
+        ) { _ in true }
+
+        let client = try await WireRemoteClient.connect(
+            to: endpoint,
+            deviceID: deviceID,
+            deviceKey: mac.deviceKey
+        )
+        do {
+            _ = try await client.fetch(UUID(), into: spoolDirectory.appending(path: "inbox"))
+            XCTFail("Fetching an unknown item must fail")
+        } catch {
+            // Expected — and the session survives it.
+        }
+        let stillListable = try await client.list()
+        XCTAssertEqual(stillListable.count, 0)
+        await client.close()
+    }
+
     func testUnpairedDeviceIsRefused() async throws {
         let identity = MacIdentity(id: UUID(), name: "Loopback Mac")
         let delegate = LoopbackDelegate(
@@ -172,6 +290,7 @@ private final class LoopbackDelegate: WireServerDelegate, @unchecked Sendable {
     private let shelf: URL
     private var secret: Data?
     private var peer: PairedPeer?
+    private var shelved: [(id: UUID, url: URL)] = []
 
     init(identity: MacIdentity, spool: URL, shelf: URL, pairingSecret: Data?) {
         macIdentity = identity
@@ -217,13 +336,62 @@ private final class LoopbackDelegate: WireServerDelegate, @unchecked Sendable {
     }
 
     func commit(_ item: OfferedItem, stagedFileURL: URL, from peer: PairedPeer) throws {
-        try FileManager.default.moveItem(
-            at: stagedFileURL,
-            to: shelf.appending(path: item.displayName)
-        )
+        let landed = shelf.appending(path: item.displayName)
+        try FileManager.default.moveItem(at: stagedFileURL, to: landed)
+        lock.withLock { shelved.append((id: item.id, url: landed)) }
     }
 
     func transferFailed(_ item: OfferedItem, from peer: PairedPeer, reason: String) {}
+
+    // MARK: - Serving the shelf back
+
+    /// Everything committed here, in arrival order — the loopback stand-in for
+    /// the Mac's ShelfStore.
+    func served() -> [(id: UUID, url: URL)] {
+        lock.withLock { shelved }
+    }
+
+    func shelfEntries(for peer: PairedPeer) -> [RemoteEntry] {
+        lock.withLock { shelved }.map { entry in
+            let size = (try? entry.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            return RemoteEntry(
+                id: entry.id,
+                displayName: entry.url.lastPathComponent,
+                kindHint: "file",
+                contentTypeIdentifier: nil,
+                byteCount: Int64(size),
+                addedAt: Date()
+            )
+        }
+    }
+
+    func readItem(_ itemID: UUID, for peer: PairedPeer) throws -> OutgoingItem {
+        guard let entry = lock.withLock({ shelved.first { $0.id == itemID } }) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        return try WireStreaming.offer(
+            id: entry.id,
+            displayName: entry.url.lastPathComponent,
+            contentTypeIdentifier: nil,
+            kindHint: "file",
+            fileURL: entry.url
+        )
+    }
+
+    func removeItem(_ itemID: UUID, for peer: PairedPeer) throws {
+        let removed: URL? = lock.withLock {
+            guard let index = shelved.firstIndex(where: { $0.id == itemID }) else { return nil }
+            return shelved.remove(at: index).url
+        }
+        guard let removed else { throw CocoaError(.fileNoSuchFile) }
+        try FileManager.default.removeItem(at: removed)
+    }
+
+    /// Puts a file on the loopback shelf without a transfer, so the reverse
+    /// direction can be tested on its own.
+    func place(_ url: URL, id: UUID = UUID()) {
+        lock.withLock { shelved.append((id: id, url: url)) }
+    }
 }
 
 /// Event sink usable from a @Sendable callback.
