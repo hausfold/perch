@@ -17,7 +17,12 @@ final class MobileAppModel: ObservableObject {
     enum PairingPhase: Equatable {
         case idle
         case searching
-        case confirming(code: String)
+        /// The phone has done its part; the code is shown passively while the
+        /// person presses Approve on the Mac. No tap needed here — possession
+        /// of the QR secret already authenticated both ends, the digits are
+        /// only there to compare if you're worried someone photographed your
+        /// QR.
+        case awaitingMacApproval(code: String)
         case failed(String)
     }
 
@@ -32,7 +37,9 @@ final class MobileAppModel: ObservableObject {
     private let pairing = MacPairingStore()
     private let browser = WireBrowser()
     private var discovered: [DiscoveredMac] = []
-    private var confirmAnswer: ((Bool) -> Void)?
+    /// Bumped when the user cancels, so a lingering pairing task can't write
+    /// state (or worse, store a pairing) after being abandoned.
+    private var pairingAttempt = 0
 
     init() {
         shelf = try? MobileShelf()
@@ -206,25 +213,20 @@ final class MobileAppModel: ObservableObject {
     }
 
     func pair(with offerString: String) {
-        guard PairingOffer.decode(from: offerString) != nil else {
+        guard let offer = PairingOffer.decode(from: offerString) else {
             pairingPhase = .failed("That does not look like a Perch pairing code.")
             return
         }
-        let offer = PairingOffer.decode(from: offerString)!
         pairingPhase = .searching
+        pairingAttempt += 1
+        let attempt = pairingAttempt
         Task {
-            await runPairing(offer)
+            await runPairing(offer, attempt: attempt)
         }
     }
 
-    func answerConfirmation(_ accepted: Bool) {
-        confirmAnswer?(accepted)
-        confirmAnswer = nil
-    }
-
     func resetPairing() {
-        confirmAnswer?(false)
-        confirmAnswer = nil
+        pairingAttempt += 1
         pairingPhase = .idle
     }
 
@@ -233,12 +235,14 @@ final class MobileAppModel: ObservableObject {
         refresh()
     }
 
-    private func runPairing(_ offer: PairingOffer) async {
+    private func runPairing(_ offer: PairingOffer, attempt: Int) async {
         guard let endpoint = await MobileDelivery.discover(
             macID: offer.macID,
             timeout: .seconds(10)
         ) else {
-            pairingPhase = .failed("“\(offer.macName)” is not visible on this network. Same Wi-Fi, Perch running?")
+            if attempt == pairingAttempt {
+                pairingPhase = .failed("“\(offer.macName)” is not visible on this network. Same Wi-Fi, Perch running?")
+            }
             return
         }
         let identity = MobileConfig.deviceIdentity()
@@ -249,33 +253,24 @@ final class MobileAppModel: ObservableObject {
                 deviceID: identity.id,
                 deviceName: identity.name
             ) { [weak self] code in
-                await withCheckedContinuation { continuation in
-                    Task { @MainActor [weak self] in
-                        guard let self else {
-                            continuation.resume(returning: false)
-                            return
-                        }
-                        // Automated runs can't tap Confirm.
-                        #if DEBUG
-                        if ProcessInfo.processInfo.environment["PERCH_AUTOPAIR"] == "1" {
-                            continuation.resume(returning: true)
-                            return
-                        }
-                        #endif
-                        confirmAnswer = { accepted in
-                            continuation.resume(returning: accepted)
-                        }
-                        pairingPhase = .confirming(code: code)
-                    }
+                // The phone's half is done the moment the keys agree; show
+                // the digits and hand the one human decision to the Mac.
+                await MainActor.run { [weak self] in
+                    guard let self, attempt == self.pairingAttempt else { return }
+                    self.pairingPhase = .awaitingMacApproval(code: code)
                 }
+                return true
             }
+            guard attempt == pairingAttempt else { return }
             try pairing.store(mac)
             pairingPhase = .idle
             notice = "Paired with \(mac.name)."
             refresh()
             await flush()
         } catch {
-            pairingPhase = .failed(error.localizedDescription)
+            if attempt == pairingAttempt {
+                pairingPhase = .failed(error.localizedDescription)
+            }
         }
     }
 }

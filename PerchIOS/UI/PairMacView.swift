@@ -45,22 +45,22 @@ struct PairMacView: View {
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        case let .confirming(code):
+        case let .awaitingMacApproval(code):
             VStack(spacing: 16) {
-                Text("Do the digits match?")
+                Text("Now approve on your Mac")
                     .font(.title2.weight(.semibold))
-                Text("Your Mac is showing six digits. Confirm only if they're these:")
+                Text("Your Mac is asking for permission and showing these digits:")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                 Text(code)
                     .font(.system(size: 44, weight: .bold, design: .monospaced))
                     .kerning(6)
-                HStack(spacing: 12) {
-                    Button("No") { model.answerConfirmation(false) }
-                    Button("They Match") { model.answerConfirmation(true) }
-                        .buttonStyle(.borderedProminent)
-                }
+                ProgressView()
+                Text("If your Mac shows different digits, cancel — someone else may be pairing.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
             }
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
