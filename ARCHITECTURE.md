@@ -16,21 +16,26 @@
 ## Boundaries
 
 ```text
-NSDraggingDestination
-        │
-        ▼
-ShelfDropHandler ── distinguishes promises / file URLs / images / links / text
-        │              (a .nebelhauslicense is a key, not cargo — it goes to
-        │               LicenseStore and is never staged)
-        ▼
+NSDraggingDestination                 paired iPhone / iPad
+        │                                     │  Bonjour + encrypted wire
+        ▼                                     ▼
+ShelfDropHandler                      MobileReceiver ── pairing, Keychain,
+        │  distinguishes promises /           │         spool + digest verify
+        │  file URLs / images / links /       │         (PerchWire/, ADR 0005)
+        │  text (a .nebelhauslicense is       │
+        │  a key, not cargo — it goes to      │
+        │  LicenseStore and is never staged)  │
+        ▼                                     ▼
 ShelfStore ─────── main-actor state, pending/completed/error transitions
         │           admission is checked here, before any bytes are copied
+        │           (mobile offers included — a refused item is never sent)
         │
         ├── LicenseStore ────── offline Ed25519 verify, CalVer coverage, the cap
         │
         ├── TransferPipeline ── bounded background work, iCloud + coordination
         │
         └── StagingRepository ─ UUID containers, atomic manifest, recovery
+                                (shared source with the iOS shelf — PerchWire/)
 
 NSScreen[] ──► ShelfWindowSystem ──► ShelfPanelController per display
                                            │
@@ -104,9 +109,11 @@ Which of those it offers comes from `InstallKind`, resolved from the bundle path
 plus two out-of-band receipts — the rice's `perch.installed-from` marker and
 brew's Caskroom directory — with the rice's theme drop as a third signal if the
 receipts ever stop being readable from inside the container. The poll is the
-app's only network call and the only reason it holds
+app's only *outbound internet* call and the only reason it holds
 `com.apple.security.network.client`; a Settings toggle stops it, and DEBUG builds
-never run it. See ADR 0003.
+never run it. See ADR 0003. (The mobile listener below is the app's other
+network surface — local-network only, paired devices only, its own toggle, and
+the sole reason for `network.server`. See ADR 0005.)
 
 ### Knowing whether this Mac paid
 
@@ -133,6 +140,20 @@ the ceiling, on the same bottom strip the release nudge uses, and outranks it
 while both are live. Until the public key constant is filled in, `canSell` is
 false and there is no cap at all — a paywall with no purchasable door is worse
 than no paywall. See ADR 0004.
+
+### Arrivals from a paired iPhone
+
+The iOS companion (`PerchIOS/` + `PerchShare/`, sharing `PerchWire/` and the
+staging layout via `PerchMobileCore/`) is a shelf of its own: a share stages a
+local copy first, then delivery to the Mac is opportunistic and honestly
+stated (`waiting` until the Mac says `stored`). On the Mac, `MobileReceiver`
+listens on Bonjour `_perch._tcp` for devices paired via a one-shot QR secret +
+X25519 + a human-confirmed six-digit code; every frame after the hello is
+ChaChaPoly-sealed under per-session keys. Arriving bytes spool into a hidden
+dot-directory on the shelf's volume, are digest-verified, and enter the shelf
+through the same admission-first, atomic-commit path as a drag. Pairing lives
+in the Keychain; revoking a device deletes its row. The wire protocol, the
+pairing ceremony, and the no-relay stance are ADR 0005.
 
 ### Name collisions
 
@@ -203,3 +224,7 @@ True move-original semantics are still not inferred from modifier keys.
 - Expiration while running: scheduler calling the existing prune operation.
 - Explicit move workflow: extend the promise `ExportTransaction`, never a change to importing.
 - Finder actions and share actions: commands over completed staged URLs.
+- Mac→phone direction: a `send shelf to phone` is a new offer flow over the
+  same session layer, never a new transport.
+- An opt-in encrypted relay for delivery while both devices are away: slots
+  into the outbox's `waiting → delivered` states without a model rewrite.

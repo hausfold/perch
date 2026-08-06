@@ -204,6 +204,76 @@ final class ShelfStore: ObservableObject {
         batchTracker.finishScheduling()
     }
 
+    // MARK: - Mobile arrivals
+    //
+    // The same shape as every other import: admission decided before any
+    // bytes move, a pending tile while bytes arrive, and the commit path
+    // converging on `finishTransfer`. The wire server verifies digests; by
+    // the time a file reaches `completeMobileImport` it is complete and
+    // already on the shelf's volume.
+
+    /// Where the wire server spools partial arrivals. Hidden (dot-named)
+    /// inside the shelf root so recovery and cleanup never mistake a
+    /// half-arrived file for shelf content, while staying on the same volume
+    /// for an atomic final move.
+    nonisolated static func mobileSpoolRoot(inside shelfRoot: URL) -> URL {
+        shelfRoot.appending(path: ".mobile-spool", directoryHint: .isDirectory)
+    }
+
+    /// Admission for a phone's offer, before the phone sends a byte. Each
+    /// accepted item gets a pending tile so an arrival is visible while it
+    /// streams.
+    func admitMobileItems(
+        _ offered: [OfferedItem],
+        deviceName: String
+    ) -> (accepted: [OfferedItem], refused: [RefusedItem]) {
+        let room = admissible(offered.count)
+        let accepted = Array(offered.prefix(room))
+        let refused = offered.dropFirst(room).map {
+            RefusedItem(id: $0.id, reason: "The shelf is full.")
+        }
+        if !refused.isEmpty {
+            license.noteCapReached(refused: refused.count)
+        }
+        for item in accepted {
+            pendingTransfers.append(
+                PendingTransfer(id: item.id, displayName: item.displayName, phase: .copying)
+            )
+        }
+        return (accepted, refused)
+    }
+
+    /// A verified, complete arrival: move it out of the spool into its own
+    /// container and onto the shelf. The move is a same-volume rename — the
+    /// bytes were already written to this volume by the wire server, off main.
+    func completeMobileImport(_ offered: OfferedItem, spooledAt spoolURL: URL) throws {
+        var container: URL?
+        do {
+            let allocated = try repository.allocateImportDirectory(id: offered.id)
+            container = allocated
+            let destination = allocated.appending(
+                path: StagingRepository.safeFilename(offered.displayName)
+            )
+            try FileManager.default.moveItem(at: spoolURL, to: destination)
+            let item = try repository.item(forStagedURL: destination, id: offered.id)
+            finishTransfer(offered.id, with: .success(item))
+        } catch {
+            // Leaving the container behind would poison every retry of this
+            // item: the phone keeps its ID, and allocation would then throw
+            // "already exists" forever.
+            if let container {
+                try? FileManager.default.removeItem(at: container)
+            }
+            finishTransfer(offered.id, with: .failure(error))
+            throw error
+        }
+    }
+
+    /// The stream died or the bytes were wrong — drop the pending tile.
+    func failMobileImport(_ itemID: UUID) {
+        pendingTransfers.removeAll { $0.id == itemID }
+    }
+
     func remove(_ item: ShelfItem) {
         do {
             try repository.remove(item)

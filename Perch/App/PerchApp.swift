@@ -6,6 +6,8 @@ struct PerchApp: App {
     @NSApplicationDelegateAdaptor(PerchAppDelegate.self) private var appDelegate
     @StateObject private var runtime = AppRuntime.shared
     @StateObject private var update = UpdateCheck.shared
+    // Observed directly so the menu re-renders when a device pairs/revokes.
+    @ObservedObject private var mobile = AppRuntime.shared.mobile
 
     var body: some Scene {
         MenuBarExtra {
@@ -39,6 +41,17 @@ struct PerchApp: App {
             }
 
             Divider()
+            // The menu reflects the pairing state instead of offering the
+            // same door twice: paired devices are listed (disabled rows),
+            // and the action reads accordingly.
+            ForEach(mobile.pairedDevices) { device in
+                Text("\(device.name) — paired")
+            }
+            Button(mobile.pairedDevices.isEmpty ? "Pair a Device…" : "Pair Another Device…") {
+                MobilePairingWindowController.shared.present(receiver: runtime.mobile)
+            }
+
+            Divider()
             SettingsLink()
             Button("Quit Perch") {
                 NSApp.terminate(nil)
@@ -50,7 +63,7 @@ struct PerchApp: App {
         .menuBarExtraStyle(.menu)
 
         Settings {
-            SettingsView(settings: runtime.settings)
+            SettingsView(settings: runtime.settings, mobile: runtime.mobile)
         }
     }
 }

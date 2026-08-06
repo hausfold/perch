@@ -9,6 +9,7 @@ final class AppRuntime: ObservableObject {
     let theme: ShelfTheme
     let store: ShelfStore
     let windowSystem: ShelfWindowSystem
+    let mobile: MobileReceiver
 
     private init() {
         settings = AppSettings()
@@ -24,6 +25,7 @@ final class AppRuntime: ObservableObject {
             store.latestError = "Persistent storage was unavailable. This shelf will last until the app quits."
         }
         windowSystem = ShelfWindowSystem(store: store, settings: settings, theme: theme)
+        mobile = MobileReceiver(store: store, settings: settings)
     }
 
     func start() {
@@ -31,6 +33,7 @@ final class AppRuntime: ObservableObject {
         store.restore()
         windowSystem.start()
         UpdateCheck.shared.start()
+        mobile.start()
     }
 
     func openSettings() {

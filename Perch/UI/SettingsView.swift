@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
+    @ObservedObject var mobile: MobileReceiver
     /// Read by `UpdateCheck.automaticChecksEnabled`; defaults to on.
     @AppStorage("automaticUpdateChecks") private var automaticUpdateChecks = true
     @ObservedObject private var update: UpdateCheck = .shared
@@ -71,6 +72,41 @@ struct SettingsView: View {
             }
             }
 
+            Section("iPhone & iPad") {
+                Toggle(
+                    "Receive from paired devices",
+                    isOn: Binding(
+                        get: { settings.mobileEnabled },
+                        set: { enabled in
+                            settings.mobileEnabled = enabled
+                            mobile.applyEnabledSetting()
+                        }
+                    )
+                )
+                Button("Pair a Device…") {
+                    MobilePairingWindowController.shared.present(receiver: mobile)
+                }
+                .disabled(!settings.mobileEnabled)
+                ForEach(mobile.pairedDevices) { device in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(device.name)
+                            Text("Paired \(device.pairedAt.formatted(date: .abbreviated, time: .omitted))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Revoke", role: .destructive) {
+                            mobile.revoke(device)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+                Text("Anything you put on Perch on a paired iPhone lands on this shelf when both are on your network. Transfers are end-to-end encrypted with a key made at pairing; nothing goes through a server, and revoking a device ends it instantly.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Updates") {
                 Toggle("Check for new releases", isOn: $automaticUpdateChecks)
                 HStack {
@@ -102,7 +138,7 @@ struct SettingsView: View {
         .formStyle(.grouped)
         // Tall enough for the Updates section's explanation without the form
         // scrolling — a settings window this small should show everything at once.
-        .frame(width: 470, height: 660)
+        .frame(width: 470, height: 840)
         .navigationTitle("Perch Settings")
     }
 

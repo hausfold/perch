@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Merged with the generated Info.plist; only keys the
+	     INFOPLIST_KEY_ build settings can't express live here. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Perch finds your paired Mac on your network to hand it what you put on the shelf. Nothing leaves your network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_perch._tcp</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>The camera reads the pairing QR code your Mac shows. It is never used otherwise.</string>
+</dict>
+</plist>
