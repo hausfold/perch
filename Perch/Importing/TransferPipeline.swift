@@ -148,11 +148,7 @@ final class TransferPipeline: @unchecked Sendable {
     }
 
     private static func safeFilename(_ candidate: String) -> String {
-        let cleaned = candidate
-            .replacingOccurrences(of: "/", with: "∕")
-            .replacingOccurrences(of: ":", with: "꞉")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return cleaned.isEmpty ? "Untitled" : cleaned
+        StagingRepository.safeFilename(candidate)
     }
 
     private static func isUndownloadedCloudItem(_ url: URL) throws -> Bool {

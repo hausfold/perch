@@ -39,6 +39,11 @@ struct PerchApp: App {
             }
 
             Divider()
+            Button("Pair a Device…") {
+                MobilePairingWindowController.shared.present(receiver: runtime.mobile)
+            }
+
+            Divider()
             SettingsLink()
             Button("Quit Perch") {
                 NSApp.terminate(nil)
@@ -50,7 +55,7 @@ struct PerchApp: App {
         .menuBarExtraStyle(.menu)
 
         Settings {
-            SettingsView(settings: runtime.settings)
+            SettingsView(settings: runtime.settings, mobile: runtime.mobile)
         }
     }
 }

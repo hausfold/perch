@@ -1,0 +1,281 @@
+import Foundation
+import Network
+import SwiftUI
+import UIKit
+
+/// Everything the iOS app's UI observes: the local shelf, the paired Mac and
+/// whether it is on the network right now, and the state of an in-flight
+/// pairing.
+@MainActor
+final class MobileAppModel: ObservableObject {
+    enum MacPresence: Equatable {
+        case none
+        case away(name: String)
+        case nearby(name: String)
+    }
+
+    enum PairingPhase: Equatable {
+        case idle
+        case searching
+        case confirming(code: String)
+        case failed(String)
+    }
+
+    @Published private(set) var items: [ShelfItem] = []
+    @Published private(set) var deliveries: [UUID: MobileShelf.Delivery] = [:]
+    @Published private(set) var presence: MacPresence = .none
+    @Published private(set) var pairingPhase: PairingPhase = .idle
+    @Published private(set) var isFlushing = false
+    @Published var notice: String?
+
+    let shelf: MobileShelf?
+    private let pairing = MacPairingStore()
+    private let browser = WireBrowser()
+    private var discovered: [DiscoveredMac] = []
+    private var confirmAnswer: ((Bool) -> Void)?
+
+    init() {
+        shelf = try? MobileShelf()
+        if shelf == nil {
+            notice = "Perch could not open its storage. Reinstalling the app may help."
+        }
+        refresh()
+    }
+
+    // MARK: - Lifecycle
+
+    func becameActive() {
+        refresh()
+        shelf?.pruneReceipts()
+        startBrowsing()
+        // Automated end-to-end runs stage and pair from the environment —
+        // there is no finger to do it.
+        #if DEBUG
+        if let text = ProcessInfo.processInfo.environment["PERCH_AUTOSEND_TEXT"],
+           let shelf, items.isEmpty {
+            _ = try? shelf.stageText(text)
+            refresh()
+        }
+        if let offerString = ProcessInfo.processInfo.environment["PERCH_PAIR_OFFER"],
+           pairedMacName == nil {
+            pair(with: offerString)
+        }
+        #endif
+    }
+
+    func becameInactive() {
+        browser.stop()
+    }
+
+    func refresh() {
+        guard let shelf else { return }
+        items = shelf.items()
+        deliveries = shelf.deliveries()
+        let paired = pairing.pairedMac()
+        switch (paired, discovered.first(where: { $0.macID == paired?.id })) {
+        case (nil, _):
+            presence = .none
+        case let (mac?, nil):
+            presence = .away(name: mac.name)
+        case let (mac?, _?):
+            presence = .nearby(name: mac.name)
+        }
+    }
+
+    private func startBrowsing() {
+        browser.start { [weak self] macs in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                discovered = macs
+                let wasAway = if case .away = presence { true } else { false }
+                refresh()
+                // The Mac just walked in and things are waiting — deliver.
+                if wasAway, case .nearby = presence {
+                    await flush()
+                }
+            }
+        }
+    }
+
+    // MARK: - Adding
+
+    func addFiles(_ urls: [URL]) {
+        guard let shelf else { return }
+        // Copies happen off the main actor; a dropped 2 GB video must not
+        // freeze the list.
+        Task.detached { [shelf] in
+            var firstError: String?
+            for url in urls {
+                do {
+                    _ = try shelf.stageFile(at: url)
+                } catch {
+                    firstError = firstError ?? error.localizedDescription
+                }
+            }
+            await MainActor.run { [firstError] in
+                if let firstError {
+                    self.notice = firstError
+                }
+                self.refresh()
+            }
+            await self.flush()
+        }
+    }
+
+    func addData(_ data: Data, displayName: String) {
+        guard let shelf else { return }
+        Task.detached { [shelf] in
+            let failure: String?
+            do {
+                _ = try shelf.stageData(data, displayName: displayName)
+                failure = nil
+            } catch {
+                failure = error.localizedDescription
+            }
+            await MainActor.run { [failure] in
+                if let failure {
+                    self.notice = failure
+                }
+                self.refresh()
+            }
+            await self.flush()
+        }
+    }
+
+    func addPasteboard() {
+        guard let shelf else { return }
+        let board = UIPasteboard.general
+        do {
+            if let url = board.url {
+                _ = try shelf.stageLink(url, title: nil)
+            } else if let text = board.string, !text.isEmpty {
+                _ = try shelf.stageText(text)
+            } else if let image = board.image, let png = image.pngData() {
+                _ = try shelf.stageData(png, displayName: "Image.png")
+            } else {
+                notice = "Nothing usable on the clipboard."
+                return
+            }
+        } catch {
+            notice = error.localizedDescription
+        }
+        refresh()
+        Task { await flush() }
+    }
+
+    func remove(_ item: ShelfItem) {
+        guard let shelf else { return }
+        try? shelf.remove(item)
+        refresh()
+    }
+
+    func stagedURL(for item: ShelfItem) -> URL? {
+        guard let shelf else { return nil }
+        return item.fileURL(inside: shelf.repository.rootURL)
+    }
+
+    // MARK: - Delivering
+
+    func flush() async {
+        guard let shelf, !isFlushing else { return }
+        isFlushing = true
+        defer {
+            isFlushing = false
+            refresh()
+        }
+        switch await MobileDelivery.flush(shelf: shelf, pairing: pairing) {
+        case let .delivered(count):
+            notice = count == 1 ? "1 item is on your Mac." : "\(count) items are on your Mac."
+        case let .waiting(count, reason):
+            if let reason {
+                notice = reason
+            } else {
+                notice = count == 1
+                    ? "1 item is waiting for your Mac."
+                    : "\(count) items are waiting for your Mac."
+            }
+        case .nothingWaiting, .notPaired:
+            break
+        }
+    }
+
+    // MARK: - Pairing
+
+    var pairedMacName: String? {
+        pairing.pairedMac()?.name
+    }
+
+    func pair(with offerString: String) {
+        guard PairingOffer.decode(from: offerString) != nil else {
+            pairingPhase = .failed("That does not look like a Perch pairing code.")
+            return
+        }
+        let offer = PairingOffer.decode(from: offerString)!
+        pairingPhase = .searching
+        Task {
+            await runPairing(offer)
+        }
+    }
+
+    func answerConfirmation(_ accepted: Bool) {
+        confirmAnswer?(accepted)
+        confirmAnswer = nil
+    }
+
+    func resetPairing() {
+        confirmAnswer?(false)
+        confirmAnswer = nil
+        pairingPhase = .idle
+    }
+
+    func unpair() {
+        pairing.unpair()
+        refresh()
+    }
+
+    private func runPairing(_ offer: PairingOffer) async {
+        guard let endpoint = await MobileDelivery.discover(
+            macID: offer.macID,
+            timeout: .seconds(10)
+        ) else {
+            pairingPhase = .failed("“\(offer.macName)” is not visible on this network. Same Wi-Fi, Perch running?")
+            return
+        }
+        let identity = MobileConfig.deviceIdentity()
+        do {
+            let mac = try await WirePairingClient.pair(
+                offer: offer,
+                endpoint: endpoint,
+                deviceID: identity.id,
+                deviceName: identity.name
+            ) { [weak self] code in
+                await withCheckedContinuation { continuation in
+                    Task { @MainActor [weak self] in
+                        guard let self else {
+                            continuation.resume(returning: false)
+                            return
+                        }
+                        // Automated runs can't tap Confirm.
+                        #if DEBUG
+                        if ProcessInfo.processInfo.environment["PERCH_AUTOPAIR"] == "1" {
+                            continuation.resume(returning: true)
+                            return
+                        }
+                        #endif
+                        confirmAnswer = { accepted in
+                            continuation.resume(returning: accepted)
+                        }
+                        pairingPhase = .confirming(code: code)
+                    }
+                }
+            }
+            try pairing.store(mac)
+            pairingPhase = .idle
+            notice = "Paired with \(mac.name)."
+            refresh()
+            await flush()
+        } catch {
+            pairingPhase = .failed(error.localizedDescription)
+        }
+    }
+}

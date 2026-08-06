@@ -24,10 +24,25 @@ which tool reads which file is [`.agents/README.md`](./.agents/README.md).
 ## Build
 
 ```sh
+# macOS app + the whole test suite (includes the wire loopback tests)
 xcodebuild -project Perch.xcodeproj -scheme Perch \
   -configuration Debug -destination 'platform=macOS' \
   -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO test
+
+# iOS companion + Share extension (simulator)
+xcodebuild -project Perch.xcodeproj -scheme PerchIOS \
+  -configuration Debug -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath DerivedData build
 ```
+
+Don't pass `CODE_SIGNING_ALLOWED=NO` to the **iOS** build you intend to run:
+it strips the App Group entitlement and the app aborts at launch. Simulator
+ad-hoc signing needs no team or provisioning.
+
+Targets: `Perch` (macOS) · `PerchIOS` (iPhone/iPad app) · `PerchShare` (Share
+extension) · `PerchTests`. Shared sources, compiled into each app directly:
+`PerchWire/` (wire protocol + crypto + the staging layer both platforms use)
+and `PerchMobileCore/` (iOS-only shelf/pairing/delivery, app + extension).
 
 Read `PRD.md`, `ARCHITECTURE.md`, and the ADRs before changing transfer
 semantics. Update them when a product boundary changes.

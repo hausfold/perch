@@ -6,6 +6,7 @@ final class AppSettings: ObservableObject {
     private enum Key {
         static let showOnAllDisplays = "showOnAllDisplays"
         static let retentionDays = "retentionDays"
+        static let mobileEnabled = "mobileEnabled"
     }
 
     private let defaults: UserDefaults
@@ -18,6 +19,12 @@ final class AppSettings: ObservableObject {
         didSet { defaults.set(retentionDays, forKey: Key.retentionDays) }
     }
 
+    /// Whether this Mac listens for its paired iPhones at all. Off tears the
+    /// listener down; pairing stays remembered for when it comes back on.
+    @Published var mobileEnabled: Bool {
+        didSet { defaults.set(mobileEnabled, forKey: Key.mobileEnabled) }
+    }
+
     @Published private(set) var launchAtLogin = false
     @Published private(set) var launchAtLoginError: String?
 
@@ -26,9 +33,11 @@ final class AppSettings: ObservableObject {
         defaults.register(defaults: [
             Key.showOnAllDisplays: true,
             Key.retentionDays: 7,
+            Key.mobileEnabled: true,
         ])
         showOnAllDisplays = defaults.bool(forKey: Key.showOnAllDisplays)
         retentionDays = max(1, defaults.integer(forKey: Key.retentionDays))
+        mobileEnabled = defaults.bool(forKey: Key.mobileEnabled)
         refreshLaunchAtLogin()
     }
 

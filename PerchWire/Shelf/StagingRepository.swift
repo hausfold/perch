@@ -288,6 +288,18 @@ final class StagingRepository: @unchecked Sendable {
         return recovered
     }
 
+    /// A display name that is safe as a single path component. Shared by every
+    /// import path — drags on the Mac, shares on the phone, wire arrivals
+    /// (where the name comes from another device and gets no benefit of the
+    /// doubt: "." and ".." are names only a path traversal wants).
+    static func safeFilename(_ candidate: String) -> String {
+        let cleaned = candidate
+            .replacingOccurrences(of: "/", with: "∕")
+            .replacingOccurrences(of: ":", with: "꞉")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty || cleaned == "." || cleaned == ".." ? "Untitled" : cleaned
+    }
+
     private func isDetached(_ container: URL) -> Bool {
         fileManager.fileExists(
             atPath: container.appending(path: Self.detachedMarker).path
