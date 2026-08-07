@@ -1,0 +1,158 @@
+name: testflight
+
+# The iOS companion's deploy path: archive PerchIOS (+ the embedded PerchShare
+# extension), export a signed .ipa, upload it to App Store Connect. It lands in
+# TestFlight and stops there — *submitting* a build for review is a human act in
+# App Store Connect, on purpose (see docs/app-store.md).
+#
+# Runs on the same `v*` tag as the Mac release, so `bench release perch` ships
+# both halves of the product at one version, and on workflow_dispatch for when
+# only the phone side needs a build.
+#
+# Versioning: VERSION is still the single source of truth, but App Store Connect
+# wants a strictly numeric, leading-zero-free CFBundleShortVersionString, so
+# `2026.08.06` is injected as `2026.8.6`. The build number is this workflow's run
+# number — monotonic, which is the only property App Store Connect cares about.
+# A same-day re-release (`2026.08.06-2`) therefore lands as the same marketing
+# version with a higher build; that's fine for TestFlight, and a *store* release
+# of it needs a fresh VERSION day.
+#
+# Secrets (in addition to the release workflow's):
+#   IOS_DIST_CERT_P12       base64 of the exported "Apple Distribution" .p12
+#   IOS_DIST_CERT_PASSWORD  the password protecting that .p12
+#   ASC_KEY_P8              base64 of an App Store Connect API key (.p8) whose
+#                           role is App Manager — the notarization key is scoped
+#                           to notarization and cannot upload builds
+#   ASC_KEY_ID              that key's Key ID
+#   ASC_ISSUER_ID           the App Store Connect issuer ID
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  testflight:
+    name: archive + upload to TestFlight
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version App Store Connect will accept
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME != VERSION $VERSION — bump VERSION or retag" >&2
+            exit 1
+          fi
+          # 2026.08.06[-2] -> 2026.8.6 (three components, no leading zeros).
+          MARKETING="$(printf '%s' "${VERSION%%-*}" | awk -F. '{printf "%d.%d.%d", $1, $2, $3}')"
+          echo "PERCH_MARKETING_VERSION=$MARKETING" >> "$GITHUB_ENV"
+          echo "PERCH_BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "shipping $MARKETING ($GITHUB_RUN_NUMBER) from VERSION $VERSION"
+
+      - name: Import the Apple Distribution certificate
+        env:
+          IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/ios-signing.keychain-db"
+          KEYCHAIN_PW="$(uuidgen)"
+          echo "$IOS_DIST_CERT_P12" | base64 -d > "$RUNNER_TEMP/ios-cert.p12"
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/ios-cert.p12" -P "$IOS_DIST_CERT_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          security find-identity -v -p codesigning "$KEYCHAIN" | grep -q "Apple Distribution"
+          rm -f "$RUNNER_TEMP/ios-cert.p12"
+
+      - name: Lay down the App Store Connect API key
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          set -euo pipefail
+          # xcodebuild reads it by path; altool only looks in these well-known
+          # directories, keyed by the Key ID. Write it once, satisfy both.
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$ASC_KEY_P8" | base64 -d > "$HOME/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8"
+          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8"
+
+      - name: Archive PerchIOS
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          # -allowProvisioningUpdates lets Xcode mint/refresh the App Store
+          # profiles for both bundle IDs against the API key, so no .mobileprovision
+          # is checked in or hand-rotated. The App IDs and their App Group
+          # capability are created once, by hand (docs/app-store.md).
+          xcodebuild \
+            -project Perch.xcodeproj \
+            -scheme PerchIOS \
+            -configuration Release \
+            -quiet \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/PerchIOS.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            MARKETING_VERSION="$PERCH_MARKETING_VERSION" \
+            CURRENT_PROJECT_VERSION="$PERCH_BUILD_NUMBER" \
+            DEVELOPMENT_TEAM="88M28542LQ" \
+            archive
+
+      - name: Export the .ipa
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/PerchIOS.xcarchive" \
+            -exportOptionsPlist .github/ios/ExportOptions.plist \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          ls -la "$RUNNER_TEMP/export"
+
+      - name: Upload to App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          IPAS=("$RUNNER_TEMP"/export/*.ipa)
+          if [ "${#IPAS[@]}" -ne 1 ]; then
+            echo "expected exactly one .ipa, found ${#IPAS[@]}" >&2
+            exit 1
+          fi
+          IPA="${IPAS[0]}"
+          # Validate first: it catches a bad icon, a missing usage string, or a
+          # duplicate build number in seconds instead of in an email an hour later.
+          xcrun altool --validate-app -f "$IPA" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          xcrun altool --upload-app -f "$IPA" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          echo "uploaded $PERCH_MARKETING_VERSION ($PERCH_BUILD_NUMBER) — it appears in TestFlight after Apple finishes processing"
+
+      - name: Keep the archive around
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PerchIOS-${{ github.run_number }}-xcarchive
+          path: ${{ runner.temp }}/PerchIOS.xcarchive
+          retention-days: 14
+          if-no-files-found: ignore

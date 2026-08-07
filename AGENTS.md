@@ -71,3 +71,19 @@ release ZIP**, not a from-source build:
 Released: `nix/release.nix` pins a real notarized release (CI rewrites it on
 every `bench release perch` tag) and the rice enables `nebelhaus.perch.enable`
 by default, like trill.
+
+## The companion's own path (App Store)
+
+The iPhone/iPad half can't ride the cask or the flake — it ships through the App
+Store, free, on the *same* `v*` tag ([ADR 0006](docs/architecture-decisions/0006-companion-ships-free-on-the-mac-release-tag.md)):
+`.github/workflows/testflight.yml` archives `PerchIOS`, exports the `.ipa`, and
+uploads it. It stops at TestFlight — attaching a build to a store version and
+submitting for review is a human act, and its runbook (listing copy, privacy
+label, export compliance, screenshots, review notes) is
+[`docs/app-store.md`](./docs/app-store.md).
+
+Two things bite if you forget them: `PerchIOS/` and `PerchShare/` each carry a
+`PrivacyInfo.xcprivacy`, and they compile the *same* shared sources — a new
+required-reason API is a two-file change. And `VERSION`'s CalVer reaches App
+Store Connect with leading zeros stripped (`2026.08.06` → `2026.8.6`), build
+number = the workflow's run number.
