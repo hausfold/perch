@@ -9,6 +9,7 @@ struct PairMacView: View {
 
     @State private var pastedCode = ""
     @State private var showingScanner = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
@@ -29,6 +30,8 @@ struct PairMacView: View {
             // Pairing succeeded — the sheet's work is done.
             if phase == .idle, model.pairedMacName != nil {
                 dismiss()
+            } else if phase != .idle {
+                UIAccessibility.post(notification: .screenChanged, argument: nil)
             }
         }
     }
@@ -40,7 +43,7 @@ struct PairMacView: View {
             entry
         case .searching:
             VStack(spacing: 16) {
-                ProgressView()
+                MotionAwareProgressView(accessibilityLabel: "Looking for your Mac")
                 Text("Looking for your Mac…")
                     .foregroundStyle(.secondary)
             }
@@ -53,10 +56,8 @@ struct PairMacView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                Text(code)
-                    .font(.system(size: 44, weight: .bold, design: .monospaced))
-                    .kerning(6)
-                ProgressView()
+                verificationCode(code)
+                MotionAwareProgressView(accessibilityLabel: "Waiting for Mac approval")
                 Text("If your Mac shows different digits, cancel — someone else may be pairing.")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
@@ -94,9 +95,28 @@ struct PairMacView: View {
                     }
                 }
                 .sheet(isPresented: $showingScanner) {
-                    QRScannerView { scanned in
-                        showingScanner = false
-                        model.pair(with: scanned)
+                    NavigationStack {
+                        ZStack(alignment: .bottom) {
+                            QRScannerView(
+                                highlightsCodes: !reduceMotion
+                            ) { scanned in
+                                showingScanner = false
+                                model.pair(with: scanned)
+                            }
+                            Text("Point your iPhone at the QR code shown by Perch on your Mac.")
+                                .font(.callout)
+                                .multilineTextAlignment(.center)
+                                .padding()
+                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                                .padding()
+                        }
+                        .navigationTitle("Scan QR Code")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Cancel") { showingScanner = false }
+                            }
+                        }
                     }
                 }
             }
@@ -105,6 +125,8 @@ struct PairMacView: View {
                     .font(.caption.monospaced())
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
+                    .accessibilityLabel("Pairing code")
+                    .accessibilityInputLabels(["Pairing code", "Code"])
                 Button("Pair") {
                     model.pair(with: pastedCode)
                 }
@@ -112,16 +134,34 @@ struct PairMacView: View {
             }
         }
     }
+
+    private func verificationCode(_ code: String) -> some View {
+        ViewThatFits(in: .horizontal) {
+            Text(code)
+                .kerning(6)
+            VStack(spacing: 4) {
+                Text(String(code.prefix(3)))
+                    .kerning(6)
+                Text(String(code.dropFirst(3)))
+                    .kerning(6)
+            }
+        }
+        .font(.system(.largeTitle, design: .monospaced, weight: .bold))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Verification code")
+        .accessibilityValue(code.map(String.init).joined(separator: " "))
+    }
 }
 
 /// The thinnest possible VisionKit wrapper: report the first QR payload seen.
 private struct QRScannerView: UIViewControllerRepresentable {
+    let highlightsCodes: Bool
     let onScan: (String) -> Void
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
         let scanner = DataScannerViewController(
             recognizedDataTypes: [.barcode(symbologies: [.qr])],
-            isHighlightingEnabled: true
+            isHighlightingEnabled: highlightsCodes
         )
         scanner.delegate = context.coordinator
         try? scanner.startScanning()

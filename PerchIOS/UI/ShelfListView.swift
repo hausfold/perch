@@ -11,6 +11,7 @@ struct ShelfListView: View {
     @State private var showingFileImporter = false
     @State private var showingPhotoPicker = false
     @State private var photoSelection: [PhotosPickerItem] = []
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         NavigationStack {
@@ -98,6 +99,9 @@ struct ShelfListView: View {
                             state: model.deliveries[item.id, default: .waiting],
                             stagedURL: model.stagedURL(for: item)
                         )
+                        .accessibilityAction(named: "Remove \(item.displayName)") {
+                            model.remove(item)
+                        }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
                                 model.remove(item)
@@ -111,13 +115,25 @@ struct ShelfListView: View {
             if !model.remoteItems.isEmpty {
                 Section {
                     ForEach(model.remoteItems) { entry in
-                        RemoteRow(
-                            entry: entry,
-                            isFetching: model.fetching.contains(entry.id)
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture {
+                        let isFetching = model.fetching.contains(entry.id)
+                        let location = model.pairedMacName ?? "your Mac"
+                        let accessibilityValue = isFetching ? "Downloading" : "On \(location)"
+
+                        Button {
                             Task { await model.fetch(entry) }
+                        } label: {
+                            RemoteRow(
+                                entry: entry,
+                                isFetching: isFetching
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(entry.displayName)
+                        .accessibilityValue(accessibilityValue)
+                        .accessibilityHint("Downloads this item to your device")
+                        .accessibilityInputLabels([entry.displayName, "Download \(entry.displayName)"])
+                        .accessibilityAction(named: "Remove \(entry.displayName)") {
+                            Task { await model.removeRemote(entry) }
                         }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
@@ -132,7 +148,10 @@ struct ShelfListView: View {
                         Text("On \(model.pairedMacName ?? "your Mac")")
                         Spacer()
                         if model.isSyncing {
-                            ProgressView().controlSize(.mini)
+                            MotionAwareProgressView(
+                                accessibilityLabel: "Syncing items",
+                                isCompact: true
+                            )
                         }
                     }
                 } footer: {
@@ -183,29 +202,47 @@ struct ShelfListView: View {
                     .foregroundStyle(.secondary)
             }
         case let .nearby(name):
-            HStack {
-                Label {
-                    VStack(alignment: .leading) {
-                        Text(name)
-                        Text("Nearby")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 8) {
+                        nearbyLabel(name)
+                        sendControl
                     }
-                } icon: {
-                    Image(systemName: "laptopcomputer")
-                        .foregroundStyle(.green)
-                }
-                Spacer()
-                if model.isFlushing {
-                    ProgressView()
-                } else if !model.items.isEmpty {
-                    Button("Send") {
-                        Task { await model.flush() }
+                } else {
+                    HStack {
+                        nearbyLabel(name)
+                        Spacer()
+                        sendControl
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
                 }
             }
+        }
+    }
+
+    private func nearbyLabel(_ name: String) -> some View {
+        Label {
+            VStack(alignment: .leading) {
+                Text(name)
+                Text("Nearby")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } icon: {
+            Image(systemName: "laptopcomputer")
+                .foregroundStyle(.green)
+        }
+    }
+
+    @ViewBuilder
+    private var sendControl: some View {
+        if model.isFlushing {
+            MotionAwareProgressView(accessibilityLabel: "Sending items")
+        } else if !model.items.isEmpty {
+            Button("Send") {
+                Task { await model.flush() }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
         }
     }
 
@@ -279,13 +316,18 @@ private struct ItemRow: View {
     let state: MobileShelf.Delivery
     let stagedURL: URL?
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 36
+
     var body: some View {
         HStack(spacing: 12) {
             icon
-                .frame(width: 36, height: 36)
+                .frame(width: min(iconSize, 72), height: min(iconSize, 72))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.displayName)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -296,6 +338,8 @@ private struct ItemRow: View {
                     Image(systemName: "square.and.arrow.up")
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel("Share \(item.displayName)")
+                .accessibilityInputLabels(["Share \(item.displayName)", "Share"])
             }
         }
     }
@@ -318,7 +362,7 @@ private struct ItemRow: View {
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
-                .frame(width: 36, height: 36)
+                .frame(width: min(iconSize, 72), height: min(iconSize, 72))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
         } else {
             Image(systemName: symbolName)
@@ -345,25 +389,32 @@ private struct RemoteRow: View {
     let entry: RemoteEntry
     let isFetching: Bool
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 36
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: symbolName)
                 .font(.title3)
                 .foregroundStyle(.secondary)
-                .frame(width: 36, height: 36)
+                .frame(width: min(iconSize, 72), height: min(iconSize, 72))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.displayName)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
             if isFetching {
-                ProgressView()
+                MotionAwareProgressView(accessibilityLabel: "Downloading")
+                    .accessibilityHidden(true)
             } else {
                 Image(systemName: "arrow.down.circle")
                     .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
             }
         }
     }
@@ -405,16 +456,22 @@ private struct NoticeBanner: View {
     let dismiss: () -> Void
 
     var body: some View {
-        Text(text)
-            .font(.callout)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.regularMaterial, in: Capsule())
-            .padding(.bottom, 12)
-            .onTapGesture(perform: dismiss)
-            .task {
-                try? await Task.sleep(for: .seconds(4))
-                dismiss()
-            }
+        Button(action: dismiss) {
+            Text(text)
+                .font(.callout)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.regularMaterial, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Dismisses this notification")
+        .padding(.bottom, 12)
+        .onAppear {
+            UIAccessibility.post(notification: .announcement, argument: text)
+        }
+        .task {
+            try? await Task.sleep(for: .seconds(4))
+            dismiss()
+        }
     }
 }

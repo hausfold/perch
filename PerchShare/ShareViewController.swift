@@ -197,29 +197,29 @@ struct ShareStatusView: View {
         VStack(spacing: 14) {
             switch state.phase {
             case .staging:
-                ProgressView()
+                ShareProgressView(accessibilityLabel: "Putting items on Perch")
                 Text("Putting on Perch…")
                     .foregroundStyle(.secondary)
             case .sending:
-                ProgressView()
+                ShareProgressView(accessibilityLabel: "Sending items to your Mac")
                 Text("Sending to your Mac…")
                     .foregroundStyle(.secondary)
             case let .delivered(macName):
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 40))
+                    .font(.largeTitle)
                     .foregroundStyle(.green)
                 Text("On \(macName)")
                     .font(.headline)
             case let .keptLocally(message):
                 Image(systemName: "tray.full.fill")
-                    .font(.system(size: 40))
+                    .font(.largeTitle)
                     .foregroundStyle(.tint)
                 Text(message)
                     .font(.callout)
                     .multilineTextAlignment(.center)
             case let .failed(message):
                 Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 40))
+                    .font(.largeTitle)
                     .foregroundStyle(.orange)
                 Text(message)
                     .font(.callout)
@@ -230,5 +230,25 @@ struct ShareStatusView: View {
         }
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onChange(of: state.phase) { _, _ in
+            UIAccessibility.post(notification: .screenChanged, argument: nil)
+        }
+    }
+}
+
+private struct ShareProgressView: View {
+    let accessibilityLabel: String
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Group {
+            if reduceMotion {
+                Image(systemName: "hourglass")
+            } else {
+                ProgressView()
+            }
+        }
+        .accessibilityLabel(accessibilityLabel)
     }
 }
