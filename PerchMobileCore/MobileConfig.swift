@@ -27,6 +27,13 @@ enum MobileConfig {
         groupContainer.appending(path: "MobileShelf", directoryHint: .isDirectory)
     }
 
+    /// Where items pulled off the Mac land. Deliberately NOT the shelf root:
+    /// anything in there is an outbox entry and would be delivered straight
+    /// back to the Mac it just came from.
+    static var inboxRoot: URL {
+        groupContainer.appending(path: "MacInbox", directoryHint: .isDirectory)
+    }
+
     static var groupDefaults: UserDefaults {
         UserDefaults(suiteName: appGroupID) ?? .standard
     }

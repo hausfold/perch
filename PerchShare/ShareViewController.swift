@@ -45,9 +45,18 @@ final class ShareViewController: UIViewController {
         let pairing = MacPairingStore()
 
         var staged = 0
-        for provider in providers {
+        var stagedLinks: Set<String> = []
+        for provider in Self.distinct(providers) {
             do {
-                _ = try await Self.stage(provider, onto: shelf)
+                let item = try await Self.stage(provider, onto: shelf)
+                // Two providers can still resolve to the same page (a share
+                // that offers the URL twice under different types). A link
+                // already staged in this same share is that page again, not a
+                // second one.
+                if item.kind == .link, !stagedLinks.insert(item.displayName).inserted {
+                    try? shelf.remove(item)
+                    continue
+                }
                 staged += 1
                 state.stagedCount = staged
             } catch {
@@ -78,6 +87,30 @@ final class ShareViewController: UIViewController {
             state.phase = .keptLocally("On Perch.")
             scheduleFinish()
         }
+    }
+
+    /// One share is one thing, however many ways the host describes it.
+    ///
+    /// Safari (and anything else sharing a web page) attaches *several*
+    /// representations: the page URL as `public.url`, and its title — or the
+    /// URL again — as `public.plain-text`. Staging every attachment landed the
+    /// page on the Mac twice. When the share carries a link, loose text
+    /// alongside it is that link's title, not a second thing worth shelving.
+    /// Files and images are never dropped: those genuinely are separate items.
+    nonisolated static func distinct(_ providers: [NSItemProvider]) -> [NSItemProvider] {
+        let carriesLink = providers.contains {
+            $0.hasItemConformingToTypeIdentifier(UTType.url.identifier)
+                && !$0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
+        }
+        guard carriesLink else { return providers }
+        return providers.filter { !isTextOnly($0) }
+    }
+
+    /// A provider that offers nothing but text — no file, no URL, no image.
+    private nonisolated static func isTextOnly(_ provider: NSItemProvider) -> Bool {
+        let types = provider.registeredTypeIdentifiers.compactMap(UTType.init)
+        guard !types.isEmpty else { return false }
+        return types.allSatisfy { $0.conforms(to: .text) }
     }
 
     /// Stage one attachment, favouring the richest representation the host

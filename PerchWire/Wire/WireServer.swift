@@ -35,6 +35,18 @@ public protocol WireServerDelegate: Sendable {
     /// The file is complete and its digest verified — put it on the shelf.
     func commit(_ item: OfferedItem, stagedFileURL: URL, from peer: PairedPeer) async throws
     func transferFailed(_ item: OfferedItem, from peer: PairedPeer, reason: String) async
+
+    // The reverse direction — the shelf as something a paired phone can read
+    // and prune, not just deliver into.
+
+    /// The Mac's shelf as this phone should see it.
+    func shelfEntries(for peer: PairedPeer) async -> [RemoteEntry]
+    /// One shelf item, described and located well enough to stream. Throwing
+    /// is the normal answer for "gone" or "not something a phone can hold" —
+    /// the reason reaches the phone verbatim.
+    func readItem(_ itemID: UUID, for peer: PairedPeer) async throws -> OutgoingItem
+    /// Take an item off the shelf because the phone asked.
+    func removeItem(_ itemID: UUID, for peer: PairedPeer) async throws
 }
 
 public enum WireServerError: LocalizedError {
@@ -348,6 +360,21 @@ public actor WireServerSession {
                             reason: error.localizedDescription
                         )))
                     }
+                case .shelfListRequest:
+                    let entries = await delegate.shelfEntries(for: peer)
+                    try await connection.send(.control(.shelfList(entries: entries)))
+                case let .fetchItem(itemID):
+                    try await serveFetch(itemID, to: peer)
+                case let .removeItem(itemID):
+                    do {
+                        try await delegate.removeItem(itemID, for: peer)
+                        try await connection.send(.control(.removeAck(itemID: itemID)))
+                    } catch {
+                        try await connection.send(.control(.itemFailed(
+                            itemID: itemID,
+                            reason: error.localizedDescription
+                        )))
+                    }
                 case .bye:
                     break receiveLoop
                 default:
@@ -402,6 +429,42 @@ public actor WireServerSession {
                 inbound[itemID] = item
             }
         }
+    }
+
+    // MARK: - Serving the shelf back
+    //
+    // A fetch is a delivery with the roles swapped: the Mac describes the item
+    // first (so the phone can size it and hold the bytes to a digest), streams
+    // it, then closes it. Fetching is a copy — the item stays on the shelf
+    // until someone removes it, on either end.
+
+    private func serveFetch(_ itemID: UUID, to peer: PairedPeer) async throws {
+        let outgoing: OutgoingItem
+        do {
+            outgoing = try await delegate.readItem(itemID, for: peer)
+        } catch {
+            try await connection.send(.control(.itemFailed(
+                itemID: itemID,
+                reason: error.localizedDescription
+            )))
+            return
+        }
+        try await connection.send(.control(.offer(
+            transferID: UUID(),
+            items: [outgoing.offered]
+        )))
+        do {
+            try await WireStreaming.send(outgoing, over: connection)
+        } catch {
+            // The phone is mid-item and waiting; tell it, so it drops the
+            // partial rather than hanging on a stream that stopped.
+            try await connection.send(.control(.itemFailed(
+                itemID: itemID,
+                reason: error.localizedDescription
+            )))
+            return
+        }
+        try await connection.send(.control(.itemDone(itemID: itemID)))
     }
 }
 

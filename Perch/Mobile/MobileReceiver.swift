@@ -159,6 +159,101 @@ final class MobileReceiver: ObservableObject {
         func transferFailed(_ item: OfferedItem, from peer: PairedPeer, reason: String) async {
             await receiver.arrivalFailed(item, reason: reason)
         }
+
+        func shelfEntries(for peer: PairedPeer) async -> [RemoteEntry] {
+            await receiver.shelfEntries()
+        }
+
+        func readItem(_ itemID: UUID, for peer: PairedPeer) async throws -> OutgoingItem {
+            let located = try await receiver.locate(itemID)
+            await receiver.noteFetch(located.displayName, by: peer.name)
+            // Digesting a 2 GB video is not main-actor work; the locate above
+            // was, and it was cheap.
+            return try await Task.detached(priority: .userInitiated) {
+                try WireStreaming.offer(
+                    id: located.id,
+                    displayName: located.displayName,
+                    contentTypeIdentifier: located.contentTypeIdentifier,
+                    kindHint: located.kindHint,
+                    fileURL: located.fileURL
+                )
+            }.value
+        }
+
+        func removeItem(_ itemID: UUID, for peer: PairedPeer) async throws {
+            try await receiver.removeFromShelf(itemID, by: peer.name)
+        }
+    }
+
+    /// A shelf item pinned down for the wire: everything the streamer needs,
+    /// off the main actor.
+    private struct LocatedItem: Sendable {
+        let id: UUID
+        let displayName: String
+        let contentTypeIdentifier: String?
+        let kindHint: String
+        let fileURL: URL
+    }
+
+    /// Why a phone can't have an item. The reason travels to the phone
+    /// verbatim, so it is written to be read by a person.
+    private enum ServeError: LocalizedError {
+        case gone
+        case folderUnsupported
+
+        var errorDescription: String? {
+            switch self {
+            case .gone: "That item is no longer on the Mac's shelf."
+            case .folderUnsupported: "Folders can't be pulled to a phone yet."
+            }
+        }
+    }
+
+    // MARK: - Serving the shelf to a phone
+
+    private func shelfEntries() -> [RemoteEntry] {
+        store.items.map {
+            RemoteEntry(
+                id: $0.id,
+                displayName: $0.displayName,
+                kindHint: $0.kind.rawValue,
+                contentTypeIdentifier: $0.contentTypeIdentifier,
+                byteCount: $0.byteCount,
+                addedAt: $0.addedAt
+            )
+        }
+    }
+
+    private func locate(_ itemID: UUID) throws -> LocatedItem {
+        guard let item = store.items.first(where: { $0.id == itemID }),
+              let url = item.fileURL(inside: store.repository.rootURL),
+              FileManager.default.fileExists(atPath: url.path)
+        else {
+            throw ServeError.gone
+        }
+        // A folder is a tree, and the wire carries one file per item.
+        guard item.kind != .folder else { throw ServeError.folderUnsupported }
+        return LocatedItem(
+            id: item.id,
+            displayName: item.displayName,
+            contentTypeIdentifier: item.contentTypeIdentifier,
+            kindHint: item.kind.rawValue,
+            fileURL: url
+        )
+    }
+
+    private func noteFetch(_ displayName: String, by deviceName: String) {
+        lastEvent = "\(deviceName) took \(displayName)."
+    }
+
+    /// A phone swiped an item away. Same removal the shelf's own menu does —
+    /// the shelf is shared, so either end can prune it.
+    private func removeFromShelf(_ itemID: UUID, by deviceName: String) throws {
+        guard let item = store.items.first(where: { $0.id == itemID }) else {
+            throw ServeError.gone
+        }
+        store.remove(item)
+        lastEvent = "\(deviceName) removed \(item.displayName)."
     }
 
     // MARK: - Pairing plumbing

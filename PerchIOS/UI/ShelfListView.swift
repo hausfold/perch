@@ -9,12 +9,13 @@ struct ShelfListView: View {
 
     @State private var showingPairSheet = false
     @State private var showingFileImporter = false
+    @State private var showingPhotoPicker = false
     @State private var photoSelection: [PhotosPickerItem] = []
 
     var body: some View {
         NavigationStack {
             Group {
-                if model.items.isEmpty && receipts.isEmpty {
+                if model.items.isEmpty && model.remoteItems.isEmpty && receipts.isEmpty {
                     emptyState
                 } else {
                     list
@@ -25,6 +26,18 @@ struct ShelfListView: View {
             .sheet(isPresented: $showingPairSheet) {
                 PairMacView(model: model)
             }
+            .sheet(item: $model.incoming) { file in
+                ShareSheet(url: file.url)
+            }
+            // A PhotosPicker rendered inside a Menu never presents — the menu
+            // dismisses and takes the picker's presentation with it. Driving it
+            // from a flag set by an ordinary menu button is the fix.
+            .photosPicker(
+                isPresented: $showingPhotoPicker,
+                selection: $photoSelection,
+                maxSelectionCount: nil,
+                matching: .any(of: [.images, .videos])
+            )
             .fileImporter(
                 isPresented: $showingFileImporter,
                 allowedContentTypes: [.item, .folder],
@@ -63,7 +76,7 @@ struct ShelfListView: View {
         } description: {
             Text(model.pairedMacName == nil
                 ? "Share something to Perch, or pair your Mac to give this pocket somewhere to empty."
-                : "Share something to Perch from any app and it'll be waiting on \(model.pairedMacName ?? "your Mac").")
+                : "Share something to Perch from any app and it'll be waiting on \(model.pairedMacName ?? "your Mac") — and whatever you drop on the shelf there shows up here.")
         } actions: {
             if model.pairedMacName == nil {
                 Button("Pair a Mac") { showingPairSheet = true }
@@ -95,6 +108,37 @@ struct ShelfListView: View {
                     }
                 }
             }
+            if !model.remoteItems.isEmpty {
+                Section {
+                    ForEach(model.remoteItems) { entry in
+                        RemoteRow(
+                            entry: entry,
+                            isFetching: model.fetching.contains(entry.id)
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            Task { await model.fetch(entry) }
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                Task { await model.removeRemote(entry) }
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text("On \(model.pairedMacName ?? "your Mac")")
+                        Spacer()
+                        if model.isSyncing {
+                            ProgressView().controlSize(.mini)
+                        }
+                    }
+                } footer: {
+                    Text("Tap to bring one here. Swipe to take it off the shelf.")
+                }
+            }
             if !receipts.isEmpty {
                 Section("Delivered") {
                     ForEach(receipts, id: \.id) { receipt in
@@ -113,6 +157,7 @@ struct ShelfListView: View {
         .refreshable {
             model.refresh()
             await model.flush()
+            await model.syncRemote(announceFailure: true)
         }
     }
 
@@ -170,10 +215,9 @@ struct ShelfListView: View {
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             Menu {
-                PhotosPicker(
-                    selection: $photoSelection,
-                    matching: .any(of: [.images, .videos])
-                ) {
+                Button {
+                    showingPhotoPicker = true
+                } label: {
                     Label("From Photos", systemImage: "photo.on.rectangle")
                 }
                 Button {
@@ -292,6 +336,68 @@ private struct ItemRow: View {
         case .text: "text.alignleft"
         }
     }
+}
+
+/// One thing sitting on the Mac's shelf. Tapping pulls it down; the row shows
+/// that pull happening, because on a phone a tap that does nothing visible for
+/// two seconds reads as a tap that missed.
+private struct RemoteRow: View {
+    let entry: RemoteEntry
+    let isFetching: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbolName)
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .frame(width: 36, height: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.displayName)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if isFetching {
+                ProgressView()
+            } else {
+                Image(systemName: "arrow.down.circle")
+                    .foregroundStyle(.tint)
+            }
+        }
+    }
+
+    private var subtitle: String {
+        var parts: [String] = []
+        if let bytes = entry.byteCount {
+            parts.append(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
+        }
+        parts.append(entry.addedAt.formatted(.relative(presentation: .named)))
+        return parts.joined(separator: " · ")
+    }
+
+    private var symbolName: String {
+        switch ShelfItem.Kind(rawValue: entry.kindHint) {
+        case .folder: "folder"
+        case .image: "photo"
+        case .link: "link"
+        case .text: "text.alignleft"
+        case .file, nil: "doc"
+        }
+    }
+}
+
+/// The system share sheet, which is what "save this on my phone" actually
+/// means on iOS — Files, Photos, or straight into another app.
+private struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 private struct NoticeBanner: View {

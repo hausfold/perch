@@ -51,6 +51,31 @@ retried when the app next runs otherwise. Honest states, no fake "sent".
   move into a UUID container → `stored`. The phone deletes its copy only on
   `stored`, and keeps a dated receipt.
 
+**The shelf is shared, and the phone is the one who asks.** A phone that can
+only deliver is a one-way pocket, and the first thing testing on a real iPhone
+produced was "I dropped this on the Mac — where is it?" So the same session
+carries the reverse direction: `shelfListRequest → shelfList`, `fetchItem →
+offer + chunks + itemDone`, `removeItem → removeAck`. All three are
+phone-initiated, and that is a decision, not a limitation:
+
+- The Mac cannot usefully dial a phone. It is asleep, off the network, or
+  locked most of the time; a Mac that pushed would need a wake path, which
+  means a relay or a notification service — the exact dependency this ADR
+  exists to avoid.
+- So "in sync" is a poll: every few seconds while the app is in the foreground
+  and the Mac is visible, plus pull-to-refresh. Cheap on a LAN, invisible when
+  the Mac is away (no endpoint, no connection, no error), and nothing to keep
+  alive in the background.
+- A fetch is a **copy**, not a move — the shelf is shared, so taking a copy to
+  the phone leaves the Mac's tile alone. Removal is explicit from either end,
+  and a phone's removal is the shelf's ordinary `remove`.
+- Fetched bytes land in a `MacInbox` container, never the phone's shelf root:
+  the shelf root *is* the outbox, so staging an arrival there would deliver it
+  straight back to the Mac it came from. From the inbox they go to the system
+  share sheet, because iOS has no shelf of its own to drop them on.
+- Folders are refused with a stated reason. The wire carries one file per item,
+  and inventing a tar format for a v1 is not the trade.
+
 Why not TLS-PSK (`sec_protocol_options_add_pre_shared_key`)? It buys the same
 confidentiality from a C API with worse testability, and still needs the
 pairing layer built by hand. The hand-rolled frame layer is ~150 lines, fully
@@ -71,5 +96,12 @@ relay slots in without a model rewrite.
 - The Mac approval sheet and the phone's six-digit confirm are load-bearing
   (they are the MITM defense); `PERCH_AUTOPAIR=1` bypasses both in DEBUG
   builds only, for automated end-to-end runs.
+- A phone can delete from the Mac's shelf. That is the point of a shared shelf,
+  and the pairing ceremony is what gates it: a device key is the relationship,
+  and revoking it in Settings ends the ability.
+- One share is one item, however many representations the host offers. Safari
+  hands over a page as both `public.url` and `public.plain-text`, and staging
+  every attachment put the page on the Mac twice; loose text alongside a link is
+  that link's title, so it is dropped (files and images never are).
 - The iOS targets ship nothing yet — App Store distribution, icons, and the
   free-companion/paid-Mac story are deliberately out of this ADR.
