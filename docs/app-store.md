@@ -31,9 +31,18 @@ Everything here is done once, by hand, in your login session — not in CI.
 3. **Create the App Store Connect record**: New App → iOS, name `Perch`, primary
    language English (U.S.), bundle ID `com.nebelhaus.perch.ios`, SKU `perch-ios`.
 4. **Mint an App Store Connect API key** (Users and Access → Integrations), role
-   **App Manager**, and download the `.p8` once — Apple will not show it twice.
-   The notarization key already in the repo's secrets is scoped to notarization
+   **Admin**, and download the `.p8` once — Apple will not show it twice. The
+   notarization key already in the repo's secrets is scoped to notarization
    and *cannot* upload builds; this is a second key.
+
+   Role picker is single-select, not a checkbox list. **App Manager** alone
+   uploads builds but can't touch Certificates/Identifiers/Profiles, so
+   `xcodebuild -allowProvisioningUpdates` fails on the first archive with
+   `Cloud signing permission error` / `No profiles for '<bundle id>' were
+   found` — it has nothing to create a provisioning profile with. **Developer**
+   alone can manage profiles but its upload rights are unconfirmed. Admin
+   covers both and is what this repo's key actually runs as; scoping it down
+   further is unverified.
 5. **Export the Apple Distribution certificate** as a `.p12` with a password.
 6. **Add the five secrets** to this repo (Settings → Secrets → Actions):
 
