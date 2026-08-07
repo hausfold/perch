@@ -12,5 +12,13 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>The camera reads the pairing QR code your Mac shows. It is never used otherwise.</string>
+	<!-- Export compliance. Every byte of crypto on the wire (X25519, HKDF,
+	     ChaCha20-Poly1305, SHA-256, HMAC) is CryptoKit's — standard algorithms
+	     provided by the operating system, nothing proprietary, and no
+	     encryption of our own design. Declaring it here means App Store
+	     Connect stops asking on every upload. If that reading ever changes,
+	     it changes in docs/app-store.md first. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

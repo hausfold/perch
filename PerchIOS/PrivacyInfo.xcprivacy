@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Perch collects nothing and tracks no one: there is no account, no
+	     analytics, no relay, and the only network the app speaks on is the
+	     local one, to a Mac the user paired by hand (ADR 0005). The two
+	     entries below are Apple's "required reason" APIs we do touch — both
+	     inside our own App Group container. Keep this file in step with
+	     PerchShare/PrivacyInfo.xcprivacy; the extension touches the same
+	     shared code and must declare the same reasons. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!-- MobileConfig.groupDefaults — the pairing/delivery state the
+			     app and the Share extension both read, inside the group. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+		<dict>
+			<!-- StagingRepository reads modification dates of files it staged
+			     itself, in the App Group container, to age out spool dirs. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

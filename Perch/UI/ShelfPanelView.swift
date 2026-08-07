@@ -347,7 +347,7 @@ struct ShelfPanelView: View {
             .buttonStyle(.plain)
         }
         .font(.caption)
-        .foregroundStyle(rice.onAccent)
+        .foregroundStyle(rice.onRed)
         .padding(10)
         .background(rice.red.opacity(0.88), in: RoundedRectangle(cornerRadius: 12))
     }
@@ -380,7 +380,7 @@ private struct UpdateStrip: View {
             row {
                 Image(systemName: "arrow.down.circle.fill")
                     .font(.body)
-                    .foregroundStyle(rice.green)
+                    .foregroundStyle(rice.accent)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Perch \(pending) is out")
                         .font(.callout.weight(.semibold))
@@ -405,7 +405,7 @@ private struct UpdateStrip: View {
                         .foregroundStyle(rice.onAccent)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Capsule().fill(rice.green.opacity(0.88)))
+                        .background(Capsule().fill(rice.accent.opacity(0.88)))
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -469,7 +469,7 @@ private struct LicenseStrip: View {
             row {
                 Image(systemName: "tray.full")
                     .font(.body)
-                    .foregroundStyle(rice.green)
+                    .foregroundStyle(rice.accent)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(note)
                         .font(.callout.weight(.semibold))
@@ -490,7 +490,7 @@ private struct LicenseStrip: View {
                         .foregroundStyle(rice.onAccent)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Capsule().fill(rice.green.opacity(0.88)))
+                        .background(Capsule().fill(rice.accent.opacity(0.88)))
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -679,15 +679,15 @@ private struct FileTile: View {
             Image(systemName: item.isPinned ? "pin.fill" : "pin")
                 .font(.system(size: 13, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
-                // Pinned wears the palette's green — the shelf's own mark color,
-                // the same one the ember burns — rather than the system accent,
-                // which is the one color on the panel the rice doesn't pick.
+                // Pinned wears the shelf's accent — its own mark color, the same
+                // one the ember burns — rather than the *system* accent, which
+                // is the one color on the panel the rice doesn't pick.
                 .foregroundStyle(item.isPinned ? rice.onAccent : rice.text.opacity(0.72))
                 .frame(width: 24, height: 24)
                 .background(
                     Circle().fill(
                         item.isPinned
-                            ? rice.green.opacity(0.88)
+                            ? rice.accent.opacity(0.88)
                             : rice.crust.opacity(0.62)
                     )
                 )

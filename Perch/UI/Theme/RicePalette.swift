@@ -20,7 +20,7 @@ struct RicePalette: Equatable {
 
     /// Panel fill (`base`), the wash under the remove badge (`crust`), the
     /// dashed drop outline at rest (`overlay0`), labels (`text`, `subtext0`),
-    /// the ember (`green`), and the destructive accents (`red`).
+    /// the palette's own green, and the destructive accents (`red`).
     let crust, base, overlay0, text, subtext0, green, red: Color
 
     /// Is this a LIGHT palette? Relative luminance of `base`, the panel fill.
@@ -28,6 +28,39 @@ struct RicePalette: Equatable {
     /// `preferredColorScheme`, the tint alpha, and every shadow, all of which
     /// are read inside view bodies.
     let isLight: Bool
+
+    /// **What the shelf accents with** — the ember's pips, a pinned tile, the
+    /// filled button on a notice. Defaults to the palette's `green`, which under
+    /// stock nebelung is `#abe1a6`: perch's own mark green, the exact sage of
+    /// the app icon. `accented(by:)` moves it elsewhere when the rice (or a
+    /// hand-written `config.json`) asks — see `RiceThemeDefaults.accent`.
+    private(set) var accent: Color
+
+    /// Label color for text sitting on the filled accent, and on the one other
+    /// filled swatch the panel has. Precomputed rather than derived per read,
+    /// for the same reason `isLight` is: both are read inside view bodies.
+    private(set) var onAccent: Color
+    let onRed: Color
+
+    /// The darkest and lightest inks this palette actually owns, with their
+    /// luminances. On a dark palette that is `crust`/`text`; on a latte the
+    /// roles invert, and reaching for `crust` there would put light grey on a
+    /// pale fill.
+    private let darkInk: Ink
+    private let lightInk: Ink
+
+    /// A candidate label color and the luminance that decides whether it wins.
+    /// A struct rather than a tuple so `RicePalette` keeps synthesized equality.
+    private struct Ink: Equatable {
+        let color: Color
+        let luminance: Double
+    }
+
+    /// Every role the source map carried, raw, so an accent named by *role*
+    /// (`"mauve"`) can be resolved against the palette in force. A nebelung file
+    /// has all twenty-three; a compiled-in table below has only the seven perch
+    /// paints with, which is why a named accent there falls back to green.
+    private let sourceHex: [String: String]
 
     /// The roles a palette file must carry. A subset of the catppuccin names
     /// nebelung uses, so its variant files parse here unchanged.
@@ -59,6 +92,42 @@ struct RicePalette: Equatable {
 
         let (r, g, b) = rgb["base"]!
         isLight = 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5
+
+        func ink(_ role: String) -> Ink {
+            Ink(color: color(role), luminance: Self.luminance(rgb[role]!))
+        }
+        darkInk = isLight ? ink("text") : ink("crust")
+        lightInk = isLight ? ink("base") : ink("text")
+
+        accent = color("green")
+        onAccent = Self.ink(on: Self.luminance(rgb["green"]!), darkInk, lightInk)
+        onRed = Self.ink(on: Self.luminance(rgb["red"]!), darkInk, lightInk)
+        sourceHex = map
+    }
+
+    /// WCAG relative luminance — gamma-expanded, unlike the cheap `isLight`
+    /// check on `base`. The difference doesn't matter for a near-black or
+    /// near-white panel and matters a lot for a mid-tone accent: latte's green
+    /// reads as 0.52 unexpanded (light) and 0.26 expanded (dark), and only the
+    /// second answer puts legible ink on it.
+    private static func luminance(_ rgb: (Double, Double, Double)) -> Double {
+        func expand(_ c: Double) -> Double {
+            c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * expand(rgb.0) + 0.7152 * expand(rgb.1) + 0.0722 * expand(rgb.2)
+    }
+
+    /// Whichever ink contrasts *more* with the fill. A threshold on the fill's
+    /// luminance can't answer this: what counts as "light enough for dark ink"
+    /// depends on how dark this palette's dark ink actually is, and a latte's
+    /// darkest ink is `#515151`, not black.
+    private static func ink(on fill: Double, _ dark: Ink, _ light: Ink) -> Color {
+        func contrast(_ a: Double, _ b: Double) -> Double {
+            (max(a, b) + 0.05) / (min(a, b) + 0.05)
+        }
+        return contrast(fill, dark.luminance) >= contrast(fill, light.luminance)
+            ? dark.color
+            : light.color
     }
 
     /// `"#d7d7d7"` / `"d7d7d7"` → components. Anything else is a malformed file.
@@ -74,10 +143,26 @@ struct RicePalette: Equatable {
 
     // MARK: - Painting helpers
 
-    /// Label color for text sitting on a filled `green`/`red` — the accents are
-    /// pastel on a dark palette and saturated on a light one, so the contrast
-    /// color flips with the polarity, not with the accent.
-    var onAccent: Color { isLight ? base : crust }
+    // MARK: - The accent
+
+    /// Move the accent, as `~/.config/perch/config.json` asks.
+    ///
+    /// `request` is either a **catppuccin role name** — the fourteen accents
+    /// `nebelhaus.theme.accent` chooses between, resolved against the palette in
+    /// force so the hue follows the flavor and the polarity by itself — or a
+    /// literal `"#rrggbb"`, for a standalone install hand-editing the file.
+    ///
+    /// Anything else (a role this palette doesn't carry, a typo, an empty
+    /// string) leaves the accent on `green`. A wrong accent is a cosmetic
+    /// mistake and must never be a broken shelf.
+    func accented(by request: String?) -> RicePalette {
+        guard let request, !request.isEmpty else { return self }
+        guard let rgb = Self.components(sourceHex[request] ?? request) else { return self }
+        var moved = self
+        moved.accent = Color(.sRGB, red: rgb.0, green: rgb.1, blue: rgb.2)
+        moved.onAccent = Self.ink(on: Self.luminance(rgb), darkInk, lightInk)
+        return moved
+    }
 
     /// A drop shadow that works in both polarities. `alpha` is the dark-palette
     /// value; on a light palette the same black at the same weight reads as
@@ -217,17 +302,30 @@ enum RiceFiles {
 ///
 /// ```json
 /// { "themeDark": "nebelung-high-contrast",
-///   "themeLight": "nebelung-latte-high-contrast" }
+///   "themeLight": "nebelung-latte-high-contrast",
+///   "accent": "mauve" }
 /// ```
 ///
-/// The rice writes this (nebelhaus `modules/perch`) so `nebelhaus.theme.flavor`
-/// and `.contrast` reach perch declaratively. Perch's own settings live in
-/// `UserDefaults`, which Nix has no business writing — this file carries only
+/// The rice writes this (nebelhaus `modules/perch`) so `nebelhaus.theme.flavor`,
+/// `.contrast` and `.accent` reach perch declaratively. Perch's own settings live
+/// in `UserDefaults`, which Nix has no business writing — this file carries only
 /// what the rice owns. Delete it (or the rice's `theme` option) and the
-/// compiled-in nebelung pair applies.
+/// compiled-in nebelung pair applies, accented with its own green.
+///
+/// There is no accent picker in Settings and there won't be: the shelf is a
+/// five-second surface, and "follow the rice" is the feature. This file is the
+/// hidden setting — a standalone install can write it by hand, where a literal
+/// `"#rrggbb"` is accepted as well as a role name.
 struct RiceThemeDefaults: Decodable, Equatable {
     let themeDark: String?
     let themeLight: String?
+
+    /// A catppuccin role name (`"mauve"`, `"sapphire"`, … — the fourteen
+    /// `nebelhaus.theme.accent` offers) or a literal `"#rrggbb"`. Absent means
+    /// the palette's green, which is perch's mark green. Defaulted so the
+    /// memberwise initializer stays two arguments at the call sites that
+    /// predate accents.
+    var accent: String? = nil
 
     static func load(from url: URL = RiceFiles.configFile) -> RiceThemeDefaults? {
         guard let data = try? Data(contentsOf: url) else { return nil }
@@ -276,5 +374,9 @@ enum RiceTheme {
             name(systemIsLight: systemIsLight, defaults: defaults),
             themesDirectory: themesDirectory
         )
+        // The accent is resolved *against the palette that won*, so naming a
+        // role picks that role's hue in whichever flavor and polarity is in
+        // force — one config key, right in both halves of the pair.
+        .accented(by: defaults?.accent)
     }
 }

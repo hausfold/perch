@@ -24,12 +24,13 @@ struct ShelfEmber: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.rice) private var rice
 
-    /// The palette's green — `#abe1a6` under stock nebelung, which is perch's
-    /// mark green: deliberately the muted sage of the app icon and not a
-    /// saturated green, which at this size and this close to the camera would
-    /// read as the system's recording indicator. A latte rice swaps in its own
-    /// green, which is darker for the same reason, against a bright desktop.
-    private var ember: Color { rice.green }
+    /// The shelf's accent — `#abe1a6` unless the rice moved it, which is
+    /// perch's mark green: deliberately the muted sage of the app icon and not
+    /// a saturated green, which at this size and this close to the camera would
+    /// read as the system's recording indicator. A latte palette swaps in its
+    /// own darker one for the same reason, against a bright desktop; a rice
+    /// that picked another accent gets that hue's equivalent.
+    private var ember: Color { rice.accent }
     private static let pipSize: CGFloat = 5
     /// Past this the row stops growing. Presence is the signal, not the total.
     private static let maxPips = 5

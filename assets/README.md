@@ -14,3 +14,11 @@ muted green accent, so it reads at 16 px and sits next to the rest of the family
 
 The files in `Perch/Assets.xcassets/AppIcon.appiconset` are mechanically scaled
 from `perch-icon-master.png`. Keep the master rather than upscaling an icon slot.
+
+`PerchIOS/Assets.xcassets/AppIcon.appiconset/icon_1024.png` comes from the same
+master, with three differences iOS requires: it is a single 1024×1024 slot (iOS
+derives the rest), it is **flattened onto the mark's own graphite** — an iOS app
+icon may not carry an alpha channel, and iOS masks its own squircle, so the
+master's rounded corners would otherwise show as transparent notches — and the
+mark is **inset 9%**, because the master bleeds its lower card off the tile edge
+and iOS's mask is tight enough to clip that into a fragment at 60 pt.

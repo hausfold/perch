@@ -48,20 +48,37 @@ follows macOS Light/Dark:
 
 ```text
 ~/.config/perch/
-  config.json          { "themeDark": "nebelung", "themeLight": "nebelung-latte" }
+  config.json          { "themeDark": "nebelung", "themeLight": "nebelung-latte",
+                         "accent": "mauve" }
   themes/<name>.json   flat "role": "#hex" map — a nebelung *.hex.json verbatim
 ```
 
 A file in `themes/` **shadows** a built-in of the same name, so a palette bump
 lands without a new release, and any Catppuccin-shaped palette drops in under its
-own name. Perch reads seven roles — `base`, `crust`, `overlay0`, `text`,
-`subtext0`, `green`, `red` — and ignores the rest; a missing or malformed file
-falls back to built-in nebelung rather than failing.
+own name. Perch requires seven roles — `base`, `crust`, `overlay0`, `text`,
+`subtext0`, `green`, `red` — plus whichever one `accent` names, and ignores the
+rest; a missing or malformed file falls back to built-in nebelung rather than
+failing.
+
+`accent` is the one colour the shelf *emphasises* with — the ember's pips under
+the notch, a pinned tile, the filled button on a notice. It takes either a
+catppuccin role name (the fourteen `nebelhaus.theme.accent` offers, resolved
+against whichever palette is in force, so the hue follows the flavour and the
+polarity by itself) or a literal `"#rrggbb"` if you're hand-editing. Leave it
+out and the shelf accents with the palette's own `green` — `#abe1a6` under stock
+nebelung, which is perch's mark green, the exact sage of the app icon. A role
+the palette doesn't carry, or a typo, falls back to that same green rather than
+to a broken shelf.
+
+Label colour on a filled accent is chosen for contrast against the accent
+itself, not against the panel, so a pale accent gets dark ink and a deep one
+gets light ink whichever polarity it lands in.
 
 On a [nebelhaus](https://github.com/nebelhaus/nebelhaus) rice all of this is
-written for you from `nebelhaus.theme.flavor` / `.contrast`; standalone installs
-can write the two files by hand or ignore them entirely. Perch has no theme
-picker: colors come from the rice, everything else from Settings.
+written for you from `nebelhaus.theme.flavor` / `.contrast` / `.accent`;
+standalone installs can write the two files by hand or ignore them entirely.
+Perch has no theme or accent picker: colors come from the rice, everything else
+from Settings.
 
 Changes are picked up the next time the shelf opens — no relaunch.
 
