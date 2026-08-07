@@ -54,7 +54,7 @@ Everything here is done once, by hand, in your login session — not in CI.
 Draft copy, ready to paste. Keep it honest about what the app is: a companion,
 not a standalone.
 
-- **Name**: `Perch`
+- **Name**: `Perch for Mac` (App Store Connect rejected plain `Perch` as taken; bundle ID, SKU, and in-app branding stay `Perch`/`perch-ios`)
 - **Subtitle** (30 max): `Send it to your Mac's shelf`
 - **Category**: Productivity (secondary: Utilities)
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
