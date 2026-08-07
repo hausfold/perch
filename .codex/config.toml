@@ -7,10 +7,11 @@
 # This file only carries the one thing AGENTS.md can't express: the session hook
 # that installs Nix in a cloud container.
 
-hooks = ".codex/hooks.json"
+[hooks]
+file = ".codex/hooks.json"
 
 [features]
-codex_hooks = true
+hooks = true
 
 # Two caveats, both upstream, both harmless if they bite:
 #   * repo-local hooks have historically not fired in every interactive session
