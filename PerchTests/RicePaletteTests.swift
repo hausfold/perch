@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import Perch
 
@@ -191,8 +192,88 @@ final class RicePaletteTests: XCTestCase {
         XCTAssertEqual(RicePalette.nebelungLatte.shadow(0.4), .black.opacity(0.4 * 0.35))
     }
 
-    func testAccentLabelColorFlipsWithThePolarity() {
+    func testAccentLabelColorFollowsTheFillNotThePanel() {
+        // Stock nebelung: a pastel accent on a dark panel wants dark ink.
         XCTAssertEqual(RicePalette.nebelung.onAccent, RicePalette.nebelung.crust)
+        XCTAssertEqual(RicePalette.nebelung.onRed, RicePalette.nebelung.crust)
+        // Latte: saturated accents, light ink.
         XCTAssertEqual(RicePalette.nebelungLatte.onAccent, RicePalette.nebelungLatte.base)
+        XCTAssertEqual(RicePalette.nebelungLatte.onRed, RicePalette.nebelungLatte.base)
+
+        // The combination stock palettes never produce: a *pale* accent on a
+        // *light* panel. Reaching for crust there would be light grey on pale
+        // green; the ink has to come from the dark end of a latte instead.
+        let pale = RicePalette.nebelungLatte.accented(by: "#abe1a6")
+        XCTAssertEqual(pale.onAccent, RicePalette.nebelungLatte.text)
+
+        // And its mirror: a deep accent on a dark panel wants light ink, where
+        // the palette's own pastel green wanted `crust`.
+        let deep = RicePalette.nebelung.accented(by: "#1e3a8a")
+        XCTAssertEqual(deep.onAccent, RicePalette.nebelung.text)
+    }
+
+    // MARK: - The accent
+
+    func testTheDefaultAccentIsTheMarkGreen() {
+        XCTAssertEqual(RicePalette.nebelung.accent, RicePalette.nebelung.green)
+        XCTAssertEqual(RicePalette.nebelungLatte.accent, RicePalette.nebelungLatte.green)
+    }
+
+    func testARoleNameResolvesAgainstThePaletteInForce() throws {
+        try write("nebelung", nebelungFile)
+        let palette = RicePalette.named("nebelung", themesDirectory: themes)
+            .accented(by: "mauve")
+        XCTAssertEqual(palette.accent, Color(.sRGB, red: 0xC9 / 255, green: 0xA8 / 255, blue: 0xF1 / 255))
+        // Everything else about the palette is untouched.
+        XCTAssertEqual(palette.green, RicePalette.nebelung.green)
+    }
+
+    func testALiteralHexWorksForAStandaloneInstall() {
+        let palette = RicePalette.nebelung.accented(by: "#8db4f3")
+        XCTAssertEqual(palette.accent, Color(.sRGB, red: 0x8D / 255, green: 0xB4 / 255, blue: 0xF3 / 255))
+        XCTAssertEqual(RicePalette.nebelung.accented(by: "8db4f3").accent, palette.accent)
+    }
+
+    func testAnUnresolvableAccentLeavesTheShelfOnGreen() {
+        // A role the compiled-in table doesn't carry (it has only the seven
+        // perch paints with), a typo, and nothing at all.
+        XCTAssertEqual(RicePalette.nebelung.accented(by: "mauve").accent, RicePalette.nebelung.green)
+        XCTAssertEqual(RicePalette.nebelung.accented(by: "chartreuse").accent, RicePalette.nebelung.green)
+        XCTAssertEqual(RicePalette.nebelung.accented(by: "").accent, RicePalette.nebelung.green)
+        XCTAssertEqual(RicePalette.nebelung.accented(by: nil).accent, RicePalette.nebelung.green)
+    }
+
+    func testTheRiceAccentReachesTheResolvedPalette() throws {
+        try write("nebelung", nebelungFile)
+        try write("nebelung-latte", nebelungFile.merging(["green": "4a9e3a", "teal": "179299"]) { _, new in new })
+        let defaults = RiceThemeDefaults(
+            themeDark: "nebelung",
+            themeLight: "nebelung-latte",
+            accent: "teal"
+        )
+
+        let dark = RiceTheme.palette(systemIsLight: false, defaults: defaults, themesDirectory: themes)
+        let light = RiceTheme.palette(systemIsLight: true, defaults: defaults, themesDirectory: themes)
+
+        // One key, resolved against whichever half is in force — so the accent
+        // is that flavor's teal on each side, not one hex on both.
+        XCTAssertEqual(dark.accent, Color(.sRGB, red: 0x9B / 255, green: 0xE0 / 255, blue: 0xD5 / 255))
+        XCTAssertEqual(light.accent, Color(.sRGB, red: 0x17 / 255, green: 0x92 / 255, blue: 0x99 / 255))
+    }
+
+    func testConfigFileCarriesTheAccent() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "PerchConfig-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appending(path: "config.json")
+
+        try Data(#"{"themeDark":"nebelung","themeLight":"nebelung-latte","accent":"mauve"}"#.utf8)
+            .write(to: url)
+        XCTAssertEqual(RiceThemeDefaults.load(from: url)?.accent, "mauve")
+
+        // A rice that predates the option, or a standalone install: no key.
+        try Data(#"{"themeDark":"nebelung"}"#.utf8).write(to: url)
+        XCTAssertNil(RiceThemeDefaults.load(from: url)?.accent)
     }
 }
