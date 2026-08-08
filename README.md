@@ -36,7 +36,7 @@ Shelf apps aren't new — Yoink, Dropover, and friends have carried the idea for
 years. Perch's angle is **dependability and restraint**:
 
 - **copies, not moves** — a shelf that *moves* your only copy can delete it before the destination finished reading it. Perch stages copies and exports copies, so an interrupted drag never loses data.
-- **minimal permissions, no surveillance** — no Accessibility, no input taps, no screen reading, no Dock icon, no telemetry. nothing about your files is ever written to a log. the only network call it makes is an hourly look at perch's own release tag, and Settings turns that off.
+- **minimal permissions, no surveillance** — no Accessibility, no input taps, no screen reading, no Dock icon, no telemetry. nothing about your files is ever written to a log. the only thing it sends to the internet is an hourly look at perch's own release tag, and Settings turns that off; the only other traffic is to an iPhone you paired yourself, on your own network, encrypted end to end ([ADR 0005](docs/architecture-decisions/0005-mobile-companion-wire.md)).
 - **native and calm** — one sandbox-friendly menu-bar app in the [nebelung](https://github.com/nebelhaus/nebelung) fog-grey palette, which follows your rice's flavor and contrast and swaps with macOS Light/Dark.
 
 ## install

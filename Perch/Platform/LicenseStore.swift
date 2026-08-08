@@ -40,8 +40,11 @@ final class LicenseStore: ObservableObject {
     ///
     /// hausfold is the seller — the name on the receipt, the terms and the
     /// refund policy — so the page lives on hausfold.co, not on nebelhaus.com.
-    /// `/perch` there is a real page as of 2026-08-08; `nebelhaus.com/perch`
-    /// still resolves and will 301 here when the site consolidates.
+    ///
+    /// ⚠️ `hausfold.co/perch` ships in hausfold/hausfold.co#1, which must be
+    /// merged (it deploys on push to main) before this lands. Until then the
+    /// path 404s. `nebelhaus.com/perch` still resolves either way and 301s here
+    /// when the site consolidates.
     nonisolated static let purchaseURL = URL(string: "https://hausfold.co/perch")!
 
     private let defaults: UserDefaults

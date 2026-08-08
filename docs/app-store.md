@@ -84,12 +84,19 @@ a companion, not a standalone.
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
 - **Support URL**: `https://hausfold.co/perch`
 - **Marketing URL**: `https://hausfold.co/perch`
-  ⚠️ **Both were `https://nebelhaus.com/perch` in the submitted listing** and
-  changed here on 2026-08-08, when `hausfold.co/perch` became a real page —
-  hausfold is the seller, and the privacy policy the listing already points at
-  lives on the same domain. **Editing them in App Store Connect is a separate,
-  manual act**; a listing field is not changed by a commit. Both URLs still
-  resolve, so nothing breaks in the meantime.
+  ⚠️ **Both were `https://nebelhaus.com/perch` in the submitted listing.**
+  hausfold is the seller, and perch's privacy policy — the one thing App Store
+  Connect *requires* a URL for — already lives at
+  `https://hausfold.co/perch/privacy`, on that domain and live today. The
+  support and marketing URLs belong beside it. Two things follow, and getting
+  either wrong costs a review cycle:
+  - **`hausfold.co/perch` ships in
+    [hausfold/hausfold.co#1](https://github.com/hausfold/hausfold.co/pull/1)
+    and 404s until it merges.** Support URL reachability is a routine App
+    Review rejection. Do not paste these until that PR is deployed;
+    `nebelhaus.com/perch` resolves today and is the safe value until then.
+  - **Editing a listing field in App Store Connect is a manual act.** A commit
+    to this file changes the copy of record, not the listing.
 - **Keywords** (100 chars, comma-separated, no spaces):
   `shelf,airdrop,transfer,mac,send,share,files,drop,handoff,local,offline,nearby`
 
