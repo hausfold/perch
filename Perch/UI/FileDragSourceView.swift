@@ -192,7 +192,7 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
         // copy must stay off the main actor (architecture invariant: the main
         // actor never performs a potentially blocking copy).
         let queue = OperationQueue()
-        queue.name = "com.nebelhaus.perch.export"
+        queue.name = "com.hausfold.perch.export"
         queue.qualityOfService = .userInitiated
         return queue
     }

@@ -9,7 +9,7 @@ without waiting on a release: because macOS 26 blocks a from-source Nix build
 (the `_nixbld` user can't apply SwiftPM's manifest sandbox — see
 `../package.nix`), bench builds `Perch.app` from the branch **in your login
 session** (where `xcodebuild` works), signs it with a stable identity under the
-`com.nebelhaus.perch.dev` bundle id, and points this input at that build:
+`com.hausfold.perch.dev` bundle id, and points this input at that build:
 
 ```
 --override-input nebelhaus/perch/prebuilt path:/path/to/built-app-dir

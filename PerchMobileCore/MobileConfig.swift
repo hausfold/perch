@@ -46,7 +46,7 @@ enum MobileConfig {
     /// while presenting a brand-new deviceID: "paired" on screen, refused by
     /// the Mac. Identity and pairing survive together or die together.
     static func deviceIdentity() -> (id: UUID, name: String) {
-        let service = "com.nebelhaus.perch.mobile-identity"
+        let service = "com.hausfold.perch.mobile-identity"
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

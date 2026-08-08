@@ -182,7 +182,7 @@ final class UpdateCheck: ObservableObject {
     /// the confirmation that a command was copied. Nil most of the time.
     @Published private(set) var statusNote: String?
 
-    private let logger = Logger(subsystem: "com.nebelhaus.perch", category: "Update")
+    private let logger = Logger(subsystem: "com.hausfold.perch", category: "Update")
     private var fetching = false
     private var didStart = false
     private var timer: Timer?
@@ -430,7 +430,7 @@ final class UpdateCheck: ObservableObject {
     // UserDefaults, like trill's: perch is the only reader (pounce needs a file
     // because a daemon and a shell script share the state). Under the sandbox
     // this is the container's own defaults, so a `bench try` dev build — which
-    // signs under `com.nebelhaus.perch.dev` — keeps its own, exactly like its
+    // signs under `com.hausfold.perch.dev` — keeps its own, exactly like its
     // own staging directory.
 
     private enum Key {

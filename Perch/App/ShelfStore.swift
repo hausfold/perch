@@ -17,7 +17,7 @@ final class ShelfStore: ObservableObject {
     /// shelf holds, and that decision has to happen before staging starts so a
     /// refused item is never copied and then thrown away.
     private let license: LicenseStore
-    private let logger = Logger(subsystem: "com.nebelhaus.perch", category: "Shelf")
+    private let logger = Logger(subsystem: "com.hausfold.perch", category: "Shelf")
     // The live `qlmanage -p` preview, if any, so a new double-click can replace
     // it instead of stacking another window on top.
     private var quickLookProcess: Process?
@@ -502,7 +502,7 @@ final class ShelfStore: ObservableObject {
 
     private let promisedFileQueue: OperationQueue = {
         let queue = OperationQueue()
-        queue.name = "com.nebelhaus.perch.promises"
+        queue.name = "com.hausfold.perch.promises"
         queue.qualityOfService = .userInitiated
         queue.maxConcurrentOperationCount = 2
         return queue
