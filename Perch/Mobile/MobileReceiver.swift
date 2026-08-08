@@ -125,7 +125,8 @@ final class MobileReceiver: ObservableObject {
         let receiver: MobileReceiver
 
         func identity() async -> MacIdentity {
-            await receiver.identity
+            // Immutable and Sendable, so it needs no actor hop.
+            receiver.identity
         }
 
         func activePairingSecret() async -> Data? {
@@ -149,7 +150,8 @@ final class MobileReceiver: ObservableObject {
         }
 
         func spoolDirectory() async throws -> URL {
-            try await receiver.spoolDirectory()
+            // `nonisolated` on purpose: asked for mid-stream, off main.
+            try receiver.spoolDirectory()
         }
 
         func commit(_ item: OfferedItem, stagedFileURL: URL, from peer: PairedPeer) async throws {

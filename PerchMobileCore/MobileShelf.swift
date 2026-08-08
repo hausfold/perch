@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import UniformTypeIdentifiers
 
@@ -147,28 +146,19 @@ final class MobileShelf: @unchecked Sendable {
 
     /// The wire offer for one staged item — including the digest the Mac will
     /// hold the arriving bytes to.
+    ///
+    /// The digest itself comes from `WireStreaming`, the same code the Mac uses
+    /// to offer an item back to a phone. "The bytes are verified end to end" is
+    /// only one fact if there is only one place that hashes them.
     func offer(for item: ShelfItem) throws -> OutgoingItem {
-        guard let url = item.fileURL(inside: repository.rootURL),
-              let handle = FileHandle(forReadingAtPath: url.path)
-        else {
+        guard let url = item.fileURL(inside: repository.rootURL) else {
             throw CocoaError(.fileNoSuchFile)
         }
-        defer { try? handle.close() }
-        var digest = SHA256()
-        var byteCount: Int64 = 0
-        while let data = try handle.read(upToCount: 1 << 20), !data.isEmpty {
-            digest.update(data: data)
-            byteCount += Int64(data.count)
-        }
-        return OutgoingItem(
-            offered: OfferedItem(
-                id: item.id,
-                displayName: item.displayName,
-                contentTypeIdentifier: item.contentTypeIdentifier,
-                kindHint: item.kind.rawValue,
-                byteCount: byteCount,
-                sha256: Data(digest.finalize())
-            ),
+        return try WireStreaming.offer(
+            id: item.id,
+            displayName: item.displayName,
+            contentTypeIdentifier: item.contentTypeIdentifier,
+            kindHint: item.kind.rawValue,
             fileURL: url
         )
     }

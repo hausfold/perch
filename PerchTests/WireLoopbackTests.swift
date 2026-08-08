@@ -253,7 +253,195 @@ final class WireLoopbackTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(started), 10)
     }
 
+    /// A zero-byte item is a real shelf item (an empty file dragged onto the
+    /// notch), and its digest is the digest of nothing — the streamer must not
+    /// treat "no chunks" as "nothing happened".
+    func testFetchingAnEmptyItemLandsAnEmptyFile() async throws {
+        let paired = try await pairedSession()
+        defer { paired.server.stop() }
+
+        let emptyURL = shelfDirectory.appending(path: "empty.txt")
+        try Data().write(to: emptyURL)
+        let emptyID = UUID()
+        paired.delegate.place(emptyURL, id: emptyID)
+
+        let inbox = spoolDirectory.appending(path: "inbox")
+        let fetched = try await paired.client.fetch(emptyID, into: inbox)
+        XCTAssertEqual(fetched.lastPathComponent, "empty.txt")
+        XCTAssertEqual(try Data(contentsOf: fetched), Data())
+        await paired.client.close()
+    }
+
+    /// The file shrank between the digest and the first byte. The phone must
+    /// end up with nothing — not a short file wearing the real name — and the
+    /// session must still be usable, exactly as a vanished item is.
+    func testAFileThatShrankMidFetchLeavesNoPartialAndKeepsTheSession() async throws {
+        let paired = try await pairedSession()
+        defer { paired.server.stop() }
+
+        let url = shelfDirectory.appending(path: "shrinking.bin")
+        try Data(repeating: 0xAB, count: 2 << 20).write(to: url)
+        let itemID = UUID()
+        paired.delegate.place(url, id: itemID)
+        paired.delegate.setMutationBeforeStreaming { url in
+            try? Data(repeating: 0xAB, count: 1 << 10).write(to: url)
+        }
+
+        let inbox = spoolDirectory.appending(path: "inbox-shrank")
+        do {
+            _ = try await paired.client.fetch(itemID, into: inbox)
+            XCTFail("A file that shrank underfoot must not land")
+        } catch {
+            // Expected.
+        }
+        XCTAssertEqual(try contents(of: inbox), [], "no partial and no wrongly-named file may survive")
+        // The contract this class already asserts for a vanished item: a failed
+        // fetch is one failed request, not a dead session.
+        _ = try await paired.client.list()
+        await paired.client.close()
+    }
+
+    /// The mirror case: the file grew, so the Mac streams past the byte count it
+    /// promised and the phone stops taking it part-way through.
+    ///
+    /// Regression: the abandoned item's remaining chunk frames were still in the
+    /// socket, so the *next* request on that session read file bytes as its
+    /// reply — a `list()` answered with a chunk. Nothing may land, and the
+    /// session must say it is finished rather than answer from the backlog.
+    func testAFileThatGrewMidFetchEndsTheSessionInsteadOfDesyncingIt() async throws {
+        let paired = try await pairedSession()
+        defer { paired.server.stop() }
+
+        let url = shelfDirectory.appending(path: "growing.bin")
+        try Data(repeating: 0xCD, count: 1 << 10).write(to: url)
+        let itemID = UUID()
+        paired.delegate.place(url, id: itemID)
+        paired.delegate.setMutationBeforeStreaming { url in
+            try? Data(repeating: 0xCD, count: 3 << 20).write(to: url)
+        }
+
+        let inbox = spoolDirectory.appending(path: "inbox-grew")
+        do {
+            _ = try await paired.client.fetch(itemID, into: inbox)
+            XCTFail("A file that grew underfoot must not land")
+        } catch {
+            // Expected.
+        }
+        XCTAssertEqual(try contents(of: inbox), [], "no partial and no wrongly-named file may survive")
+        do {
+            _ = try await paired.client.list()
+            XCTFail("A session abandoned mid-item must not answer another request")
+        } catch WireClientError.sessionLost {
+            // Expected: stated, not guessed.
+        }
+        await paired.client.close()
+    }
+
+    /// Bytes that do not match the digest are a failed item, not a failed
+    /// session: the Mac closed the item, so the phone can simply ask again.
+    func testAWrongDigestFailsTheItemButNotTheSession() async throws {
+        let paired = try await pairedSession()
+        defer { paired.server.stop() }
+
+        let url = shelfDirectory.appending(path: "swapped.bin")
+        try Data(repeating: 0x11, count: 900 << 10).write(to: url)
+        let itemID = UUID()
+        paired.delegate.place(url, id: itemID)
+        // Same length, different bytes: the offer's digest is already out and
+        // only the digest check can catch this.
+        paired.delegate.setMutationBeforeStreaming { url in
+            try? Data(repeating: 0x22, count: 900 << 10).write(to: url)
+        }
+
+        let inbox = spoolDirectory.appending(path: "inbox-digest")
+        do {
+            _ = try await paired.client.fetch(itemID, into: inbox)
+            XCTFail("Bytes that miss the digest must not land")
+        } catch {
+            // Expected.
+        }
+        XCTAssertEqual(try contents(of: inbox), [], "corrupt bytes must never get the real name")
+        _ = try await paired.client.list()
+        await paired.client.close()
+    }
+
+    /// Two whole files down one session, back to back. Each must land complete
+    /// — a fetch that leaves frames unread poisons the one after it.
+    func testTwoFetchesOnOneSessionBothLandWhole() async throws {
+        let paired = try await pairedSession()
+        defer { paired.server.stop() }
+
+        let firstURL = shelfDirectory.appending(path: "first.bin")
+        let secondURL = shelfDirectory.appending(path: "second.bin")
+        let first = Data((0..<(1 << 20)).map { UInt8(truncatingIfNeeded: $0 &* 13) })
+        let second = Data((0..<(1 << 20)).map { UInt8(truncatingIfNeeded: $0 &* 29) })
+        try first.write(to: firstURL)
+        try second.write(to: secondURL)
+        let firstID = UUID()
+        let secondID = UUID()
+        paired.delegate.place(firstURL, id: firstID)
+        paired.delegate.place(secondURL, id: secondID)
+
+        let inbox = spoolDirectory.appending(path: "inbox-two")
+        let firstLanded = try await paired.client.fetch(firstID, into: inbox.appending(path: "a"))
+        XCTAssertEqual(try Data(contentsOf: firstLanded), first)
+        let secondLanded = try await paired.client.fetch(secondID, into: inbox.appending(path: "b"))
+        XCTAssertEqual(try Data(contentsOf: secondLanded), second)
+        await paired.client.close()
+    }
+
     // MARK: - Helpers
+
+    /// A running server with one paired phone and an open session: what every
+    /// reverse-direction test needs before it can say anything interesting.
+    private struct PairedSession {
+        let server: WireServer
+        let delegate: LoopbackDelegate
+        let client: WireRemoteClient
+    }
+
+    private func pairedSession() async throws -> PairedSession {
+        let identity = MacIdentity(id: UUID(), name: "Loopback Mac")
+        let delegate = LoopbackDelegate(
+            identity: identity,
+            spool: spoolDirectory,
+            shelf: shelfDirectory,
+            pairingSecret: nil
+        )
+        let server = WireServer(delegate: delegate)
+        try server.start(identity: identity)
+        let port = try XCTUnwrap(waitForPort(server))
+        let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: port)!)
+        let offer = PairingOffer(
+            macID: identity.id,
+            macName: identity.name,
+            secret: WireCrypto.randomSecret()
+        )
+        delegate.setPairingSecret(offer.secret)
+        let deviceID = UUID()
+        let mac = try await WirePairingClient.pair(
+            offer: offer,
+            endpoint: endpoint,
+            deviceID: deviceID,
+            deviceName: "Test iPhone"
+        ) { _ in true }
+        return PairedSession(
+            server: server,
+            delegate: delegate,
+            client: try await WireRemoteClient.connect(
+                to: endpoint,
+                deviceID: deviceID,
+                deviceKey: mac.deviceKey
+            )
+        )
+    }
+
+    /// What the phone actually has in a fetch directory, hidden `.partial`
+    /// spools included — the whole point of these assertions.
+    private func contents(of directory: URL) throws -> [String] {
+        guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
+        return try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
+    }
 
     private func waitForPort(_ server: WireServer, attempts: Int = 50) -> UInt16? {
         for _ in 0..<attempts {
@@ -291,6 +479,7 @@ private final class LoopbackDelegate: WireServerDelegate, @unchecked Sendable {
     private var secret: Data?
     private var peer: PairedPeer?
     private var shelved: [(id: UUID, url: URL)] = []
+    private var mutateBeforeStreaming: (@Sendable (URL) -> Void)?
 
     init(identity: MacIdentity, spool: URL, shelf: URL, pairingSecret: Data?) {
         macIdentity = identity
@@ -369,13 +558,22 @@ private final class LoopbackDelegate: WireServerDelegate, @unchecked Sendable {
         guard let entry = lock.withLock({ shelved.first { $0.id == itemID } }) else {
             throw CocoaError(.fileNoSuchFile)
         }
-        return try WireStreaming.offer(
+        let outgoing = try WireStreaming.offer(
             id: entry.id,
             displayName: entry.url.lastPathComponent,
             contentTypeIdentifier: nil,
             kindHint: "file",
             fileURL: entry.url
         )
+        // The offer is out; anything the test does to the file now is the
+        // "changed underfoot between the digest and the bytes" case.
+        lock.withLock { mutateBeforeStreaming }?(entry.url)
+        return outgoing
+    }
+
+    /// Rewrites a shelf file after its offer is built but before a byte moves.
+    func setMutationBeforeStreaming(_ hook: (@Sendable (URL) -> Void)?) {
+        lock.withLock { mutateBeforeStreaming = hook }
     }
 
     func removeItem(_ itemID: UUID, for peer: PairedPeer) throws {
