@@ -28,7 +28,7 @@ motion.
 No Dock icon. No Accessibility, Input Monitoring, or Screen Recording
 permission. It only ever sees what you choose to drop on it.
 
-📖 **[nebelhaus.com/perch](https://nebelhaus.com/perch)**
+📖 **[hausfold.co/perch](https://hausfold.co/perch)**
 
 ## why perch
 
@@ -75,7 +75,7 @@ standalone installs do it once, by hand. ([why](docs/reference.md#the-one-system
 
 ## more
 
-- [nebelhaus.com/perch](https://nebelhaus.com/perch) — the product page
+- [hausfold.co/perch](https://hausfold.co/perch) — the product page
 - [Reference](docs/reference.md) — building, where your staged files live, and the v1 product boundary
 - [Architecture](ARCHITECTURE.md) · [Architecture decisions](docs/architecture-decisions/)
 

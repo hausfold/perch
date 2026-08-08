@@ -82,8 +82,14 @@ a companion, not a standalone.
 - **Subtitle** (30 max): `Send it to your Mac's shelf`
 - **Category**: Productivity (secondary: Utilities)
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
-- **Support URL**: `https://nebelhaus.com/perch`
-- **Marketing URL**: `https://nebelhaus.com/perch`
+- **Support URL**: `https://hausfold.co/perch`
+- **Marketing URL**: `https://hausfold.co/perch`
+  ⚠️ **Both were `https://nebelhaus.com/perch` in the submitted listing** and
+  changed here on 2026-08-08, when `hausfold.co/perch` became a real page —
+  hausfold is the seller, and the privacy policy the listing already points at
+  lives on the same domain. **Editing them in App Store Connect is a separate,
+  manual act**; a listing field is not changed by a commit. Both URLs still
+  resolve, so nothing breaks in the meantime.
 - **Keywords** (100 chars, comma-separated, no spaces):
   `shelf,airdrop,transfer,mac,send,share,files,drop,handoff,local,offline,nearby`
 
@@ -114,7 +120,7 @@ a companion, not a standalone.
 > • Nothing is collected. No analytics, no ads, no tracking, and your file names
 >   never appear in a log.
 >
-> The Mac half is a separate app, downloaded from nebelhaus.com/perch. This
+> The Mac half is a separate app, downloaded from hausfold.co/perch. This
 > companion is free and always will be.
 
 The listing is *named* `Perch Companion`, so never write "the companion" as if it
@@ -133,7 +139,7 @@ the app with no Mac on their desk; say so before they conclude it's broken.
 
 > This app is the iPhone/iPad companion to the Perch desktop app — a separate
 > Mac application distributed outside the App Store at
-> https://nebelhaus.com/perch. It does not require the Mac app to be reviewed:
+> https://hausfold.co/perch. It does not require the Mac app to be reviewed:
 >
 > • The app is fully usable on its own. Tap + to add a file or a photo, or share
 >   anything to Perch from another app: it is staged on the phone's shelf
@@ -149,7 +155,11 @@ the app with no Mac on their desk; say so before they conclude it's broken.
 > • The app is free with no in-app purchases. The Mac app is paid, sold on our
 >   website, and never mentioned as a purchase inside this app.
 
-Also fill in: no demo account needed, contact = `support@nebelhaus.com`.
+Also fill in: no demo account needed, contact = `hi@hausfold.co`. (Not
+`support@…` on either domain — neither exists yet, and a review contact that
+bounces is the one field you cannot afford to get wrong. `hi@hausfold.co` is
+live and is what every page of the site already says. Switch it when
+`support@hausfold.co` exists — `docs/going-paid.md`'s pre-flight owns that.)
 
 ## Known rejection risks, and the answer to each
 
