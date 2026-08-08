@@ -49,7 +49,7 @@ final class LicenseStore: ObservableObject {
 
     private let defaults: UserDefaults
     private let verifier: LicenseVerifier
-    private let logger = Logger(subsystem: "com.nebelhaus.perch", category: "License")
+    private let logger = Logger(subsystem: "com.hausfold.perch", category: "License")
     private var noteTask: Task<Void, Never>?
 
     private enum Key {
@@ -86,7 +86,7 @@ final class LicenseStore: ObservableObject {
         // A debug build is always licensed, exactly like the update check never
         // nudges one: developing perch shouldn't mean tripping over its own
         // paywall. The escape hatch exists so the cap and its strip can still be
-        // exercised — `defaults write com.nebelhaus.perch licenseDebugForceFree -bool YES`.
+        // exercised — `defaults write com.hausfold.perch licenseDebugForceFree -bool YES`.
         #if DEBUG
         if !defaults.bool(forKey: Key.forceFree) {
             state = .licensed(

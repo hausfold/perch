@@ -74,7 +74,7 @@ public enum WireServerError: LocalizedError {
 /// one `WireServerSession` per accepted connection.
 public final class WireServer: @unchecked Sendable {
     private let delegate: WireServerDelegate
-    private let logger = Logger(subsystem: "com.nebelhaus.perch", category: "WireServer")
+    private let logger = Logger(subsystem: "com.hausfold.perch", category: "WireServer")
     private var listener: NWListener?
     private let lock = NSLock()
 
@@ -145,7 +145,7 @@ public final class WireServer: @unchecked Sendable {
 public actor WireServerSession {
     private let connection: WireConnection
     private let delegate: WireServerDelegate
-    private let logger = Logger(subsystem: "com.nebelhaus.perch", category: "WireSession")
+    private let logger = Logger(subsystem: "com.hausfold.perch", category: "WireSession")
 
     /// An item mid-arrival: its spool file, running digest, and byte count.
     private struct InboundItem {

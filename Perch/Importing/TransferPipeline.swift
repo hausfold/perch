@@ -31,7 +31,7 @@ final class TransferPipeline: @unchecked Sendable {
     init(repository: StagingRepository) {
         self.repository = repository
         queue = OperationQueue()
-        queue.name = "com.nebelhaus.perch.transfer"
+        queue.name = "com.hausfold.perch.transfer"
         queue.qualityOfService = .userInitiated
         queue.maxConcurrentOperationCount = 2
     }

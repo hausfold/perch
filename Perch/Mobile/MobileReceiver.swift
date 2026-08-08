@@ -35,7 +35,7 @@ final class MobileReceiver: ObservableObject {
     private let devices = PairedDeviceStore()
     private let identity = MacWireIdentity.current()
     private var server: WireServer?
-    private let logger = Logger(subsystem: "com.nebelhaus.perch", category: "MobileReceiver")
+    private let logger = Logger(subsystem: "com.hausfold.perch", category: "MobileReceiver")
     /// Captured once so the wire server can ask for the spool root without a
     /// main-actor hop mid-stream.
     private nonisolated let shelfRoot: URL

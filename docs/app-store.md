@@ -305,10 +305,16 @@ holding an old key ("paired on screen, refused by the Mac"). No migration code
 is warranted: the app has never been released, so the only data at risk is on
 your own test devices.
 
-**Not in scope here:** the Mac app keeps `com.nebelhaus.perch` for now. It ships
-Developer ID + notarized through the cask, never the App Store, so it is under no
-deadline — and renaming *it* moves `~/Library/Containers/com.nebelhaus.perch/`,
-which is where the real shelf lives.
+**The Mac app followed, separately.** This section once said the Mac half kept
+`com.nebelhaus.perch` "for now" — it was under no App Store deadline, and renaming
+it moves `~/Library/Containers/com.nebelhaus.perch/`, where the real shelf lives.
+It was renamed to `com.hausfold.perch` on 2026-08-08 anyway, before the licence
+public key gets baked in: the bundle id *is* the sandbox container **and** the
+`defaults` domain `LicenseStore` writes the licence to, so renaming it after
+anyone has paid would deactivate their licence. Same reasoning as above, same
+accepted cost — empty shelf, Settings back to defaults, pairings broken (the
+keychain services in `PerchMobileCore/` are what break those, not the container
+move), local-network prompt re-appears. No migration shim; there are no users yet.
 
 ## Appendix: the one-time Apple side
 

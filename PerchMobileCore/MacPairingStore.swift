@@ -8,7 +8,7 @@ import Security
 /// Share extension can seal frames with the same device key the app paired
 /// with.
 final class MacPairingStore: @unchecked Sendable {
-    private static let service = "com.nebelhaus.perch.mobile-mac"
+    private static let service = "com.hausfold.perch.mobile-mac"
     private static let account = "paired-mac"
 
     func pairedMac() -> PairedPeer? {

@@ -9,8 +9,8 @@ import Security
 /// the container. Revoking a device deletes its item; there is nothing else
 /// to clean up anywhere.
 final class PairedDeviceStore: @unchecked Sendable {
-    private static let service = "com.nebelhaus.perch.mobile-device"
-    private let logger = Logger(subsystem: "com.nebelhaus.perch", category: "PairedDevices")
+    private static let service = "com.hausfold.perch.mobile-device"
+    private let logger = Logger(subsystem: "com.hausfold.perch", category: "PairedDevices")
     private let lock = NSLock()
 
     func all() -> [PairedPeer] {

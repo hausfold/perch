@@ -285,7 +285,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.nebelhaus.perch;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hausfold.perch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = targeted;
@@ -313,7 +313,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.nebelhaus.perch;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hausfold.perch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = targeted;
@@ -329,7 +329,7 @@
 				DEVELOPMENT_TEAM = 88M28542LQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.nebelhaus.perch.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hausfold.perch.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_STRICT_CONCURRENCY = targeted;
 				SWIFT_VERSION = 6.0;
@@ -345,7 +345,7 @@
 				DEVELOPMENT_TEAM = 88M28542LQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.nebelhaus.perch.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hausfold.perch.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_STRICT_CONCURRENCY = targeted;
 				SWIFT_VERSION = 6.0;

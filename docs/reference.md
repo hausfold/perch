@@ -31,7 +31,7 @@ never needs this.
 The active shelf is stored under the app's own container:
 
 ```text
-~/Library/Containers/com.nebelhaus.perch/Data/Library/Application Support/
+~/Library/Containers/com.hausfold.perch/Data/Library/Application Support/
   Perch/ActiveShelf/
 ```
 

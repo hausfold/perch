@@ -277,7 +277,7 @@ final class LicenseTests: XCTestCase {
     /// Each store gets its own defaults so a test never writes into the real
     /// container or reads another test's license.
     private func isolatedDefaults() -> UserDefaults {
-        let suite = "com.nebelhaus.perch.tests.\(UUID().uuidString)"
+        let suite = "com.hausfold.perch.tests.\(UUID().uuidString)"
         return UserDefaults(suiteName: suite) ?? .standard
     }
 
