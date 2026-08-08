@@ -37,7 +37,15 @@ final class LicenseStore: ObservableObject {
     nonisolated static let freeTierCapacity = 2
 
     /// Where the store buys a license. Same page the README points at.
-    nonisolated static let purchaseURL = URL(string: "https://nebelhaus.com/perch")!
+    ///
+    /// hausfold is the seller — the name on the receipt, the terms and the
+    /// refund policy — so the page lives on hausfold.co, not on nebelhaus.com.
+    ///
+    /// ⚠️ `hausfold.co/perch` ships in hausfold/hausfold.co#1, which must be
+    /// merged (it deploys on push to main) before this lands. Until then the
+    /// path 404s. `nebelhaus.com/perch` still resolves either way and 301s here
+    /// when the site consolidates.
+    nonisolated static let purchaseURL = URL(string: "https://hausfold.co/perch")!
 
     private let defaults: UserDefaults
     private let verifier: LicenseVerifier

@@ -36,14 +36,34 @@ must not land before the store can take their money.
       Verify by importing the emailed file into a `bench try` build — do not
       take "the signature verifies in Node" as proof; the Swift verifier is the
       one that matters.
-- [ ] **nebelhaus.com/perch sells.** The strip's `Get Perch` button and the
+- [ ] **hausfold.co/perch sells.** The strip's `Get Perch` button and the
       Settings `Buy Perch — $19` link both open
-      `https://nebelhaus.com/perch`, so that page needs a checkout on it, not a
+      `https://hausfold.co/perch`, so that page needs a checkout on it, not a
       README in consumer voice with no button.
+      *The page is written* — consumer voice, install, no price — along with
+      `hausfold.co/terms` and `hausfold.co/refunds`, which is the pair Paddle's
+      account review asks for. ⚠️ It ships in
+      [hausfold/hausfold.co#1](https://github.com/hausfold/hausfold.co/pull/1);
+      **until that merges the path 404s**, and merging it is what makes this
+      checkbox tickable. What it still lacks after that is the price block and
+      the overlay, and those land together, in one commit, on the day this
+      runbook is executed. (Was `nebelhaus.com/perch`, which still resolves and
+      301s once the site consolidates; hausfold is the seller, so the page it
+      sells from is hausfold's.)
 - [ ] **The FAQ covers fair source, the update year, seats, and refunds.** The
       first support email you get will be one of those four.
-- [ ] **`support@nebelhaus.com` exists** and you've decided what SLA you'll
+      *Three of the four are written* in hausfold.co#1: fair source and the
+      update year on `/terms`, refunds on a page of their own. **Seats is the
+      gap** — the terms say a seat is a person, and nothing says how a buyer
+      picks a seat count at checkout. That's Paddle product configuration, not
+      a page edit.
+- [ ] **`support@hausfold.co` exists** and you've decided what SLA you'll
       actually honour. Paying customers change the tone of the issue tracker.
+      Until it does, every page on the site says `hi@hausfold.co`, which
+      routes today — moving them is a find-and-replace, but do it *before* the
+      first receipt goes out, not after. (Was `support@nebelhaus.com`; people
+      buy a hausfold product, and hausfold is the name they'll have seen on the
+      receipt — `notes/go-to-market.md` §6 in the workshop.)
 - [ ] **The private key is backed up offline.** If it is lost, no new license
       can ever be issued and every existing one still works forever — a
       uniquely annoying failure mode.

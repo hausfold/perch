@@ -28,7 +28,7 @@ motion.
 No Dock icon. No Accessibility, Input Monitoring, or Screen Recording
 permission. It only ever sees what you choose to drop on it.
 
-📖 **[nebelhaus.com/perch](https://nebelhaus.com/perch)**
+📖 **[hausfold.co/perch](https://hausfold.co/perch)**
 
 ## why perch
 
@@ -36,7 +36,7 @@ Shelf apps aren't new — Yoink, Dropover, and friends have carried the idea for
 years. Perch's angle is **dependability and restraint**:
 
 - **copies, not moves** — a shelf that *moves* your only copy can delete it before the destination finished reading it. Perch stages copies and exports copies, so an interrupted drag never loses data.
-- **minimal permissions, no surveillance** — no Accessibility, no input taps, no screen reading, no Dock icon, no telemetry. nothing about your files is ever written to a log. the only network call it makes is an hourly look at perch's own release tag, and Settings turns that off.
+- **minimal permissions, no surveillance** — no Accessibility, no input taps, no screen reading, no Dock icon, no telemetry. nothing about your files is ever written to a log. the only thing it sends to the internet is an hourly look at perch's own release tag, and Settings turns that off; the only other traffic is to an iPhone you paired yourself, on your own network, encrypted end to end ([ADR 0005](docs/architecture-decisions/0005-mobile-companion-wire.md)).
 - **native and calm** — one sandbox-friendly menu-bar app in the [nebelung](https://github.com/nebelhaus/nebelung) fog-grey palette, which follows your rice's flavor and contrast and swaps with macOS Light/Dark.
 
 ## install
@@ -75,7 +75,7 @@ standalone installs do it once, by hand. ([why](docs/reference.md#the-one-system
 
 ## more
 
-- [nebelhaus.com/perch](https://nebelhaus.com/perch) — the product page
+- [hausfold.co/perch](https://hausfold.co/perch) — the product page
 - [Reference](docs/reference.md) — building, where your staged files live, and the v1 product boundary
 - [Architecture](ARCHITECTURE.md) · [Architecture decisions](docs/architecture-decisions/)
 
