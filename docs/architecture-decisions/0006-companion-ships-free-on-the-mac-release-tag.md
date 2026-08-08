@@ -58,7 +58,7 @@ carries monotonicity; the marketing version carries meaning.
   App Store Connect API key with App Manager role. The notarization key cannot
   upload builds, so the repo now holds two App Store Connect keys with different
   scopes — label them.
-- The App Group `group.com.nebelhaus.perch` becomes release infrastructure, not
+- The App Group `group.com.hausfold.perch` becomes release infrastructure, not
   just a build detail: it must exist on both App IDs in the portal or every
   archive fails at signing.
 - Privacy manifests are now a maintenance obligation. `PerchIOS/` and
