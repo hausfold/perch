@@ -7,7 +7,7 @@ import UIKit
 /// lives. Both processes read and write the same places, which is the whole
 /// reason these paths live in the group container and not in either sandbox.
 enum MobileConfig {
-    static let appGroupID = "group.com.nebelhaus.perch"
+    static let appGroupID = "group.com.hausfold.perch"
 
     static var groupContainer: URL {
         guard let url = FileManager.default.containerURL(

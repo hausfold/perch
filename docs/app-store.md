@@ -78,7 +78,7 @@ The copy of record. What's in App Store Connect should match what's here; when
 they disagree, fix it here first and paste. Keep it honest about what the app is:
 a companion, not a standalone.
 
-- **Name**: `Perch for Mac` (App Store Connect rejected plain `Perch` as taken; bundle ID, SKU, and in-app branding stay `Perch`/`perch-ios`)
+- **Name**: `Perch for Mac` (App Store Connect rejected plain `Perch` as taken; in-app branding stays `Perch`). Bundle ID `com.hausfold.perch.ios`, SKU `perch-ios-hausfold` — both changed by the hausfold rename, see [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app)
 - **Subtitle** (30 max): `Send it to your Mac's shelf`
 - **Category**: Productivity (secondary: Utilities)
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
@@ -179,7 +179,7 @@ xcodebuild -project Perch.xcodeproj -scheme PerchIOS -configuration Debug \
   -derivedDataPath DerivedData build
 xcrun simctl boot 'iPhone 17 Pro Max'
 xcrun simctl install booted DerivedData/Build/Products/Debug-iphonesimulator/PerchIOS.app
-xcrun simctl launch booted com.nebelhaus.perch.ios
+xcrun simctl launch booted com.hausfold.perch.ios
 xcrun simctl io booted screenshot shot.png
 ```
 
@@ -214,26 +214,103 @@ question per-build in App Store Connect, delete the key and Apple will ask on
 every upload. If you ever hand-roll a cipher, this flips to `true` and you owe
 Apple a compliance code.
 
+## Re-identifying an already-submitted app
+
+Written 2026-08-08, for the hausfold rename — `com.nebelhaus.perch.ios` →
+`com.hausfold.perch.ios`. Keep it: the ordering generalizes to any bundle-id
+change after a record exists, and the trap it avoids is not obvious.
+
+**Why it can't be an edit.** App Store Connect only offers the bundle-id
+dropdown while *no build is associated with the record*. Perch's 1.0 has an
+uploaded build and is Waiting for Review, so the id on that record is frozen. A
+new record is the only path.
+
+**The trap: the App Store name, not the bundle id.** Plain `Perch` was already
+taken by someone else — that's why this listing is `Perch for Mac`. Two records
+cannot hold the same name at once, and a *deleted* app's name does not reliably
+return to the pool on any schedule Apple documents. So deleting first and
+creating second risks losing the only name you have left. **Never delete the old
+record while you still need something from it.**
+
+The ordering that keeps every option open:
+
+1. 👤 **Remove the 1.0 submission from review.** The version page →
+   *Remove from Review*. Free, reversible, and it stops Apple approving a build
+   under the old id while you work. Do this before anything else.
+2. 🤖 **Land the code change** — the four `PRODUCT_BUNDLE_IDENTIFIER` lines, both
+   `.entitlements` files, and `MobileConfig.appGroupID`. Already done in the PR
+   that added this section.
+3. 👤 **Register the new identifiers** (Appendix steps 1–2): the two App IDs and
+   App Group `group.com.hausfold.perch`. Xcode's automatic signing will register
+   the App IDs on the first local archive, but it **will not invent the App
+   Group** — create that by hand or every archive fails at signing.
+4. 👤 **Create the new App Store Connect record** under a **temporary name**
+   (the old record still holds `Perch for Mac`), bundle id
+   `com.hausfold.perch.ios`, SKU `perch-ios-hausfold`.
+5. 🤖 **Upload a build**: `gh workflow run testflight.yml`. No tag needed — the
+   phone side ships on `workflow_dispatch`. Confirm it lands in TestFlight under
+   the *new* record.
+6. 👤 **Only now, delete the old record.** It is unreleased, free, and carries no
+   purchases, so nothing but the name is at stake — and by this point the new
+   record demonstrably works.
+7. 👤 **Rename the new record** to `Perch for Mac` in App Information. Deleting
+   the old record is what *allows* this, but does not reliably make the name
+   available on any schedule Apple documents — so if it's still held, wait and
+   retry. You are not blocked either way: the record exists and builds fine under
+   the temporary name, and the name is editable until release.
+8. 👤 Re-attach the build, re-enter the listing metadata, and submit.
+
+**What this resets, and why that's fine.** Renaming the App Group changes
+`kSecAttrAccessGroup`, so the phone's shelf, its outbox *and* its keychain
+identity all become unreachable at once. That is exactly the invariant
+`MobileConfig.deviceIdentity()` documents — *"identity and pairing survive
+together or die together"* — and dying together is the safe half: the phone
+mints a fresh `deviceID` and you re-pair, rather than presenting a new id while
+holding an old key ("paired on screen, refused by the Mac"). No migration code
+is warranted: the app has never been released, so the only data at risk is on
+your own test devices.
+
+**Not in scope here:** the Mac app keeps `com.nebelhaus.perch` for now. It ships
+Developer ID + notarized through the cask, never the App Store, so it is under no
+deadline — and renaming *it* moves `~/Library/Containers/com.nebelhaus.perch/`,
+which is where the real shelf lives.
+
 ## Appendix: the one-time Apple side
 
-Done once, by hand, in your login session — not in CI. **All seven steps are
-already done** for `com.nebelhaus.perch.ios` (first green upload: `v2026.08.07`).
-They stay written down because they come back: the Apple Distribution
-certificate expires annually, API keys get rotated, and a new machine or a new
-app starts here again.
+Done once, by hand, in your login session — not in CI. They stay written down
+because they come back: the Apple Distribution certificate expires annually, API
+keys get rotated, and a new machine or a new app starts here again.
+
+> ⚠️ **Steps 1–3 are being re-run right now, under `com.hausfold.*`.** They were
+> completed once for `com.nebelhaus.perch.ios` (first green upload `v2026.08.07`,
+> submitted as *Perch for Mac* 1.0). The hausfold rename re-does them against new
+> identifiers — follow
+> [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app),
+> which is the ordering that keeps the App Store **name** safe. Steps 4–7 carry
+> over untouched: **Team ID `88M28542LQ` and every certificate and API key are
+> unchanged.**
 
 1. **Register the two App IDs** (developer.apple.com → Identifiers), explicit,
    under team `88M28542LQ`:
-   - `com.nebelhaus.perch.ios` — the app
-   - `com.nebelhaus.perch.ios.share` — the Share extension
-2. **Create the App Group** `group.com.nebelhaus.perch` and enable it on *both*
+   - `com.hausfold.perch.ios` — the app
+   - `com.hausfold.perch.ios.share` — the Share extension
+2. **Create the App Group** `group.com.hausfold.perch` and enable it on *both*
    IDs. This is the one capability the build genuinely needs; without it the app
    `fatalError`s on launch by design (`PerchMobileCore/MobileConfig.swift`).
    `-allowProvisioningUpdates` can mint profiles, but it will not invent this
    capability — get it right here or every archive fails at signing.
-3. **Create the App Store Connect record**: New App → iOS, name `Perch for Mac`
-   (plain `Perch` is taken — see [The listing](#the-listing)), primary language
-   English (U.S.), bundle ID `com.nebelhaus.perch.ios`, SKU `perch-ios`.
+3. **Create the App Store Connect record**: New App → iOS, primary language
+   English (U.S.), bundle ID `com.hausfold.perch.ios`, SKU `perch-ios-hausfold`.
+   **For the name, follow
+   [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app)
+   — create under a temporary one** while the original record still holds
+   `Perch for Mac`, and move the name across at step 7. Taking the real name
+   here collides with the live record and is the exact failure that section
+   exists to avoid.
+   ⚠️ **A SKU can never be reused, even after the app that held it is deleted.**
+   `perch-ios` is spent on the original record forever, which is why the hausfold
+   one is `perch-ios-hausfold`. The SKU is private to your account and appears
+   nowhere a user can see, so its ugliness is free.
 4. **Mint an App Store Connect API key** (Users and Access → Integrations), role
    **Admin**, and download the `.p8` once — Apple will not show it twice. The
    notarization key already in the repo's secrets is scoped to notarization

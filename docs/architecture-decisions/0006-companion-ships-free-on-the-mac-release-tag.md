@@ -55,12 +55,17 @@ carries monotonicity; the marketing version carries meaning.
 ## Consequences
 
 - Two more identities to keep alive: an Apple Distribution certificate and an
-  App Store Connect API key with App Manager role. The notarization key cannot
-  upload builds, so the repo now holds two App Store Connect keys with different
-  scopes — label them.
+  App Store Connect API key with **Admin** role. (This said "App Manager";
+  corrected 2026-08-08 — App Manager uploads builds but cannot touch
+  Certificates/Identifiers/Profiles, so `-allowProvisioningUpdates` fails on the
+  first archive. `docs/app-store.md` has the error text.) The notarization key
+  cannot upload builds at all, so the repo holds two App Store Connect keys with
+  different scopes — label them.
 - The App Group `group.com.nebelhaus.perch` becomes release infrastructure, not
   just a build detail: it must exist on both App IDs in the portal or every
   archive fails at signing.
+  *(Renamed to `group.com.hausfold.perch` on 2026-08-08 by the hausfold rename —
+  the string above is left as it read at decision time.)*
 - Privacy manifests are now a maintenance obligation. `PerchIOS/` and
   `PerchShare/` each carry one, and they must agree — the two bundles compile the
   *same* `PerchWire/` and `PerchMobileCore/` sources, so a new required-reason
