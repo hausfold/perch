@@ -78,7 +78,7 @@ The copy of record. What's in App Store Connect should match what's here; when
 they disagree, fix it here first and paste. Keep it honest about what the app is:
 a companion, not a standalone.
 
-- **Name**: `Perch for Mac` (App Store Connect rejected plain `Perch` as taken; bundle ID, SKU, and in-app branding stay `Perch`/`perch-ios`)
+- **Name**: `Perch for Mac` (App Store Connect rejected plain `Perch` as taken; in-app branding stays `Perch`). Bundle ID `com.hausfold.perch.ios`, SKU `perch-ios-hausfold` — both changed by the hausfold rename, see [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app)
 - **Subtitle** (30 max): `Send it to your Mac's shelf`
 - **Category**: Productivity (secondary: Utilities)
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
@@ -253,9 +253,11 @@ The ordering that keeps every option open:
 6. 👤 **Only now, delete the old record.** It is unreleased, free, and carries no
    purchases, so nothing but the name is at stake — and by this point the new
    record demonstrably works.
-7. 👤 **Rename the new record** to `Perch for Mac` in App Information. If Apple
-   still holds the name, wait and retry; you are not blocked, because the record
-   already exists and builds fine under the temporary name.
+7. 👤 **Rename the new record** to `Perch for Mac` in App Information. Deleting
+   the old record is what *allows* this, but does not reliably make the name
+   available on any schedule Apple documents — so if it's still held, wait and
+   retry. You are not blocked either way: the record exists and builds fine under
+   the temporary name, and the name is editable until release.
 8. 👤 Re-attach the build, re-enter the listing metadata, and submit.
 
 **What this resets, and why that's fine.** Renaming the App Group changes
@@ -297,14 +299,18 @@ keys get rotated, and a new machine or a new app starts here again.
    `fatalError`s on launch by design (`PerchMobileCore/MobileConfig.swift`).
    `-allowProvisioningUpdates` can mint profiles, but it will not invent this
    capability — get it right here or every archive fails at signing.
-3. **Create the App Store Connect record**: New App → iOS, name `Perch for Mac`
-   (plain `Perch` is taken — see [The listing](#the-listing)), primary language
-   English (U.S.), bundle ID `com.hausfold.perch.ios`, SKU `perch-ios`.
-   ⚠️ **A SKU can never be reused, even after the app that held it is deleted** —
-   and neither can the app *name*, while the old record still exists. `perch-ios`
-   is spent on the original record, so the hausfold one takes a fresh SKU:
-   `perch-ios-hausfold`. The SKU is private to your account and appears nowhere a
-   user can see, so its ugliness is free.
+3. **Create the App Store Connect record**: New App → iOS, primary language
+   English (U.S.), bundle ID `com.hausfold.perch.ios`, SKU `perch-ios-hausfold`.
+   **For the name, follow
+   [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app)
+   — create under a temporary one** while the original record still holds
+   `Perch for Mac`, and move the name across at step 7. Taking the real name
+   here collides with the live record and is the exact failure that section
+   exists to avoid.
+   ⚠️ **A SKU can never be reused, even after the app that held it is deleted.**
+   `perch-ios` is spent on the original record forever, which is why the hausfold
+   one is `perch-ios-hausfold`. The SKU is private to your account and appears
+   nowhere a user can see, so its ugliness is free.
 4. **Mint an App Store Connect API key** (Users and Access → Integrations), role
    **Admin**, and download the `.p8` once — Apple will not show it twice. The
    notarization key already in the repo's secrets is scoped to notarization
