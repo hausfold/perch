@@ -326,7 +326,7 @@ public actor WireServerSession {
                         refused: decision.refused
                     )))
                 case let .itemDone(itemID):
-                    guard var item = inbound.removeValue(forKey: itemID) else {
+                    guard let item = inbound.removeValue(forKey: itemID) else {
                         try await connection.send(.control(.itemFailed(
                             itemID: itemID,
                             reason: "The Mac never saw bytes for that item."
@@ -400,6 +400,17 @@ public actor WireServerSession {
                     let spoolURL = spool.appending(path: ".\(itemID.uuidString).partial")
                     FileManager.default.createFile(atPath: spoolURL.path, contents: nil)
                     guard let handle = FileHandle(forWritingAtPath: spoolURL.path) else {
+                        // Every later chunk for this item would fail the same
+                        // way, so end it here rather than leaving the phone
+                        // streaming into a tile that will never resolve — and
+                        // take the empty spool file with it.
+                        try? FileManager.default.removeItem(at: spoolURL)
+                        accepted[itemID] = nil
+                        await delegate.transferFailed(
+                            offered,
+                            from: peer,
+                            reason: "The Mac could not open a spool file."
+                        )
                         try await connection.send(.control(.itemFailed(
                             itemID: itemID,
                             reason: "The Mac could not open a spool file."

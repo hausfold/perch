@@ -7,6 +7,9 @@ public enum WireClientError: LocalizedError {
     case peerFailure(String)
     case unexpectedReply
     case fileUnreadable(String)
+    /// A request left the session mid-item, so replies and requests can no
+    /// longer be paired up. Reconnecting is the whole fix.
+    case sessionLost
 
     public var errorDescription: String? {
         switch self {
@@ -14,6 +17,7 @@ public enum WireClientError: LocalizedError {
         case let .peerFailure(reason): reason
         case .unexpectedReply: "The Mac sent an unexpected reply."
         case let .fileUnreadable(name): "\(name) could not be read for sending."
+        case .sessionLost: "The connection to the Mac was interrupted. Try again."
         }
     }
 }
@@ -199,7 +203,9 @@ public enum WireTransferClient {
                 try await WireStreaming.send(item, over: connection) { sent, total in
                     await onEvent(.progress(itemID: item.offered.id, sent: sent, of: total))
                 }
-            } catch let error as WireClientError {
+            } catch {
+                // A dropped connection fails this item just as surely as an
+                // unreadable file does; the tile must say so either way.
                 await onEvent(.failed(itemID: item.offered.id, reason: error.localizedDescription))
                 throw error
             }
