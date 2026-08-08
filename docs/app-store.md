@@ -17,7 +17,10 @@ no receipts.
 
 ## One-time: the Apple side
 
-Everything here is done once, by hand, in your login session — not in CI.
+Everything here is done once, by hand, in your login session — not in CI. **All
+seven steps are already done** for `com.nebelhaus.perch.ios` (first green upload:
+`v2026.08.07`); they stay written down for the next machine, the next key
+rotation, and the next app.
 
 1. **Register the two App IDs** (developer.apple.com → Identifiers), explicit,
    under team `88M28542LQ`:
@@ -28,8 +31,9 @@ Everything here is done once, by hand, in your login session — not in CI.
    `fatalError`s on launch by design (`PerchMobileCore/MobileConfig.swift`).
    `-allowProvisioningUpdates` can mint profiles, but it will not invent this
    capability — get it right here or every archive fails at signing.
-3. **Create the App Store Connect record**: New App → iOS, name `Perch`, primary
-   language English (U.S.), bundle ID `com.nebelhaus.perch.ios`, SKU `perch-ios`.
+3. **Create the App Store Connect record**: New App → iOS, name `Perch for Mac`
+   (plain `Perch` is taken — see the listing section), primary language English
+   (U.S.), bundle ID `com.nebelhaus.perch.ios`, SKU `perch-ios`.
 4. **Mint an App Store Connect API key** (Users and Access → Integrations), role
    **Admin**, and download the `.p8` once — Apple will not show it twice. The
    notarization key already in the repo's secrets is scoped to notarization
@@ -99,8 +103,12 @@ not a standalone.
 > • Nothing is collected. No analytics, no ads, no tracking, and your file names
 >   never appear in a log.
 >
-> Perch for Mac is a separate app from nebelhaus.com/perch. The companion is free
-> and always will be.
+> The Mac half is a separate app, downloaded from nebelhaus.com/perch. This
+> companion is free and always will be.
+
+The listing is *named* `Perch for Mac`, so never write "Perch for Mac is a
+separate app" in the copy — inside this listing that sentence points at itself.
+Say "the Mac half" or "the Perch desktop app" and let the URL do the work.
 
 **What's New** (per release): one honest line. If a release only touched the Mac
 side, say so — a build with no phone-facing change is still a legitimate upload.
@@ -164,9 +172,9 @@ content in it. Don't ship a screenshot of an empty state.
 This is the part that decides whether the first submission comes back. A reviewer
 opens the app with no Mac on their desk; say so before they conclude it's broken.
 
-> Perch is the companion to Perch for Mac (a separate app, distributed outside
-> the App Store at https://nebelhaus.com/perch). It does not require the Mac app
-> to be reviewed:
+> This app is the iPhone/iPad companion to the Perch desktop app — a separate
+> Mac application distributed outside the App Store at
+> https://nebelhaus.com/perch. It does not require the Mac app to be reviewed:
 >
 > • The app is fully usable on its own. Tap + to add a file or a photo, or share
 >   anything to Perch from another app: it is staged on the phone's shelf
@@ -202,10 +210,43 @@ which means a Mac-only release can ride the same tag harmlessly — it just leav
 a build sitting in TestFlight that nobody promotes.
 
 Version mapping is mechanical: `VERSION` `2026.08.06` becomes marketing version
-`2026.8.6` (App Store Connect refuses leading zeros) with the workflow's run
-number as the build. A same-day re-cut (`2026.08.06-2`) uploads as the *same*
-marketing version with a higher build — fine for TestFlight, but a store release
-of it needs a new VERSION day.
+`2026.8.6` (App Store Connect refuses leading zeros), and the build number is
+`run_number × 10 + (attempt − 1)` — the attempt is folded in because a *re-run*
+keeps the same run number, and Apple rejects a build number it has already seen
+for that marketing version. So a failed upload is retryable with the Re-run
+button; you don't have to cut a new tag. A same-day re-cut (`2026.08.06-2`)
+uploads as the *same* marketing version with a higher build — fine for
+TestFlight, but a store release of it needs a new VERSION day.
+
+Phone-only builds don't need a tag at all: `gh workflow run testflight.yml`
+(add `--ref <branch>` to test the pipeline from a branch). Every run's summary
+page prints the version, the build number, and the two clicks still owed.
+
+## After you submit
+
+The first submission is the slow one; everything after it is the loop below.
+
+- **Waiting.** "Waiting for Review" → "In Review" is typically hours to a day.
+  Nothing to do; the build in TestFlight is already installable on your own
+  devices while you wait.
+- **A reviewer question** arrives in **Resolution Center**, not by email thread —
+  reply there. The review-note bullets above are the answers to the likely ones;
+  the offer to arrange a paired Mac is genuine, so honor it if they take it.
+- **Rejection is not a re-upload.** Most rejections are metadata or explanation,
+  fixed in App Store Connect and resubmitted with the same build. Only rebuild
+  (new tag or `gh workflow run`) when the *binary* has to change.
+- **Editing copy mid-review.** Description, keywords, and screenshots are frozen
+  while a version is In Review — changing them means pulling the submission and
+  going back into the queue. **Promotional text** (170 chars) is the exception:
+  it changes any time, no review. Prefer it for anything urgent.
+- **Approved.** Release manually rather than automatically the first time, so the
+  listing goes live when you're watching it. Phased release (7-day ramp) is worth
+  keeping on for later versions and pointless for the first one.
+
+Then each later release is: tag → build lands in TestFlight → **new version
+record** in App Store Connect (`+` next to iOS App) → attach the build → one
+honest What's New line → Submit. A Mac-only release skips all of that and just
+leaves an unpromoted build behind.
 
 ## Known rejection risks, and the answer to each
 

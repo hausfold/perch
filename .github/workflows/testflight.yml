@@ -11,18 +11,20 @@ name: testflight
 #
 # Versioning: VERSION is still the single source of truth, but App Store Connect
 # wants a strictly numeric, leading-zero-free CFBundleShortVersionString, so
-# `2026.08.06` is injected as `2026.8.6`. The build number is this workflow's run
-# number — monotonic, which is the only property App Store Connect cares about.
-# A same-day re-release (`2026.08.06-2`) therefore lands as the same marketing
-# version with a higher build; that's fine for TestFlight, and a *store* release
-# of it needs a fresh VERSION day.
+# `2026.08.06` is injected as `2026.8.6`. The build number is derived from this
+# workflow's run number — monotonic, which is the only property App Store Connect
+# cares about. A same-day re-release (`2026.08.06-2`) therefore lands as the same
+# marketing version with a higher build; that's fine for TestFlight, and a *store*
+# release of it needs a fresh VERSION day.
 #
 # Secrets (in addition to the release workflow's):
 #   IOS_DIST_CERT_P12       base64 of the exported "Apple Distribution" .p12
 #   IOS_DIST_CERT_PASSWORD  the password protecting that .p12
 #   ASC_KEY_P8              base64 of an App Store Connect API key (.p8) whose
-#                           role is App Manager — the notarization key is scoped
-#                           to notarization and cannot upload builds
+#                           role is Admin — App Manager can't mint provisioning
+#                           profiles, and the notarization key is scoped to
+#                           notarization and cannot upload builds at all
+#                           (docs/app-store.md spells out why)
 #   ASC_KEY_ID              that key's Key ID
 #   ASC_ISSUER_ID           the App Store Connect issuer ID
 
@@ -50,9 +52,14 @@ jobs:
           fi
           # 2026.08.06[-2] -> 2026.8.6 (three components, no leading zeros).
           MARKETING="$(printf '%s' "${VERSION%%-*}" | awk -F. '{printf "%d.%d.%d", $1, $2, $3}')"
+          # Re-running a failed run keeps the same run *number*, and App Store
+          # Connect rejects a build number it has already seen for this marketing
+          # version — so a transient upload failure would be unretryable. Fold the
+          # attempt in: still strictly increasing, and a re-run gets a fresh build.
+          BUILD="$(( GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT - 1 ))"
           echo "PERCH_MARKETING_VERSION=$MARKETING" >> "$GITHUB_ENV"
-          echo "PERCH_BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
-          echo "shipping $MARKETING ($GITHUB_RUN_NUMBER) from VERSION $VERSION"
+          echo "PERCH_BUILD_NUMBER=$BUILD" >> "$GITHUB_ENV"
+          echo "shipping $MARKETING ($BUILD) from VERSION $VERSION"
 
       - name: Import the Apple Distribution certificate
         env:
@@ -147,6 +154,23 @@ jobs:
           xcrun altool --upload-app -f "$IPA" -t ios \
             --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
           echo "uploaded $PERCH_MARKETING_VERSION ($PERCH_BUILD_NUMBER) — it appears in TestFlight after Apple finishes processing"
+
+      - name: Say what a human still has to do
+        run: |
+          set -euo pipefail
+          # The machine half ends here. Print the human half where you'll actually
+          # see it — `gh run view` / the run page — instead of in docs/app-store.md.
+          {
+            echo "## \`$PERCH_MARKETING_VERSION\` ($PERCH_BUILD_NUMBER) is on its way to TestFlight"
+            echo
+            echo "Apple takes ~10 min to process. Then, by hand:"
+            echo
+            echo "1. [TestFlight builds](https://appstoreconnect.apple.com/apps) — confirm the build arrived and shows no export-compliance prompt."
+            echo "2. Only if this release changes the phone side: App Store tab → the version record → **Build** → pick \`$PERCH_MARKETING_VERSION ($PERCH_BUILD_NUMBER)\`, write What's New, **Submit for Review**."
+            echo
+            echo "A Mac-only release can stop at step 1 — an unpromoted TestFlight build is harmless."
+            echo "Runbook: [docs/app-store.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/app-store.md)"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Keep the archive around
         if: always()
