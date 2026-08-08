@@ -78,7 +78,7 @@ The copy of record. What's in App Store Connect should match what's here; when
 they disagree, fix it here first and paste. Keep it honest about what the app is:
 a companion, not a standalone.
 
-- **Name**: `Perch for Mac` (App Store Connect rejected plain `Perch` as taken; in-app branding stays `Perch`). Bundle ID `com.hausfold.perch.ios`, SKU `perch-ios-hausfold` — both changed by the hausfold rename, see [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app)
+- **Name**: `Perch Companion` (plain `Perch` is taken by another developer; in-app branding stays `Perch`). Was `Perch for Mac` until 2026-08-08 — bundle ID, SKU and name all changed together in the hausfold re-identification, see [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app). Bundle ID `com.hausfold.perch.ios`, SKU `perch-ios-hausfold`
 - **Subtitle** (30 max): `Send it to your Mac's shelf`
 - **Category**: Productivity (secondary: Utilities)
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
@@ -117,9 +117,11 @@ a companion, not a standalone.
 > The Mac half is a separate app, downloaded from nebelhaus.com/perch. This
 > companion is free and always will be.
 
-The listing is *named* `Perch for Mac`, so never write "Perch for Mac is a
-separate app" in the copy — inside this listing that sentence points at itself.
-Say "the Mac half" or "the Perch desktop app" and let the URL do the work.
+The listing is *named* `Perch Companion`, so never write "the companion" as if it
+were something else — inside this listing that points at itself. Say "the Mac
+half" or "the Perch desktop app" for the other end, and let the URL do the work.
+(This warning previously read the same way about `Perch for Mac`, which had the
+sharper version of the problem: it named the *other* app.)
 
 **What's New** (per release): one honest line. If a release only touched the Mac
 side, say so — a build with no phone-facing change is still a legitimate upload.
@@ -226,13 +228,25 @@ uploaded build and is Waiting for Review, so the id on that record is frozen. A
 new record is the only path.
 
 **The trap: the App Store name, not the bundle id.** Plain `Perch` was already
-taken by someone else — that's why this listing is `Perch for Mac`. Two records
-cannot hold the same name at once, and a *deleted* app's name does not reliably
-return to the pool on any schedule Apple documents. So deleting first and
-creating second risks losing the only name you have left. **Never delete the old
-record while you still need something from it.**
+taken by someone else — which is why the original listing settled for `Perch for
+Mac`. Two records cannot hold the same name at once, and a *deleted* app's name
+does not reliably return to the pool on any schedule Apple documents. So the new
+record has to be created while the old one still holds its name, and deleting
+first to free it is a gamble on undocumented behaviour.
 
-The ordering that keeps every option open:
+> **✅ How this was actually resolved, 2026-08-08 — and the lesson worth keeping.**
+> The new record was created as **`Perch Companion`**, a name chosen to be kept
+> rather than a placeholder to be traded back. That deletes the gamble outright:
+> there is no name to reclaim, so the old record becomes ordinary cleanup that
+> can happen whenever, and steps 6–7 below stop being load-bearing.
+>
+> **If you ever do this again, take the free name.** `Perch for Mac` was itself
+> only a consolation prize for `Perch` being taken, and *for Mac* read oddly on
+> an iPhone app. A forced rename is the cheapest moment to pick a better name —
+> App Store names stay editable right up until release.
+
+The ordering, as run. Steps 6–7 were kept because a future re-identification may
+need the old name back:
 
 1. 👤 **Remove the 1.0 submission from review.** The version page →
    *Remove from Review*. Free, reversible, and it stops Apple approving a build
@@ -244,21 +258,25 @@ The ordering that keeps every option open:
    App Group `group.com.hausfold.perch`. Xcode's automatic signing will register
    the App IDs on the first local archive, but it **will not invent the App
    Group** — create that by hand or every archive fails at signing.
-4. 👤 **Create the new App Store Connect record** under a **temporary name**
-   (the old record still holds `Perch for Mac`), bundle id
-   `com.hausfold.perch.ios`, SKU `perch-ios-hausfold`.
+4. 👤 **Create the new App Store Connect record.** ✅ Done — `Perch Companion`,
+   bundle id `com.hausfold.perch.ios`, SKU `perch-ios-hausfold`. The name is
+   permanent by choice, not temporary; see the box above.
 5. 🤖 **Upload a build**: `gh workflow run testflight.yml`. No tag needed — the
    phone side ships on `workflow_dispatch`. Confirm it lands in TestFlight under
    the *new* record.
-6. 👤 **Only now, delete the old record.** It is unreleased, free, and carries no
-   purchases, so nothing but the name is at stake — and by this point the new
-   record demonstrably works.
-7. 👤 **Rename the new record** to `Perch for Mac` in App Information. Deleting
-   the old record is what *allows* this, but does not reliably make the name
-   available on any schedule Apple documents — so if it's still held, wait and
-   retry. You are not blocked either way: the record exists and builds fine under
-   the temporary name, and the name is editable until release.
-8. 👤 Re-attach the build, re-enter the listing metadata, and submit.
+6. 👤 **Delete the old record**, once the new one has a green build. Unreleased
+   and free, it carries no purchases and — because step 4 took a keeper name —
+   no name anyone is waiting on. Ordinary cleanup, no deadline.
+7. 👤 *(only if you needed the old name back)* Rename the new record in App
+   Information. Deleting the old record is what *allows* this but does not
+   reliably free the name on any documented schedule, so expect to wait and
+   retry. Not on the path taken here.
+8. 👤 Re-enter the listing metadata against the new record, attach the build,
+   and submit. **The metadata does not come with the bundle id** — description,
+   keywords, screenshots, privacy label, export compliance and review notes are
+   all per-record and start empty. [The listing](#the-listing) and
+   [Review notes](#review-notes--paste-this-into-app-review-information) are the
+   copy of record; paste from there.
 
 **What this resets, and why that's fine.** Renaming the App Group changes
 `kSecAttrAccessGroup`, so the phone's shelf, its outbox *and* its keychain
@@ -281,14 +299,13 @@ Done once, by hand, in your login session — not in CI. They stay written down
 because they come back: the Apple Distribution certificate expires annually, API
 keys get rotated, and a new machine or a new app starts here again.
 
-> ⚠️ **Steps 1–3 are being re-run right now, under `com.hausfold.*`.** They were
-> completed once for `com.nebelhaus.perch.ios` (first green upload `v2026.08.07`,
-> submitted as *Perch for Mac* 1.0). The hausfold rename re-does them against new
-> identifiers — follow
-> [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app),
-> which is the ordering that keeps the App Store **name** safe. Steps 4–7 carry
-> over untouched: **Team ID `88M28542LQ` and every certificate and API key are
-> unchanged.**
+> ✅ **Steps 1–3 were re-run on 2026-08-08, under `com.hausfold.*`.** They had
+> been completed once for `com.nebelhaus.perch.ios` (first green upload
+> `v2026.08.07`, submitted as *Perch for Mac* 1.0); the hausfold rename re-did
+> them against new identifiers, and the listing is now **`Perch Companion`** —
+> see [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app)
+> for why the name changed with them. Steps 4–7 carried over untouched: **Team ID
+> `88M28542LQ` and every certificate and API key are unchanged.**
 
 1. **Register the two App IDs** (developer.apple.com → Identifiers), explicit,
    under team `88M28542LQ`:
@@ -299,14 +316,15 @@ keys get rotated, and a new machine or a new app starts here again.
    `fatalError`s on launch by design (`PerchMobileCore/MobileConfig.swift`).
    `-allowProvisioningUpdates` can mint profiles, but it will not invent this
    capability — get it right here or every archive fails at signing.
-3. **Create the App Store Connect record**: New App → iOS, primary language
-   English (U.S.), bundle ID `com.hausfold.perch.ios`, SKU `perch-ios-hausfold`.
-   **For the name, follow
-   [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app)
-   — create under a temporary one** while the original record still holds
-   `Perch for Mac`, and move the name across at step 7. Taking the real name
-   here collides with the live record and is the exact failure that section
-   exists to avoid.
+3. **Create the App Store Connect record**: New App → iOS, name `Perch
+   Companion`, primary language English (U.S.), bundle ID
+   `com.hausfold.perch.ios`, SKU `perch-ios-hausfold`.
+   ⚠️ **If a record already holds the name you want, do not delete it to free
+   the name** — take a name you'd keep instead, and see
+   [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app).
+   Taking a live record's name here simply
+   fails, and deleting that record to free it is a bet on undocumented Apple
+   behaviour.
    ⚠️ **A SKU can never be reused, even after the app that held it is deleted.**
    `perch-ios` is spent on the original record forever, which is why the hausfold
    one is `perch-ios-hausfold`. The SKU is private to your account and appears
