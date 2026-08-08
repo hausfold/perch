@@ -69,6 +69,10 @@ phone-initiated, and that is a decision, not a limitation:
 - A fetch is a **copy**, not a move — the shelf is shared, so taking a copy to
   the phone leaves the Mac's tile alone. Removal is explicit from either end,
   and a phone's removal is the shelf's ordinary `remove`.
+- A fetch is narrated like an arrival: progressive while the bytes move, past
+  tense only once they are all there. The Mac describes the item, streams it,
+  and is then told how that ended (`itemServed` / `serveFailed`), because "your
+  iPhone took this" is a claim it cannot make before the last chunk lands.
 - Fetched bytes land in a `MacInbox` container, never the phone's shelf root:
   the shelf root *is* the outbox, so staging an arrival there would deliver it
   straight back to the Mac it came from. From the inbox they go to the system

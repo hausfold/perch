@@ -168,7 +168,7 @@ final class MobileReceiver: ObservableObject {
 
         func readItem(_ itemID: UUID, for peer: PairedPeer) async throws -> OutgoingItem {
             let located = try await receiver.locate(itemID)
-            await receiver.noteFetch(located.displayName, by: peer.name)
+            await receiver.noteFetchStarted(located.displayName, by: peer.name)
             // Digesting a 2 GB video is not main-actor work; the locate above
             // was, and it was cheap.
             return try await Task.detached(priority: .userInitiated) {
@@ -180,6 +180,14 @@ final class MobileReceiver: ObservableObject {
                     fileURL: located.fileURL
                 )
             }.value
+        }
+
+        func itemServed(_ item: OfferedItem, to peer: PairedPeer) async {
+            await receiver.noteFetchFinished(item.displayName, by: peer.name)
+        }
+
+        func serveFailed(_ item: OfferedItem, to peer: PairedPeer, reason: String) async {
+            await receiver.noteFetchFailed(item.displayName, by: peer.name, reason: reason)
         }
 
         func removeItem(_ itemID: UUID, for peer: PairedPeer) async throws {
@@ -244,8 +252,21 @@ final class MobileReceiver: ObservableObject {
         )
     }
 
-    private func noteFetch(_ displayName: String, by deviceName: String) {
+    // A fetch is narrated the same way an arrival is: progressive while the
+    // bytes move, past tense only once they have. Saying "took" up front was a
+    // guess the Mac had no way to keep — a 2 GB video that died half way still
+    // read as taken.
+
+    private func noteFetchStarted(_ displayName: String, by deviceName: String) {
+        lastEvent = "Sending \(displayName) to \(deviceName)…"
+    }
+
+    private func noteFetchFinished(_ displayName: String, by deviceName: String) {
         lastEvent = "\(deviceName) took \(displayName)."
+    }
+
+    private func noteFetchFailed(_ displayName: String, by deviceName: String, reason: String) {
+        lastEvent = "\(displayName) didn't reach \(deviceName): \(reason)"
     }
 
     /// A phone swiped an item away. Same removal the shelf's own menu does —
