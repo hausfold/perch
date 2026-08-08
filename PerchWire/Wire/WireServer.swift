@@ -44,7 +44,18 @@ public protocol WireServerDelegate: Sendable {
     /// One shelf item, described and located well enough to stream. Throwing
     /// is the normal answer for "gone" or "not something a phone can hold" —
     /// the reason reaches the phone verbatim.
+    ///
+    /// Whatever this returns gets exactly one outcome afterwards —
+    /// `itemServed` or `serveFailed` — so a delegate can say an item is on its
+    /// way and be told how that ended. An item this *throws* on gets neither:
+    /// the delegate already knows, it raised the reason itself.
     func readItem(_ itemID: UUID, for peer: PairedPeer) async throws -> OutgoingItem
+    /// Every byte reached the phone. Fetching is a copy, so the item is still
+    /// on the shelf — this is the end of a transfer, not of an item.
+    func itemServed(_ item: OfferedItem, to peer: PairedPeer) async
+    /// The item never got there whole: the file changed underfoot, or the
+    /// connection went away mid-stream.
+    func serveFailed(_ item: OfferedItem, to peer: PairedPeer, reason: String) async
     /// Take an item off the shelf because the phone asked.
     func removeItem(_ itemID: UUID, for peer: PairedPeer) async throws
 }
@@ -460,13 +471,17 @@ public actor WireServerSession {
             )))
             return
         }
-        try await connection.send(.control(.offer(
-            transferID: UUID(),
-            items: [outgoing.offered]
-        )))
         do {
+            try await connection.send(.control(.offer(
+                transferID: UUID(),
+                items: [outgoing.offered]
+            )))
             try await WireStreaming.send(outgoing, over: connection)
+            try await connection.send(.control(.itemDone(itemID: itemID)))
         } catch {
+            // The delegate is showing this item as on its way; it hears how it
+            // ended even when the socket is the thing that broke.
+            await delegate.serveFailed(outgoing.offered, to: peer, reason: error.localizedDescription)
             // The phone is mid-item and waiting; tell it, so it drops the
             // partial rather than hanging on a stream that stopped.
             try await connection.send(.control(.itemFailed(
@@ -475,7 +490,7 @@ public actor WireServerSession {
             )))
             return
         }
-        try await connection.send(.control(.itemDone(itemID: itemID)))
+        await delegate.itemServed(outgoing.offered, to: peer)
     }
 }
 

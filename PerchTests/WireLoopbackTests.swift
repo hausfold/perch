@@ -157,6 +157,8 @@ final class WireLoopbackTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: fetched), big)
         // Fetching is a copy: the Mac still holds it.
         XCTAssertEqual(delegate.served().count, 2)
+        // …and the Mac only claims it was taken once every byte is there.
+        XCTAssertEqual(delegate.servedOutcomes(), [.served(bigID)])
 
         try await client.remove(noteID)
         XCTAssertEqual(delegate.served().map(\.id), [bigID])
@@ -209,6 +211,9 @@ final class WireLoopbackTests: XCTestCase {
         } catch {
             // Expected — and the session survives it.
         }
+        // Nothing was ever described, so there is no outcome to report: the
+        // delegate raised the reason itself and must not also be told about it.
+        XCTAssertEqual(delegate.servedOutcomes(), [])
         let stillListable = try await client.list()
         XCTAssertEqual(stillListable.count, 0)
         await client.close()
@@ -295,6 +300,12 @@ final class WireLoopbackTests: XCTestCase {
             // Expected.
         }
         XCTAssertEqual(try contents(of: inbox), [], "no partial and no wrongly-named file may survive")
+        // The Mac described this item, so it must hear how it ended — its own
+        // status line said "sending…" and has nothing else to resolve it.
+        XCTAssertEqual(paired.delegate.servedOutcomes().map(\.itemID), [itemID])
+        if case .served = paired.delegate.servedOutcomes().first {
+            XCTFail("A file that shrank underfoot was not served")
+        }
         // The contract this class already asserts for a vanished item: a failed
         // fetch is one failed request, not a dead session.
         _ = try await paired.client.list()
@@ -332,9 +343,21 @@ final class WireLoopbackTests: XCTestCase {
             _ = try await paired.client.list()
             XCTFail("A session abandoned mid-item must not answer another request")
         } catch WireClientError.sessionLost {
-            // Expected: stated, not guessed.
+            // Expected: stated, not guessed. Answered locally, which is why it
+            // works while the Mac is still pushing bytes at nobody.
         }
+        // Hanging up is what tells the Mac the phone stopped reading. It must
+        // then report the fetch as failed — its status line said "sending…" and
+        // has nothing else to resolve it.
         await paired.client.close()
+        switch await waitForOutcome(paired.delegate, itemID: itemID) {
+        case let .failed(_, reason):
+            XCTAssertFalse(reason.isEmpty)
+        case .served:
+            XCTFail("A file that grew underfoot was never served whole")
+        case nil:
+            XCTFail("The Mac must report a fetch the phone abandoned")
+        }
     }
 
     /// Bytes that do not match the digest are a failed item, not a failed
@@ -361,6 +384,12 @@ final class WireLoopbackTests: XCTestCase {
             // Expected.
         }
         XCTAssertEqual(try contents(of: inbox), [], "corrupt bytes must never get the real name")
+        // The one place the Mac's account and the phone's disagree, honestly:
+        // the Mac sent every byte it promised, so it reports the item served.
+        // Only the phone can know the bytes stopped matching a digest taken
+        // moments earlier, and the wire gives it no frame to say so. Rare
+        // enough (same length, different bytes) to state rather than fix here.
+        XCTAssertEqual(paired.delegate.servedOutcomes(), [.served(itemID)])
         _ = try await paired.client.list()
         await paired.client.close()
     }
@@ -387,6 +416,9 @@ final class WireLoopbackTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: firstLanded), first)
         let secondLanded = try await paired.client.fetch(secondID, into: inbox.appending(path: "b"))
         XCTAssertEqual(try Data(contentsOf: secondLanded), second)
+        // One outcome per served item, in order — not one per chunk, not one
+        // for the pair.
+        XCTAssertEqual(paired.delegate.servedOutcomes(), [.served(firstID), .served(secondID)])
         await paired.client.close()
     }
 
@@ -436,6 +468,23 @@ final class WireLoopbackTests: XCTestCase {
         )
     }
 
+    /// A fetch outcome the Mac reports from its own task. When the phone stops
+    /// reading part-way it has no idea when that lands, so poll for it.
+    private func waitForOutcome(
+        _ delegate: LoopbackDelegate,
+        itemID: UUID,
+        timeout: Duration = .seconds(5)
+    ) async -> LoopbackDelegate.ServeOutcome? {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            if let outcome = delegate.servedOutcomes().first(where: { $0.itemID == itemID }) {
+                return outcome
+            }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return nil
+    }
+
     /// What the phone actually has in a fetch directory, hidden `.partial`
     /// spools included — the whole point of these assertions.
     private func contents(of directory: URL) throws -> [String] {
@@ -480,6 +529,20 @@ private final class LoopbackDelegate: WireServerDelegate, @unchecked Sendable {
     private var peer: PairedPeer?
     private var shelved: [(id: UUID, url: URL)] = []
     private var mutateBeforeStreaming: (@Sendable (URL) -> Void)?
+    private var outcomes: [ServeOutcome] = []
+
+    /// How a fetch this delegate described actually ended.
+    enum ServeOutcome: Equatable {
+        case served(UUID)
+        case failed(UUID, String)
+
+        var itemID: UUID {
+            switch self {
+            case let .served(id): id
+            case let .failed(id, _): id
+            }
+        }
+    }
 
     init(identity: MacIdentity, spool: URL, shelf: URL, pairingSecret: Data?) {
         macIdentity = identity
@@ -574,6 +637,19 @@ private final class LoopbackDelegate: WireServerDelegate, @unchecked Sendable {
     /// Rewrites a shelf file after its offer is built but before a byte moves.
     func setMutationBeforeStreaming(_ hook: (@Sendable (URL) -> Void)?) {
         lock.withLock { mutateBeforeStreaming = hook }
+    }
+
+    func itemServed(_ item: OfferedItem, to peer: PairedPeer) {
+        lock.withLock { outcomes.append(.served(item.id)) }
+    }
+
+    func serveFailed(_ item: OfferedItem, to peer: PairedPeer, reason: String) {
+        lock.withLock { outcomes.append(.failed(item.id, reason)) }
+    }
+
+    /// Every fetch outcome this delegate was told about, in order.
+    func servedOutcomes() -> [ServeOutcome] {
+        lock.withLock { outcomes }
     }
 
     func removeItem(_ itemID: UUID, for peer: PairedPeer) throws {
