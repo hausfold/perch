@@ -312,9 +312,19 @@ It was renamed to `com.hausfold.perch` on 2026-08-08 anyway, before the licence
 public key gets baked in: the bundle id *is* the sandbox container **and** the
 `defaults` domain `LicenseStore` writes the licence to, so renaming it after
 anyone has paid would deactivate their licence. Same reasoning as above, same
-accepted cost — empty shelf, Settings back to defaults, pairings broken (the
-keychain services in `PerchMobileCore/` are what break those, not the container
-move), local-network prompt re-appears. No migration shim; there are no users yet.
+accepted cost — empty shelf, Settings back to defaults, pairings broken, the
+local-network prompt re-appears. What breaks pairing is the Keychain *service*
+strings moving on both sides at once (`Perch/Mobile/PairedDeviceStore.swift` on
+the Mac, `PerchMobileCore/MacPairingStore.swift` and `MobileConfig.swift` on the
+phone) — not the container move; they die together, which is the safe half.
+
+No migration shim, by decision. The Mac app *is* released (cask + `nix/release.nix`,
+and the rice enables it by default), so a live install's shelf under
+`~/Library/Containers/com.nebelhaus.perch/` is orphaned, not migrated — the
+upgrade comes up empty, and the old container is yours to delete. That is
+affordable only because nobody has *paid* yet: the licence public key isn't baked
+in, so no licence is de-activated. After that it stops being affordable, which is
+why this landed before Phase 2 rather than after.
 
 ## Appendix: the one-time Apple side
 

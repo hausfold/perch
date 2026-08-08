@@ -35,6 +35,14 @@ The active shelf is stored under the app's own container:
   Perch/ActiveShelf/
 ```
 
+Perch was `com.nebelhaus.perch` until 2026-08-08. If you ran a build from before
+then, its shelf is still sitting in the old container, orphaned — the new one
+starts empty. Nothing reads it any more, so it's safe to delete:
+
+```sh
+rm -rf ~/Library/Containers/com.nebelhaus.perch
+```
+
 Each import gets its own UUID directory — that's what prevents name collisions
 without renaming your file. The manifest records only **staged relative paths**
 and file metadata; original source paths are never persisted, and never logged.
