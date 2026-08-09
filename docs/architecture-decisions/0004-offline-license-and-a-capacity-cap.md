@@ -30,7 +30,12 @@ no input taps, and no screen reading. A licensing phone-home would spend it.
 
 **An Ed25519-signed license file, verified offline, and a capacity cap.**
 
-- **The license is a file, not an account.** `.nebelhauslicense` is a small JSON
+> Amended 2026-08-09, before the production key or first sale:
+> `.perchlicense` replaces the original `.nebelhauslicense` spelling. No
+> migration alias is needed because no valid customer license existed under the
+> old extension.
+
+- **The license is a file, not an account.** `.perchlicense` is a small JSON
   blob — `product`, `email`, `purchased`, `seats`, `sig` — signed with Ed25519
   over a canonical fixed-order `key=value` payload (not the JSON: canonicalizing
   JSON is a well-known source of signature drift, and we own both ends). The app
@@ -38,7 +43,7 @@ no input taps, and no screen reading. A licensing phone-home would spend it.
   activation server, no sign-in, nothing to revoke, and it works on an
   air-gapped Mac. It is product-scoped so a second paid app reuses the format,
   the signer, and the mail template untouched.
-- **Importing it is a file picker — or a drop on the shelf.** A `.nebelhauslicense`
+- **Importing it is a file picker — or a drop on the shelf.** A `.perchlicense`
   dropped on perch is consumed as a key rather than staged as cargo, which is
   both sandbox-legal (a dropped file is a file the user handed us) and the most
   perch way imaginable to activate perch.

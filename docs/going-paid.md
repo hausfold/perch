@@ -133,7 +133,7 @@ const license = {
   seats,
   sig: btoa(String.fromCharCode(...sig)),
 }
-// Email this as `<something>.nebelhauslicense` — the extension is what lets it
+// Email this as `<something>.perchlicense` — the extension is what lets it
 // be activated by dropping it on the shelf.
 ```
 
@@ -144,7 +144,7 @@ const license = {
 3. `bench try` the branch and actually feel it:
    - drop three files on an unlicensed shelf → two land, the strip appears,
    - `Get Perch` opens the store page,
-   - drop the emailed `.nebelhauslicense` on the shelf → it activates and is
+   - drop the emailed `.perchlicense` on the shelf → it activates and is
      not staged as a tile,
    - Settings shows the email, the seat count, and the covered-through month,
    - `Remove` returns you to the free tier.

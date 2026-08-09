@@ -22,7 +22,7 @@ NSDraggingDestination                 paired iPhone / iPad
 ShelfDropHandler                      MobileReceiver ── pairing, Keychain,
         │  distinguishes promises /           │         spool + digest verify
         │  file URLs / images / links /       │         (PerchWire/, ADR 0005)
-        │  text (a .nebelhauslicense is       │
+        │  text (a .perchlicense is           │
         │  a key, not cargo — it goes to      │
         │  LicenseStore and is never staged)  │
         ▼                                     ▼
@@ -117,7 +117,7 @@ the sole reason for `network.server`. See ADR 0005.)
 
 ### Knowing whether this Mac paid
 
-`LicenseStore` verifies a `.nebelhauslicense` — a small signed JSON blob — with
+`LicenseStore` verifies a `.perchlicense` — a small signed JSON blob — with
 CryptoKit against an Ed25519 public key baked into the app, and stores the file
 verbatim in the container's defaults. There is no activation call, no sign-in,
 and nothing to revoke: licensing adds no network traffic and no entitlement, so
