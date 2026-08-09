@@ -11,12 +11,13 @@ import os
 // button.
 //
 // Ported from pounce's `UpdateNudge`: same hourly poll, same per-version
-// dismissal, same CalVer ordering — with two deliberate differences, both of
-// them because **perch is sandboxed and an unsandboxed app is not**:
+// dismissal, same CalVer ordering — with two deliberate differences, both
+// forced by **the app sandbox**:
 //
-//   apply    an unsandboxed app can swap its own bundle for the release ZIP's
-//            (and shell out to `brew upgrade`) for the two cohorts that own
-//            their bytes. Perch cannot: `ENABLE_APP_SANDBOX = YES`, every child
+//   apply    a nudge outside the sandbox can go further than naming the step —
+//            swap its own bundle for the release ZIP's, or shell out to `brew
+//            upgrade`, for the two cohorts that own their bytes. Perch cannot:
+//            `ENABLE_APP_SANDBOX = YES`, every child
 //            process inherits that sandbox, and /Applications is outside the
 //            container — a self-swap would be denied, and a `brew` spawned from
 //            here would fail in ways nothing could report. So EVERY cohort here

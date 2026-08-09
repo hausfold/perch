@@ -84,7 +84,7 @@ struct License: Equatable, Codable {
 enum LicenseError: LocalizedError, Equatable {
     /// The bytes aren't a license file at all.
     case malformed
-    /// Signed and well-formed, but for a different nebelhaus app.
+    /// Signed and well-formed, but for a different app in the family.
     case wrongProduct(String)
     /// The signature doesn't verify, or the base64 is junk.
     case badSignature
