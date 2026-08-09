@@ -6,7 +6,7 @@ import SwiftUI
 /// dropped in `~/.config/perch/themes/`.
 ///
 /// **Why this exists.** The shelf used to be white-on-black with one sage
-/// literal, so `nebelhaus.theme.flavor` was a lie for perch: a latte rice still
+/// literal, so `haus.theme.flavor` was a lie for perch: a latte rice still
 /// got a black glass panel. The four nebelung variants are now compiled in (a
 /// perch installed without the rice still has them all) and the rice names the
 /// dark/light pair in `~/.config/perch/config.json`. Same model as trill
@@ -148,7 +148,7 @@ struct RicePalette: Equatable {
     /// Move the accent, as `~/.config/perch/config.json` asks.
     ///
     /// `request` is either a **catppuccin role name** — the fourteen accents
-    /// `nebelhaus.theme.accent` chooses between, resolved against the palette in
+    /// `haus.theme.accent` chooses between, resolved against the palette in
     /// force so the hue follows the flavor and the polarity by itself — or a
     /// literal `"#rrggbb"`, for a standalone install hand-editing the file.
     ///
@@ -306,7 +306,7 @@ enum RiceFiles {
 ///   "accent": "mauve" }
 /// ```
 ///
-/// The rice writes this (nebelhaus `modules/perch`) so `nebelhaus.theme.flavor`,
+/// The rice writes this (nebelhaus `modules/perch`) so `haus.theme.flavor`,
 /// `.contrast` and `.accent` reach perch declaratively. Perch's own settings live
 /// in `UserDefaults`, which Nix has no business writing — this file carries only
 /// what the rice owns. Delete it (or the rice's `theme` option) and the
@@ -321,7 +321,7 @@ struct RiceThemeDefaults: Decodable, Equatable {
     let themeLight: String?
 
     /// A catppuccin role name (`"mauve"`, `"sapphire"`, … — the fourteen
-    /// `nebelhaus.theme.accent` offers) or a literal `"#rrggbb"`. Absent means
+    /// `haus.theme.accent` offers) or a literal `"#rrggbb"`. Absent means
     /// the palette's green, which is perch's mark green. Defaulted so the
     /// memberwise initializer stays two arguments at the call sites that
     /// predate accents.

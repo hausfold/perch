@@ -8,7 +8,7 @@
 the shelf — files, folders, images, links, and text, caught at the top of your
 screen until you know where they're going.
 
-![part of nebelhaus](https://img.shields.io/badge/part_of-nebelhaus-f2c4e5?labelColor=202020)
+![part of hausfold](https://img.shields.io/badge/part_of-hausfold-f2c4e5?labelColor=202020)
 ![themed by nebelung](https://img.shields.io/badge/themed_by-nebelung-c9a8f1?labelColor=202020)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-b9a8e0?labelColor=202020)
 ![license](https://img.shields.io/badge/license-FSL--1.1--ALv2-d7d7d7?labelColor=202020)
