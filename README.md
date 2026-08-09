@@ -91,7 +91,7 @@ Each one stands alone. Together they're a house.
 
 ## license
 
-Perch is **fair source**, not open source: [FSL-1.1-ALv2](LICENSE) © nebelhaus —
+Perch is **fair source**, not open source: [FSL-1.1-ALv2](LICENSE) © hausfold —
 the Functional Source License 1.1 with an Apache-2.0 future license.
 
 In practice:
