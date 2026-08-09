@@ -2,7 +2,7 @@
 #
 # CI-OWNED: perch's release workflow (release.yml, the `bump-flake` job) rewrites
 # these on every tag — the SAME version + SHA it stamps into the Homebrew cask
-# (nebelhaus/homebrew-tap, Casks/perch.rb), at the same moment. The flake wraps
+# (hausfold/homebrew-tap, Casks/perch.rb), at the same moment. The flake wraps
 # the CI-built, Developer-ID-signed, Apple-notarized release ZIP rather than
 # compiling from source: perch is an Xcode project, and macOS 26 blocks a
 # `_nixbld` build user from applying SwiftPM's manifest sandbox (unlike pounce,

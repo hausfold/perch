@@ -243,11 +243,11 @@ final class UpdateCheckTests: XCTestCase {
     func testEndpointIsPerchsOwnRepo() {
         XCTAssertEqual(
             UpdateCheck.endpoint.absoluteString,
-            "https://api.github.com/repos/nebelhaus/perch/releases/latest"
+            "https://api.github.com/repos/hausfold/perch/releases/latest"
         )
         XCTAssertEqual(
             UpdateCheck.releasesURL.absoluteString,
-            "https://github.com/nebelhaus/perch/releases/latest"
+            "https://github.com/hausfold/perch/releases/latest"
         )
     }
 }

@@ -8,7 +8,7 @@ duplication below; if the two ever disagree, `AGENTS.md` wins.)
 The short version:
 
 - Perch is the native macOS **notch file shelf** in the
-  [nebelhaus](https://github.com/nebelhaus) family: drag files onto the notch,
+  [hausfold](https://github.com/hausfold) family: drag files onto the notch,
   they stage there, drag them back out.
 - **The invariants are non-negotiable, and most of them are about not losing a
   user's file.** Never move, rename, edit or delete a source URL; persist only

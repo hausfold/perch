@@ -16,7 +16,7 @@ name: release
 #   NOTARY_KEY_P8        base64 of the App Store Connect API key (.p8)
 #   NOTARY_KEY_ID        that key's Key ID
 #   NOTARY_ISSUER_ID     the App Store Connect issuer ID
-#   TAP_DEPLOY_KEY       write deploy key for nebelhaus/homebrew-tap (bump-tap)
+#   TAP_DEPLOY_KEY       write deploy key for hausfold/homebrew-tap (bump-tap)
 
 on:
   push:
@@ -153,7 +153,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: nebelhaus/homebrew-tap
+          repository: hausfold/homebrew-tap
           # Write deploy key for the tap repo, stored as a secret here. The
           # cask's version/sha lines are CI-owned; humans never bump them.
           ssh-key: ${{ secrets.TAP_DEPLOY_KEY }}
@@ -163,7 +163,7 @@ jobs:
           TAG="$GITHUB_REF_NAME"
           VER="${TAG#v}"
           curl -fsSL --retry 5 --retry-delay 5 -o /tmp/perch.zip \
-            "https://github.com/nebelhaus/perch/releases/download/$TAG/perch-$TAG-macos.zip"
+            "https://github.com/hausfold/perch/releases/download/$TAG/perch-$TAG-macos.zip"
           SHA="$(sha256sum /tmp/perch.zip | cut -d' ' -f1)"
           sed -i -E \
             -e "s#^  version \".*\"#  version \"$VER\"#" \
@@ -185,7 +185,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      # Perch is also a flake input of the rice (nebelhaus/nebelhaus), which
+      # Perch is also a flake input of the rice (hausfold/hausfold), which
       # installs the app through Nix instead of Homebrew. That flake wraps this
       # release ZIP, pinned by version + sha256 in nix/release.nix — the exact
       # same pair the cask carries. Keep the two in lockstep: rewrite the pin on
@@ -199,7 +199,7 @@ jobs:
           TAG="$GITHUB_REF_NAME"
           VER="${TAG#v}"
           curl -fsSL --retry 5 --retry-delay 5 -o /tmp/perch.zip \
-            "https://github.com/nebelhaus/perch/releases/download/$TAG/perch-$TAG-macos.zip"
+            "https://github.com/hausfold/perch/releases/download/$TAG/perch-$TAG-macos.zip"
           SHA="$(sha256sum /tmp/perch.zip | cut -d' ' -f1)"
           sed -i -E \
             -e "s#^  version = \".*\";#  version = \"$VER\";#" \
