@@ -163,10 +163,13 @@ the app with no Mac on their desk; say so before they conclude it's broken.
 >   website, and never mentioned as a purchase inside this app.
 
 Also fill in: no demo account needed, contact = `hi@hausfold.co`. (Not
-`support@…` on either domain — neither exists yet, and a review contact that
-bounces is the one field you cannot afford to get wrong. `hi@hausfold.co` is
-live and is what every page of the site already says. Switch it when
-`support@hausfold.co` exists — `docs/going-paid.md`'s pre-flight owns that.)
+`support@…` on either domain. A review contact that bounces is the one field
+you cannot afford to get wrong, and `hi@hausfold.co` is live, routes today, and
+is what every page of the site already says. **This is no longer a stopgap** —
+`hi@` was settled as *the* address 2026-08-09, so there is nothing to switch
+to later; see `notes/hausfold-rename.md` §5.4 in the workshop. If `support@`
+ever gets added it will be an alias onto `hi@`, which doesn't change this
+field.)
 
 ## Known rejection risks, and the answer to each
 
