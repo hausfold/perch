@@ -83,7 +83,6 @@ standalone installs do it once, by hand. ([why](docs/reference.md#the-one-system
 
 - 🏠 [**nebelhaus**](https://github.com/nebelhaus/nebelhaus) — the house. the whole rice, one Nix flake. start here.
 - 🐾 [**pounce**](https://github.com/nebelhaus/pounce) — the palette. keyboard-first launcher; every command a file.
-- 🐦 [**trill**](https://github.com/nebelhaus/trill) — the messages. native iMessage/SMS/RCS, read from `chat.db`.
 - 🪺 [**perch**](https://github.com/nebelhaus/perch) — the shelf. files, caught in the notch. *(you are here)*
 - 🌫️ [**nebelung**](https://github.com/nebelhaus/nebelung) — the theme. the silver-mist palette.
 - 🧰 [**workshop**](https://github.com/nebelhaus/workshop) — the bench. where the family is built.
