@@ -42,7 +42,7 @@ stdenvNoCC.mkDerivation {
       prebuilt
     else
       fetchurl {
-        url = "https://github.com/nebelhaus/perch/releases/download/v${version}/perch-v${version}-macos.zip";
+        url = "https://github.com/hausfold/perch/releases/download/v${version}/perch-v${version}-macos.zip";
         inherit sha256;
       };
 
@@ -77,7 +77,7 @@ stdenvNoCC.mkDerivation {
 
   meta = {
     description = "Native macOS notch file shelf";
-    homepage = "https://github.com/nebelhaus/perch";
+    homepage = "https://github.com/hausfold/perch";
     platforms = lib.platforms.darwin;
     sourceProvenance = [ lib.sourceTypes.binaryNativeCode ];
   };

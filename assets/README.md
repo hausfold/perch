@@ -2,7 +2,7 @@
 
 Perch's mark is the family's paired cat-ears sitting over its own detail: two
 overlapping cards — the shelf. Drawn as flat geometry in the
-[nebelung](https://github.com/nebelhaus/nebelung) palette, graphite against the
+[nebelung](https://github.com/hausfold/nebelung) palette, graphite against the
 muted green accent, so it reads at 16 px and sits next to the rest of the family.
 
 | file | what it is |

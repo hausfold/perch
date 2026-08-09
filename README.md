@@ -37,18 +37,18 @@ years. Perch's angle is **dependability and restraint**:
 
 - **copies, not moves** — a shelf that *moves* your only copy can delete it before the destination finished reading it. Perch stages copies and exports copies, so an interrupted drag never loses data.
 - **minimal permissions, no surveillance** — no Accessibility, no input taps, no screen reading, no Dock icon, no telemetry. nothing about your files is ever written to a log. the only thing it sends to the internet is an hourly look at perch's own release tag, and Settings turns that off; the only other traffic is to an iPhone you paired yourself, on your own network, encrypted end to end ([ADR 0005](docs/architecture-decisions/0005-mobile-companion-wire.md)).
-- **native and calm** — one sandbox-friendly menu-bar app in the [nebelung](https://github.com/nebelhaus/nebelung) fog-grey palette, which follows your rice's flavor and contrast and swaps with macOS Light/Dark.
+- **native and calm** — one sandbox-friendly menu-bar app in the [nebelung](https://github.com/hausfold/nebelung) fog-grey palette, which follows your rice's flavor and contrast and swaps with macOS Light/Dark.
 
 ## install
 
 ```sh
-brew install --cask nebelhaus/tap/perch
+brew install --cask hausfold/tap/perch
 ```
 
 Signed with our Apple Developer ID and notarized, so it opens straight away — no
 Gatekeeper prompt, no quarantine hack.
 
-Perch installs by default in the [nebelhaus](https://github.com/nebelhaus) rice,
+Perch installs by default in the [hausfold](https://github.com/hausfold) rice,
 but it stands alone — the cask works on any Mac running macOS 14 or newer.
 
 Then turn **off** System Settings ▸ Desktop & Dock ▸ *"Drag windows to top of
@@ -81,11 +81,11 @@ standalone installs do it once, by hand. ([why](docs/reference.md#the-one-system
 
 ## the family
 
-- 🏠 [**nebelhaus**](https://github.com/nebelhaus/nebelhaus) — the house. the whole rice, one Nix flake. start here.
-- 🐾 [**pounce**](https://github.com/nebelhaus/pounce) — the palette. keyboard-first launcher; every command a file.
-- 🪺 [**perch**](https://github.com/nebelhaus/perch) — the shelf. files, caught in the notch. *(you are here)*
-- 🌫️ [**nebelung**](https://github.com/nebelhaus/nebelung) — the theme. the silver-mist palette.
-- 🧰 [**workshop**](https://github.com/nebelhaus/workshop) — the bench. where the family is built.
+- 🏠 [**nebelhaus**](https://github.com/hausfold/hausfold) — the house. the whole rice, one Nix flake. start here.
+- 🐾 [**pounce**](https://github.com/hausfold/pounce) — the palette. keyboard-first launcher; every command a file.
+- 🪺 [**perch**](https://github.com/hausfold/perch) — the shelf. files, caught in the notch. *(you are here)*
+- 🌫️ [**nebelung**](https://github.com/hausfold/nebelung) — the theme. the silver-mist palette.
+- 🧰 [**workshop**](https://github.com/hausfold/workshop) — the bench. where the family is built.
 
 Each one stands alone. Together they're a house.
 

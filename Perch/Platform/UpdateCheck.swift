@@ -188,10 +188,10 @@ final class UpdateCheck: ObservableObject {
     private var timer: Timer?
     private var noteTask: Task<Void, Never>?
 
-    nonisolated static let endpoint = URL(string: "https://api.github.com/repos/nebelhaus/perch/releases/latest")!
+    nonisolated static let endpoint = URL(string: "https://api.github.com/repos/hausfold/perch/releases/latest")!
     /// Hourly: the nudge should show up the day a release is cut, not a day late.
     nonisolated static let maxAge: TimeInterval = 3600
-    nonisolated static let releasesURL = URL(string: "https://github.com/nebelhaus/perch/releases/latest")!
+    nonisolated static let releasesURL = URL(string: "https://github.com/hausfold/perch/releases/latest")!
 
     /// Settings toggle (`Updates` section). Defaults on; user-initiated checks
     /// ignore it, because asking is consent.
