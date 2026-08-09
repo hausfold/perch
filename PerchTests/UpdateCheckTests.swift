@@ -155,7 +155,7 @@ final class UpdateCheckTests: XCTestCase {
 
     // MARK: - Cohort copy
     //
-    // Perch is sandboxed, so unlike trill NO cohort self-updates: the button
+    // Perch is sandboxed, so NO cohort self-updates: the button
     // either copies this install's command or opens the release page. A cohort
     // handed the wrong command is the only way this feature can mislead.
 
@@ -212,8 +212,8 @@ final class UpdateCheckTests: XCTestCase {
 
     /// Neither an Xcode build nor a `bench try` branch build ever gets nudged —
     /// "updating" one means throwing the branch away. The project's placeholder
-    /// `MARKETING_VERSION` (0.1.0) is the case trill's rule would have missed:
-    /// it isn't "dev" and it isn't suffixed, and every release sorts above it.
+    /// `MARKETING_VERSION` (0.1.0) is the case a naive rule would miss: it
+    /// isn't "dev" and it isn't suffixed, and every release sorts above it.
     func testDevBuildsAreNeverNewerThan() {
         XCTAssertTrue(UpdateCheck.isDevVersion("dev"))
         XCTAssertTrue(UpdateCheck.isDevVersion(""))

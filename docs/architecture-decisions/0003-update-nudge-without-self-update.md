@@ -8,15 +8,15 @@ Perch has four install routes and no way to mention a new release. The rice pins
 it through the flake, a Homebrew cask carries it, the release ZIP is a drag into
 `/Applications`, and a bare `nix run` is a store path — so "how do I update?"
 has four different answers and perch, the one program that knows which install
-it is, was silent about all of them. Pounce (a palette row) and trill (a sidebar
-card) already solved this; perch is the last of the three without it.
+it is, was silent about all of them. Pounce solved this first, with a palette
+row: it detects the cohort and names the right next step, then leaves the
+applying to `update-pounce.sh`.
 
-Trill's nudge does two things: it names the right next step per cohort, and for
-the two cohorts that own their bytes — a cask and a drag-install — it *performs*
-the update, replacing its own bundle from the release ZIP or handing off to
-`brew`, then reopening itself.
+The tempting next step is a nudge that also *performs* the update — for the two
+cohorts that own their bytes, a cask and a drag-install, replacing its own
+bundle from the release ZIP or handing off to `brew`, then reopening itself.
 
-Perch cannot do the second half. It is sandboxed (`ENABLE_APP_SANDBOX = YES`,
+Perch cannot take it. It is sandboxed (`ENABLE_APP_SANDBOX = YES`,
 plus exactly one read-only exception, ADR 0002). `/Applications` is outside the
 container, every child process inherits the sandbox, and a `brew` spawned from
 inside it would fail in ways nothing would be left running to report. A
@@ -26,16 +26,16 @@ that is the wrong trade in the wrong direction.
 
 ## Decision
 
-Perch ports trill's `UpdateCheck` — the hourly poll, the CalVer ordering, the
-per-version dismissal, the cohort detection — and stops before the install.
+Perch ports pounce's `UpdateNudge` — the hourly poll, the CalVer ordering, the
+per-version dismissal, the idea of a cohort — and stops before the install.
 
 - **Every cohort gets advice, not an action.** The button copies this install's
   command (`haus update`, `brew upgrade --cask perch`, `nix flake update perch`)
   or opens the release page. Nothing in the update path writes outside the
   container or spawns a process.
 - **The surfaces are passive.** A strip along the bottom of the expanded shelf,
-  and a row in the menu bar menu. Trill posts a notification banner; perch asks
-  the system for no permission it can avoid — the same reason it polls
+  and a row in the menu bar menu. The obvious surface is a notification banner;
+  perch asks the system for no permission it can avoid — the same reason it polls
   `pressedMouseButtons` instead of installing a `CGEventTap` — so the nudge
   waits until you look at it. It also yields to a drag in progress and to an
   error banner: the shelf's job during a drag is to catch the file.
@@ -45,8 +45,12 @@ per-version dismissal, the cohort detection — and stops before the install.
   unauthenticated GET to `api.github.com` for the latest tag, off by a Settings
   toggle, never in DEBUG builds. Perch uploads nothing and downloads no file.
 
-Cohort detection is trill's, with one addition. Both of trill's receipts — the
-rice's `/Library/Application Support/nebelhaus/perch.installed-from` and
+Cohort detection is perch's own, and it can't be pounce's path prefixes: the
+rice copies the bundle to `/Applications/Perch.app` and a cask's `app` stanza
+moves it to the same path, so rice, cask and drag-install are byte-identical
+locations. Two out-of-band receipts break the tie, with a third signal as
+backstop. Both receipts —
+the rice's `/Library/Application Support/nebelhaus/perch.installed-from` and
 `<brew prefix>/Caskroom/perch` — are outside the container, so a denial would
 read as "not installed that way" rather than as an error. Both turn out to be
 readable under the sandbox today, but the failure is silent if that ever
@@ -57,11 +61,11 @@ when neither receipt was seen, and only able to promote an ambiguous
 
 ## Consequences
 
-A cask or drag-install user gets one more step than trill's equivalent user
-does: run the command, or download and drag. That is the visible cost of the
-sandbox, and it is paid by the cohorts perch's own author is not in — the rice
-cohort's answer (`haus update`) is a copied command in trill too, so on a
-nebelhaus machine the two apps now behave identically.
+A cask or drag-install user gets one more step than a self-applying nudge would
+have given them: run the command, or download and drag. That is the visible cost
+of the sandbox, and it is paid by the cohorts perch's own author is not in — the
+rice cohort was always going to be told to run `haus update`, so on a nebelhaus
+machine nothing is lost.
 
 Perch talks to the network, which it never did before. It is one host, one
 hourly GET, one tag string parsed, and a toggle that stops it. The entitlement

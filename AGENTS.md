@@ -47,22 +47,12 @@ and `PerchMobileCore/` (iOS-only shelf/pairing/delivery, app + extension).
 Read `PRD.md`, `ARCHITECTURE.md`, and the ADRs before changing transfer
 semantics. Update them when a product boundary changes.
 
-## Release & downstream (like trill)
-
-> **"trill" in this repo means the ARCHIVED Messages client**, which is now
-> [`nebelhaus/messages`](https://github.com/nebelhaus/messages) — finished,
-> read-only, and no longer part of the family the site presents. On 2026-08-08
-> the *name* passed to a different product, the notification compositor
-> (`hausfold/trill`). Every "trill" below and in this repo's code comments,
-> ADRs and tests is the old one: shared license format, ported `UpdateCheck`,
-> palette precedent. They are kept as written — the history is real and worth
-> having — but don't reconcile any of it with the compositor, and don't route a
-> change there on the strength of the word.
+## Release & downstream
 
 Perch is a native Xcode app that macOS 26 won't let Nix build from source (the
-`_nixbld` user can't apply SwiftPM's manifest sandbox), so — exactly like
-trill — the family consumes a **CI-built, Developer-ID-signed, Apple-notarized
-release ZIP**, not a from-source build:
+`_nixbld` user can't apply SwiftPM's manifest sandbox), so the family consumes a
+**CI-built, Developer-ID-signed, Apple-notarized release ZIP**, not a
+from-source build:
 
 - `VERSION` is the single source of truth (CalVer, `YYYY.MM.DD[-N]`); it names
   the tag and is injected as `MARKETING_VERSION`. Cut releases with
@@ -80,7 +70,7 @@ release ZIP**, not a from-source build:
 
 Released: `nix/release.nix` pins a real notarized release (CI rewrites it on
 every `bench release perch` tag) and the rice enables `haus.perch.enable`
-by default, like trill.
+by default.
 
 ## The companion's own path (App Store)
 

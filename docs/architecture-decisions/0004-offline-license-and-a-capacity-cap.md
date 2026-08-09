@@ -36,8 +36,8 @@ no input taps, and no screen reading. A licensing phone-home would spend it.
   JSON is a well-known source of signature drift, and we own both ends). The app
   carries the public half as a constant and verifies with CryptoKit. No
   activation server, no sign-in, nothing to revoke, and it works on an
-  air-gapped Mac. It is product-scoped so trill reuses the format, the signer,
-  and the mail template untouched.
+  air-gapped Mac. It is product-scoped so a second paid app reuses the format,
+  the signer, and the mail template untouched.
 - **Importing it is a file picker — or a drop on the shelf.** A `.nebelhauslicense`
   dropped on perch is consumed as a key rather than staged as cargo, which is
   both sandbox-legal (a dropped file is a file the user handed us) and the most

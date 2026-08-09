@@ -113,12 +113,13 @@ final class LicenseTests: XCTestCase {
         }
     }
 
-    /// The format is shared with trill, so the product scope is what stops a
-    /// trill license from unlocking perch. Checked before the signature, so the
-    /// message names the actual problem.
-    func testATrillLicenseDoesNotUnlockPerch() throws {
-        XCTAssertThrowsError(try verifier.license(from: try signed(product: "trill"))) { error in
-            XCTAssertEqual(error as? LicenseError, .wrongProduct("trill"))
+    /// The format is meant to be shared with a second paid app, so the product
+    /// scope is what stops that app's license from unlocking perch. Checked
+    /// before the signature, so the message names the actual problem.
+    func testAnotherProductsLicenseDoesNotUnlockPerch() throws {
+        let other = try signed(product: "someotherapp")
+        XCTAssertThrowsError(try verifier.license(from: other)) { error in
+            XCTAssertEqual(error as? LicenseError, .wrongProduct("someotherapp"))
         }
     }
 

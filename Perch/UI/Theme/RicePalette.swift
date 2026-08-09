@@ -9,8 +9,8 @@ import SwiftUI
 /// literal, so `haus.theme.flavor` was a lie for perch: a latte rice still
 /// got a black glass panel. The four nebelung variants are now compiled in (a
 /// perch installed without the rice still has them all) and the rice names the
-/// dark/light pair in `~/.config/perch/config.json`. Same model as trill
-/// (`Trill/DesignSystem/RicePalette.swift`) and pounce (`Theme.swift`).
+/// dark/light pair in `~/.config/perch/config.json`. Same model as pounce's
+/// `Theme.swift`.
 ///
 /// Only the seven roles the shelf actually paints with are carried. A nebelung
 /// `*.hex.json` file has all twenty-three; the rest are ignored, which is what
