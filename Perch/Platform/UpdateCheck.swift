@@ -4,29 +4,28 @@ import os
 
 // MARK: - Update check (hourly release poll + cohort-aware nudge)
 //
-// Perch ships through the same four doors as trill — the rice (a Nix-built,
-// notarized bundle the activation script copies to /Applications), a Homebrew
-// cask, a drag-install from the release ZIP, and a bare Nix store path — so the
-// nudge's one job is the same: name the RIGHT next step for THIS install rather
-// than hand everyone the same button.
+// Perch ships through four doors — the rice (a Nix-built, notarized bundle the
+// activation script copies to /Applications), a Homebrew cask, a drag-install
+// from the release ZIP, and a bare Nix store path — so the nudge's one job is to
+// name the RIGHT next step for THIS install rather than hand everyone the same
+// button.
 //
-// Ported from trill's `UpdateCheck` (Trill/Platform/UpdateCheck.swift), which
-// was itself ported from pounce's `UpdateNudge`. Same hourly poll, same
-// per-version dismissal, same CalVer ordering — with two deliberate differences,
-// both of them because **perch is sandboxed and trill is not**:
+// Ported from pounce's `UpdateNudge`: same hourly poll, same per-version
+// dismissal, same CalVer ordering — with two deliberate differences, both of
+// them because **perch is sandboxed and an unsandboxed app is not**:
 //
-//   apply    trill swaps its own bundle for the release ZIP's (and shells out to
-//            `brew upgrade`) for the two cohorts that own their bytes. Perch
-//            cannot: `ENABLE_APP_SANDBOX = YES`, every child process inherits
-//            that sandbox, and /Applications is outside the container — a
-//            self-swap would be denied, and a `brew` spawned from here would
-//            fail in ways nothing could report. So EVERY cohort here gets an
-//            instruction: a command copied to the pasteboard, or the release
-//            page. Nothing in this file writes outside the container.
-//   surface  trill posts a UNUserNotificationCenter banner. Perch asks the
-//            system for no permissions it can avoid (see the Mission Control
-//            note in the rice's modules/perch) and notifications are one of
-//            them, so the only surfaces are passive: a strip at the bottom of
+//   apply    an unsandboxed app can swap its own bundle for the release ZIP's
+//            (and shell out to `brew upgrade`) for the two cohorts that own
+//            their bytes. Perch cannot: `ENABLE_APP_SANDBOX = YES`, every child
+//            process inherits that sandbox, and /Applications is outside the
+//            container — a self-swap would be denied, and a `brew` spawned from
+//            here would fail in ways nothing could report. So EVERY cohort here
+//            gets an instruction: a command copied to the pasteboard, or the
+//            release page. Nothing in this file writes outside the container.
+//   surface  the obvious surface is a UNUserNotificationCenter banner. Perch
+//            asks the system for no permissions it can avoid (see the Mission
+//            Control note in the rice's modules/perch) and notifications are one
+//            of them, so the only surfaces are passive: a strip at the bottom of
 //            the expanded shelf, and a row in the menu bar menu. Neither
 //            interrupts anything; both wait until you look.
 //
@@ -427,7 +426,7 @@ final class UpdateCheck: ObservableObject {
 
     // MARK: State
     //
-    // UserDefaults, like trill's: perch is the only reader (pounce needs a file
+    // UserDefaults: perch is the only reader (pounce needs a file instead,
     // because a daemon and a shell script share the state). Under the sandbox
     // this is the container's own defaults, so a `bench try` dev build — which
     // signs under `com.hausfold.perch.dev` — keeps its own, exactly like its

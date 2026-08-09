@@ -358,8 +358,8 @@ struct ShelfPanelView: View {
     }
 }
 
-/// The shelf's update surface — pounce pins a palette row, trill shows a
-/// sidebar card, perch gets one quiet strip along the bottom of the open shelf.
+/// The shelf's update surface — pounce pins a palette row; perch gets one quiet
+/// strip along the bottom of the open shelf.
 ///
 /// Two shapes share the slot: a pending release (version, this install's next
 /// step, the button), and the transient answer to a menu-bar "Check for

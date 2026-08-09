@@ -26,13 +26,13 @@ import Foundation
 
 /// A parsed `.nebelhauslicense` file.
 ///
-/// Deliberately product-scoped so trill reuses the format, the signer, and the
-/// mail template untouched — the only thing that differs between the two apps
-/// is which `product` string they accept.
+/// Deliberately product-scoped so a second paid app in the family reuses the
+/// format, the signer, and the mail template untouched — the only thing that
+/// differs between two such apps is which `product` string they accept.
 struct License: Equatable, Codable {
-    /// Which nebelhaus app this license unlocks. Perch accepts `"perch"` and
-    /// nothing else, so a trill license pasted into perch fails cleanly rather
-    /// than half-working.
+    /// Which family app this license unlocks. Perch accepts `"perch"` and
+    /// nothing else, so another product's license pasted into perch fails
+    /// cleanly rather than half-working.
     let product: String
     /// Who bought it. Shown in Settings so a license is identifiable at a
     /// glance; never sent anywhere.

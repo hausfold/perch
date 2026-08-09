@@ -6,9 +6,9 @@ Status: accepted
 
 The shelf was white-on-black with one sage literal, so `nebelhaus.theme.flavor`
 and `.contrast` were a lie for perch: a latte rice still got a black glass panel,
-and a nebelung palette bump could only reach perch through a rebuild. Trill and
-pounce already solve this — a rice-written JSON names a palette per polarity, and
-the app resolves it at runtime — but neither is sandboxed, and perch is.
+and a nebelung palette bump could only reach perch through a rebuild. Pounce
+already solves this — a rice-written JSON names a palette per polarity, and the
+app resolves it at runtime — but pounce is not sandboxed, and perch is.
 
 Perch's own settings (displays, retention, launch at login) live in
 `UserDefaults`, which Nix has no business writing. What the rice owns is the
@@ -54,5 +54,5 @@ Two knock-on constraints, both load-bearing:
   container, so `~/.config` is only nameable via `getpwuid`.
 
 Perch parses seven of nebelung's twenty-three roles and ignores the rest, so the
-palette files stay interchangeable with trill's — a new role is a code change
-here, not a file-format change.
+palette files stay interchangeable with every other app the rice themes — a new
+role is a code change here, not a file-format change.
