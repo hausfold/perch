@@ -118,7 +118,7 @@ final class LicenseStore: ObservableObject {
 
     // MARK: Import / removal
 
-    /// Read a `.nebelhauslicense` from disk, verify it, and store it on success.
+    /// Read a `.perchlicense` from disk, verify it, and store it on success.
     ///
     /// Both entry points land here: the Settings picker and — the most perch way
     /// imaginable to activate perch — dropping the file on the shelf.

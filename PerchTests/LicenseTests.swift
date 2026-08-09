@@ -285,10 +285,15 @@ final class LicenseTests: XCTestCase {
     // MARK: - Recognising a license on the shelf
 
     func testALicenseFileIsAKeyNotCargo() {
-        XCTAssertTrue(LicenseStore.isLicenseFile(URL(fileURLWithPath: "/tmp/perch.nebelhauslicense")))
+        XCTAssertTrue(LicenseStore.isLicenseFile(URL(fileURLWithPath: "/tmp/perch.perchlicense")))
         // Case-insensitive: mail clients and Finder both rewrite extensions.
-        XCTAssertTrue(LicenseStore.isLicenseFile(URL(fileURLWithPath: "/tmp/Perch.NebelhausLicense")))
-        for path in ["/tmp/report.pdf", "/tmp/nebelhauslicense", "/tmp/a.nebelhauslicense.txt"] {
+        XCTAssertTrue(LicenseStore.isLicenseFile(URL(fileURLWithPath: "/tmp/Perch.PerchLicense")))
+        for path in [
+            "/tmp/report.pdf",
+            "/tmp/perchlicense",
+            "/tmp/a.perchlicense.txt",
+            "/tmp/perch.nebelhauslicense",
+        ] {
             XCTAssertFalse(LicenseStore.isLicenseFile(URL(fileURLWithPath: path)), path)
         }
     }

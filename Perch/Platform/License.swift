@@ -24,7 +24,7 @@ import Foundation
 // old build someone's license covered keeps working forever — coverage is a
 // fact about two dates, not a server's opinion.
 
-/// A parsed `.nebelhauslicense` file.
+/// A parsed `.perchlicense` file.
 ///
 /// Deliberately product-scoped so a second paid app in the family reuses the
 /// format, the signer, and the mail template untouched — the only thing that
@@ -70,7 +70,7 @@ struct License: Equatable, Codable {
     }
 
     /// The file extension the picker filters on and a shelf drop recognises.
-    static let fileExtension = "nebelhauslicense"
+    static let fileExtension = "perchlicense"
 
     /// The one product string this app honours.
     static let expectedProduct = "perch"
