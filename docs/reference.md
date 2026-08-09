@@ -70,7 +70,7 @@ failing.
 
 `accent` is the one colour the shelf *emphasises* with — the ember's pips under
 the notch, a pinned tile, the filled button on a notice. It takes either a
-catppuccin role name (the fourteen `nebelhaus.theme.accent` offers, resolved
+catppuccin role name (the fourteen `haus.theme.accent` offers, resolved
 against whichever palette is in force, so the hue follows the flavour and the
 polarity by itself) or a literal `"#rrggbb"` if you're hand-editing. Leave it
 out and the shelf accents with the palette's own `green` — `#abe1a6` under stock
@@ -83,7 +83,7 @@ itself, not against the panel, so a pale accent gets dark ink and a deep one
 gets light ink whichever polarity it lands in.
 
 On a [nebelhaus](https://github.com/nebelhaus/nebelhaus) rice all of this is
-written for you from `nebelhaus.theme.flavor` / `.contrast` / `.accent`;
+written for you from `haus.theme.flavor` / `.contrast` / `.accent`;
 standalone installs can write the two files by hand or ignore them entirely.
 Perch has no theme or accent picker: colors come from the rice, everything else
 from Settings.
@@ -163,5 +163,5 @@ refuses to ask for (see Permissions above). A system toggle is the honest fix,
 and it is reversible in the same place.
 
 The [nebelhaus](https://github.com/nebelhaus/nebelhaus) rice sets this for you
-whenever `nebelhaus.perch.enable` is on. Standalone cask installs should flip it
+whenever `haus.perch.enable` is on. Standalone cask installs should flip it
 by hand, once.

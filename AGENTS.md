@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Perch is the native macOS notch file shelf in the nebelhaus family.
+Perch is the native macOS notch file shelf in the hausfold family.
 
 **This file is the one set of instructions, for every agent.** Claude Code,
 Codex, OpenCode, Cursor, Copilot — TUI or GUI — all read *this*, directly or
@@ -79,7 +79,7 @@ release ZIP**, not a from-source build:
   `prebuilt` at it, so a branch feel-tests without waiting on a release.
 
 Released: `nix/release.nix` pins a real notarized release (CI rewrites it on
-every `bench release perch` tag) and the rice enables `nebelhaus.perch.enable`
+every `bench release perch` tag) and the rice enables `haus.perch.enable`
 by default, like trill.
 
 ## The companion's own path (App Store)
