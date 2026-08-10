@@ -57,13 +57,20 @@ must not land before the store can take their money.
       gap** — the terms say a seat is a person, and nothing says how a buyer
       picks a seat count at checkout. That's Paddle product configuration, not
       a page edit.
-- [ ] **`support@hausfold.co` exists** and you've decided what SLA you'll
-      actually honour. Paying customers change the tone of the issue tracker.
-      Until it does, every page on the site says `hi@hausfold.co`, which
-      routes today — moving them is a find-and-replace, but do it *before* the
-      first receipt goes out, not after. (Was `support@nebelhaus.com`; people
-      buy a hausfold product, and hausfold is the name they'll have seen on the
-      receipt — `notes/go-to-market.md` §6 in the workshop.)
+- [ ] **You've decided the SLA you'll actually honour on `hi@hausfold.co`.**
+      Paying customers change the tone of the issue tracker.
+      ✅ **The address half of this box is closed** — settled 2026-08-09 on
+      `hi@hausfold.co`, which routes today and is already the contact on
+      `/terms` and `/refunds`. This box used to demand `support@hausfold.co` be
+      *created*, which made a new mailbox plus a find-and-replace of the legal
+      pages a blocker on the first receipt. It isn't one: nothing has to be
+      built here, only promised.
+      If `support@` is ever wanted, **alias it onto `hi@`** — additive, and it
+      changes nothing already printed. Don't make it canonical after receipts
+      exist; old receipts would point at a mailbox you then keep forever.
+      (Was `support@nebelhaus.com`; people buy a hausfold product, and hausfold
+      is the name they'll have seen on the receipt — `notes/go-to-market.md` §6
+      and `notes/hausfold-rename.md` §5.4 in the workshop.)
 - [ ] **The private key is backed up offline.** If it is lost, no new license
       can ever be issued and every existing one still works forever — a
       uniquely annoying failure mode.
