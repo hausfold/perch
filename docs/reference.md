@@ -82,7 +82,7 @@ Label colour on a filled accent is chosen for contrast against the accent
 itself, not against the panel, so a pale accent gets dark ink and a deep one
 gets light ink whichever polarity it lands in.
 
-On a [nebelhaus](https://github.com/hausfold/hausfold) rice all of this is
+On a [nebelhaus](https://github.com/hausfold/haus) rice all of this is
 written for you from `haus.theme.flavor` / `.contrast` / `.accent`;
 standalone installs can write the two files by hand or ignore them entirely.
 Perch has no theme or accent picker: colors come from the rice, everything else
@@ -162,6 +162,6 @@ drag would require a `CGEventTap` — an Accessibility grant perch deliberately
 refuses to ask for (see Permissions above). A system toggle is the honest fix,
 and it is reversible in the same place.
 
-The [nebelhaus](https://github.com/hausfold/hausfold) rice sets this for you
+The [nebelhaus](https://github.com/hausfold/haus) rice sets this for you
 whenever `haus.perch.enable` is on. Standalone cask installs should flip it
 by hand, once.
