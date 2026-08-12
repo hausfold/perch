@@ -57,6 +57,12 @@ struct ShelfGeometry: Equatable, Sendable {
     // exit → collapse → re-enter jitter, and the sideways motion read as jank.
     let expandedContentWidth: CGFloat
     let hasCameraHousing: Bool
+    // Width of the hover-to-expand band, centered inside collapsedFrame. Kept
+    // close to the true notch/camera-housing width (or a modest fixed band on
+    // a notchless display) rather than matching the wide drag-catch band
+    // above — a hover merely passing through the side of that wide band
+    // should not pop the shelf open once it has items to reveal.
+    let hoverTriggerWidth: CGFloat
     // Depth of whatever occupies the top edge: the camera housing where there is
     // one, otherwise the menu bar. The collapsed ember hangs just under it on
     // either kind of display — never over the housing, and never out in the band
@@ -88,6 +94,14 @@ struct ShelfGeometry: Equatable, Sendable {
         } else {
             collapsedWidth = max(300, min(screen.frame.width * 0.32, 460))
             collapsedHeight = 44
+        }
+
+        if let housingWidth = screen.cameraHousingWidth {
+            // A little grace either side of the true housing edge so the
+            // trigger isn't pixel-perfect, without approaching the catch band.
+            hoverTriggerWidth = min(collapsedWidth, housingWidth + 48)
+        } else {
+            hoverTriggerWidth = min(collapsedWidth, 160)
         }
 
         // A comfortable reading width for the tile strip — deliberately a touch

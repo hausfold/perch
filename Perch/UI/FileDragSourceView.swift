@@ -85,6 +85,11 @@ struct FileDragSourceView: NSViewRepresentable {
     // Double-click to open. Optional: the drag-all stack handle reuses this
     // view purely to export, and has nothing single to open.
     var onOpen: (() -> Void)?
+    // Side length of the square carved out of each top corner so a badge
+    // overlaid there (pin/remove) gets its own clicks instead of them being
+    // captured by this view's full-card drag/click handling. nil leaves the
+    // whole view grabbable — the drag-all handle has no corner badges.
+    var badgeCornerSize: CGFloat?
 
     func makeNSView(context: Context) -> DragSourceNSView {
         DragSourceNSView()
@@ -96,6 +101,7 @@ struct FileDragSourceView: NSViewRepresentable {
         nsView.onExportEnded = onExportEnded
         nsView.onItemExportFinished = onItemExportFinished
         nsView.onOpen = onOpen
+        nsView.badgeCornerSize = badgeCornerSize
     }
 }
 
@@ -105,6 +111,7 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
     var onExportEnded: (() -> Void)?
     var onItemExportFinished: ((UUID, ExportOutcome) -> Void)?
     var onOpen: (() -> Void)?
+    var badgeCornerSize: CGFloat?
 
     private var startedSession = false
 
@@ -231,4 +238,22 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
     }
 
     override var acceptsFirstResponder: Bool { true }
+
+    // The pin/remove badges are SwiftUI content layered visually above this
+    // view but are not separate NSViews, so AppKit's real hit-testing would
+    // otherwise still route their clicks here first. Returning nil in their
+    // corners lets the hit fall through to them instead.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let corner = badgeCornerSize, superview != nil else {
+            return super.hitTest(point)
+        }
+        let local = convert(point, from: superview)
+        let topY = isFlipped ? 0 : bounds.maxY - corner
+        let leftCorner = NSRect(x: 0, y: topY, width: corner, height: corner)
+        let rightCorner = NSRect(x: bounds.maxX - corner, y: topY, width: corner, height: corner)
+        if leftCorner.contains(local) || rightCorner.contains(local) {
+            return nil
+        }
+        return super.hitTest(point)
+    }
 }
