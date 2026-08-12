@@ -88,6 +88,11 @@ final class GlassBackingView: NSView {
     private func applyCornerRadius() {
         if #available(macOS 26.0, *), let glass = contentView as? NSGlassEffectView {
             glass.cornerRadius = cornerRadius
+            return
         }
+        // The solid plate and the pre-26 NSVisualEffectView have no
+        // dedicated corner-radius property; only NSGlassEffectView does.
+        contentView?.wantsLayer = true
+        contentView?.layer?.cornerRadius = cornerRadius
     }
 }
