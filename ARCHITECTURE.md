@@ -47,6 +47,12 @@ NSScreen[] ──► ShelfWindowSystem ──► ShelfPanelController per displa
                                       copy-only group
 ```
 
+Shortcuts / Spotlight (App Intents) are a third door onto the shelf:
+`AddToShelfIntent` (`Perch/Importing/AddToShelfIntent.swift`) resolves each
+`IntentFile` to a URL or raw data and hands it to the same
+`ShelfStore.importFileURLs` / `importData` admission path `ShelfDropHandler`
+uses — no separate cap check, no separate staging logic.
+
 ## The hard cases
 
 ### Multiple displays and fullscreen Spaces

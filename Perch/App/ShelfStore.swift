@@ -120,6 +120,26 @@ final class ShelfStore: ObservableObject {
         }
     }
 
+    func importData(_ data: Data, suggestedName: String) {
+        guard admit([data]).count == 1 else { return }
+        let transferID = UUID()
+        pendingTransfers.append(
+            PendingTransfer(id: transferID, displayName: suggestedName, phase: .copying)
+        )
+        Task {
+            do {
+                let item = try await pipeline.stageData(
+                    data,
+                    suggestedName: suggestedName,
+                    itemID: transferID
+                )
+                finishTransfer(transferID, with: .success(item))
+            } catch {
+                finishTransfer(transferID, with: .failure(error))
+            }
+        }
+    }
+
     func importImage(_ image: NSImage) {
         guard admit([image]).count == 1 else { return }
         let transferID = UUID()
