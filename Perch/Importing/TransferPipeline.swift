@@ -113,6 +113,15 @@ final class TransferPipeline: @unchecked Sendable {
         }
     }
 
+    func stageData(_ data: Data, suggestedName: String, itemID: UUID) async throws -> ShelfItem {
+        try await enqueue {
+            let container = try self.repository.allocateImportDirectory(id: itemID)
+            let destination = container.appending(path: Self.safeFilename(suggestedName))
+            try data.write(to: destination, options: [.atomic])
+            return try self.repository.item(forStagedURL: destination, id: itemID)
+        }
+    }
+
     func stageText(_ text: String, suggestedName: String, itemID: UUID) async throws -> ShelfItem {
         try await enqueue {
             let container = try self.repository.allocateImportDirectory(id: itemID)
