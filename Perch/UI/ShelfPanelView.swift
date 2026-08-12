@@ -640,13 +640,15 @@ private struct FileTile: View {
                 onExportStarted: onExportStarted,
                 onExportEnded: onExportEnded,
                 onItemExportFinished: onItemExportFinished,
-                onOpen: onOpen
+                onOpen: onOpen,
+                badgeCornerSize: 34
             )
             .accessibilityLabel("Drag \(item.displayName)")
         }
         // The controls straddle the preview's corners instead of floating at
-        // the wider tile edges. Keeping this overlay above the drag source also
-        // leaves both buttons clickable across the full tile-sized grab area.
+        // the wider tile edges. SwiftUI overlay order alone doesn't make them
+        // clickable over the drag source's real NSView — see the
+        // badgeCornerSize hit-test carve-out on FileDragSourceView above.
         .overlay(alignment: .top) {
             HStack(spacing: 0) {
                 pinButton

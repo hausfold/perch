@@ -55,6 +55,7 @@ final class ShelfPanelController: NSObject {
             onHide: { [weak self] in self?.hide() }
         )
         let host = ShelfHostingView(rootView: rootView, dropHandler: dropHandler)
+        host.hoverTriggerWidth = geometry.hoverTriggerWidth
         host.onDragEntered = { [weak self] in
             self?.viewState.isDropActive = true
             self?.expand()
@@ -270,6 +271,12 @@ final class ShelfHostingView<Content: View>: NSHostingView<Content> {
     var onPointerEntered: (() -> Void)?
     var onPointerExited: (() -> Void)?
 
+    // Width of the centered hover-trigger band; nil (or ≥ bounds.width) means
+    // the whole view triggers, as before. See ShelfGeometry.hoverTriggerWidth.
+    var hoverTriggerWidth: CGFloat? {
+        didSet { updateTrackingAreas() }
+    }
+
     private let dropHandler: ShelfDropHandler
     private var trackingAreaReference: NSTrackingArea?
 
@@ -293,14 +300,26 @@ final class ShelfHostingView<Content: View>: NSHostingView<Content> {
         if let trackingAreaReference {
             removeTrackingArea(trackingAreaReference)
         }
+        // Deliberately not .inVisibleRect: that option ignores whatever rect
+        // is passed and always tracks the view's full visible bounds, which
+        // is exactly the wide drag-catch band this hover band must stay
+        // narrower than. This override already fires on bounds changes, so a
+        // plain rect kept in sync here is enough.
         let tracking = NSTrackingArea(
-            rect: bounds,
-            options: [.activeAlways, .mouseEnteredAndExited, .inVisibleRect],
+            rect: hoverRect,
+            options: [.activeAlways, .mouseEnteredAndExited],
             owner: self
         )
         addTrackingArea(tracking)
         trackingAreaReference = tracking
         super.updateTrackingAreas()
+    }
+
+    /// Centered sub-rect of `bounds` used for hover-to-expand. See
+    /// `hoverTriggerWidth`.
+    private var hoverRect: NSRect {
+        guard let hoverTriggerWidth, hoverTriggerWidth < bounds.width else { return bounds }
+        return bounds.insetBy(dx: (bounds.width - hoverTriggerWidth) / 2, dy: 0)
     }
 
     override func mouseEntered(with event: NSEvent) {
