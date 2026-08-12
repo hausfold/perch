@@ -57,5 +57,14 @@ struct PerchShortcuts: AppShortcutsProvider {
             shortTitle: "Add to Shelf",
             systemImageName: "tray.and.arrow.down"
         )
+        AppShortcut(
+            intent: ExportFromShelfIntent(),
+            phrases: [
+                "Get files from \(.applicationName)",
+                "Get \(.applicationName) shelf items",
+            ],
+            shortTitle: "Get from Shelf",
+            systemImageName: "tray.and.arrow.up"
+        )
     }
 }

@@ -47,11 +47,22 @@ NSScreen[] ──► ShelfWindowSystem ──► ShelfPanelController per displa
                                       copy-only group
 ```
 
-Shortcuts / Spotlight (App Intents) are a third door onto the shelf:
-`AddToShelfIntent` (`Perch/Importing/AddToShelfIntent.swift`) resolves each
-`IntentFile` to a URL or raw data and hands it to the same
-`ShelfStore.importFileURLs` / `importData` admission path `ShelfDropHandler`
-uses — no separate cap check, no separate staging logic.
+Shortcuts / Spotlight (App Intents) are a third door onto the shelf, in both
+directions:
+
+- **In** — `AddToShelfIntent` (`Perch/Importing/AddToShelfIntent.swift`)
+  resolves each `IntentFile` to a URL or raw data and hands it to the same
+  `ShelfStore.importFileURLs` / `importData` admission path `ShelfDropHandler`
+  uses — no separate cap check, no separate staging logic.
+- **Out** — `ExportFromShelfIntent` (same file's neighbor) returns staged
+  items as `[IntentFile]` through the exact `liftForExport` + `handOff`
+  transaction a drag-out to a terminal or editor already goes through: the
+  shelf detaches the bytes rather than deleting them, because a Shortcut
+  holding a file URL is no different from an app that read a dropped file's
+  path instead of asking for the promise.
+- `ShelfItemEntity` (`Perch/Importing/ShelfItemEntity.swift`) is the
+  `AppEntity` both intents and Spotlight resolve shelf items through — a
+  thin, live view onto `ShelfStore.items`, not a stored copy.
 
 ## The hard cases
 
