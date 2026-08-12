@@ -20,6 +20,18 @@ name: testflight
 # Secrets (in addition to the release workflow's):
 #   IOS_DIST_CERT_P12       base64 of the exported "Apple Distribution" .p12
 #   IOS_DIST_CERT_PASSWORD  the password protecting that .p12
+#   IOS_DEV_CERT_P12        base64 of one exported "Apple Development" .p12
+#   IOS_DEV_CERT_PASSWORD   the password protecting that .p12
+#                           -allowProvisioningUpdates bootstraps a development
+#                           identity for automatically-signed targets even on
+#                           an archive-only Release build. A fresh runner has
+#                           none in its keychain, so left alone Xcode mints a
+#                           new one every run — and Apple caps Development
+#                           certs per account, so that quota eventually maxes
+#                           out and every archive starts failing (2026-08-10,
+#                           2026-08-12). Persisting one dev cert here, the same
+#                           way the distribution one already is, gives Xcode an
+#                           existing identity to reuse instead of minting.
 #   ASC_KEY_P8              base64 of an App Store Connect API key (.p8) whose
 #                           role is Admin — App Manager can't mint provisioning
 #                           profiles, and the notarization key is scoped to
@@ -61,24 +73,39 @@ jobs:
           echo "PERCH_BUILD_NUMBER=$BUILD" >> "$GITHUB_ENV"
           echo "shipping $MARKETING ($BUILD) from VERSION $VERSION"
 
-      - name: Import the Apple Distribution certificate
+      - name: Import the signing certificates
         env:
           IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
           IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_DEV_CERT_P12: ${{ secrets.IOS_DEV_CERT_P12 }}
+          IOS_DEV_CERT_PASSWORD: ${{ secrets.IOS_DEV_CERT_PASSWORD }}
         run: |
           set -euo pipefail
           KEYCHAIN="$RUNNER_TEMP/ios-signing.keychain-db"
           KEYCHAIN_PW="$(uuidgen)"
-          echo "$IOS_DIST_CERT_P12" | base64 -d > "$RUNNER_TEMP/ios-cert.p12"
           security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
           security set-keychain-settings -lut 21600 "$KEYCHAIN"
           security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
-          security import "$RUNNER_TEMP/ios-cert.p12" -P "$IOS_DIST_CERT_PASSWORD" \
+
+          echo "$IOS_DIST_CERT_P12" | base64 -d > "$RUNNER_TEMP/ios-dist-cert.p12"
+          security import "$RUNNER_TEMP/ios-dist-cert.p12" -P "$IOS_DIST_CERT_PASSWORD" \
             -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          rm -f "$RUNNER_TEMP/ios-dist-cert.p12"
+
+          # Reused, not minted: a fresh runner has no development identity, and
+          # -allowProvisioningUpdates bootstraps one for automatically-signed
+          # targets even on an archive-only Release build. Left to mint its own
+          # every run, it eventually hits Apple's per-account cap on Development
+          # certs and every archive starts failing (2026-08-10, 2026-08-12).
+          echo "$IOS_DEV_CERT_P12" | base64 -d > "$RUNNER_TEMP/ios-dev-cert.p12"
+          security import "$RUNNER_TEMP/ios-dev-cert.p12" -P "$IOS_DEV_CERT_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          rm -f "$RUNNER_TEMP/ios-dev-cert.p12"
+
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
           security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
           security find-identity -v -p codesigning "$KEYCHAIN" | grep -q "Apple Distribution"
-          rm -f "$RUNNER_TEMP/ios-cert.p12"
+          security find-identity -v -p codesigning "$KEYCHAIN" | grep -q "Apple Development"
 
       - name: Lay down the App Store Connect API key
         env:
