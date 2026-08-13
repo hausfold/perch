@@ -1,4 +1,5 @@
 import AppKit
+import AppIntents
 import SwiftUI
 
 @main
@@ -8,6 +9,10 @@ struct PerchApp: App {
     @StateObject private var update = UpdateCheck.shared
     // Observed directly so the menu re-renders when a device pairs/revokes.
     @ObservedObject private var mobile = AppRuntime.shared.mobile
+
+    init() {
+        PerchShortcuts.updateAppShortcutParameters()
+    }
 
     var body: some Scene {
         MenuBarExtra {
