@@ -10,6 +10,7 @@ final class AppRuntime: ObservableObject {
     let store: ShelfStore
     let windowSystem: ShelfWindowSystem
     let mobile: MobileReceiver
+    let finderActions: FinderActionReceiver
 
     private init() {
         settings = AppSettings()
@@ -26,11 +27,13 @@ final class AppRuntime: ObservableObject {
         }
         windowSystem = ShelfWindowSystem(store: store, settings: settings, theme: theme)
         mobile = MobileReceiver(store: store, settings: settings)
+        finderActions = FinderActionReceiver(store: store)
     }
 
     func start() {
         NSApp.setActivationPolicy(.accessory)
         store.restore()
+        finderActions.start()
         windowSystem.start()
         UpdateCheck.shared.start()
         mobile.start()
@@ -39,5 +42,10 @@ final class AppRuntime: ObservableObject {
     func openSettings() {
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func stop() {
+        finderActions.stop()
+        windowSystem.stop()
     }
 }

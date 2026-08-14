@@ -39,10 +39,12 @@ Don't pass `CODE_SIGNING_ALLOWED=NO` to the **iOS** build you intend to run:
 it strips the App Group entitlement and the app aborts at launch. Simulator
 ad-hoc signing needs no team or provisioning.
 
-Targets: `Perch` (macOS) · `PerchIOS` (iPhone/iPad app) · `PerchShare` (Share
-extension) · `PerchTests`. Shared sources, compiled into each app directly:
-`PerchWire/` (wire protocol + crypto + the staging layer both platforms use)
-and `PerchMobileCore/` (iOS-only shelf/pairing/delivery, app + extension).
+Targets: `Perch` (macOS) · `PerchFinderAction` (Finder Quick Action) ·
+`PerchIOS` (iPhone/iPad app) · `PerchShare` (Share extension) · `PerchTests`.
+Shared sources, compiled into their consumers directly: `PerchWire/` (wire
+protocol + crypto + the staging layer both platforms use), `PerchMobileCore/`
+(iOS-only shelf/pairing/delivery, app + extension), and `PerchFinderBridge/`
+(Mac App Group mailbox shared by the macOS app + Finder Action).
 
 Read `PRD.md`, `ARCHITECTURE.md`, and the ADRs before changing transfer
 semantics. Update them when a product boundary changes.

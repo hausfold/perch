@@ -12,6 +12,8 @@ collect several items and then drag the group to one destination.
 - Notch-derived geometry and a clear notchless-display fallback.
 - One public-API overlay per selected display.
 - Finder files and folders, file promises, images, URLs, and text.
+- A Finder Action extension that adds selected files and folders from Finder's
+  Quick Actions menu after one explicit enable in System Settings.
 - Background staging with visible pending state.
 - Explicit iCloud placeholder handling and a bounded failure.
 - Collision-proof staging and atomic completed-item persistence.
@@ -39,11 +41,14 @@ collect several items and then drag the group to one destination.
 8. Enable auto-remove; cancelled drags keep the shelf, successful copies clear it.
 9. With a newer release published, the open shelf offers this install's own
    update step; dismissing it silences that version and no other.
+10. Enable **Add to Perch Shelf** under Finder extensions, invoke it on three
+    files while the free shelf has one open slot, and verify only one source is
+    copied while every original remains unchanged.
 
 ## Deferred without refactor
 
 - Accurate byte progress for every file-provider implementation.
 - Named or persistent shelves.
 - Explicit transactional move of originals.
-- Share extensions, Finder services, archive/compress actions.
+- Additional Share extensions and archive/compress actions.
 - User-configurable global keyboard shortcut.

@@ -80,6 +80,6 @@ final class PerchAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        AppRuntime.shared.windowSystem.stop()
+        AppRuntime.shared.stop()
     }
 }

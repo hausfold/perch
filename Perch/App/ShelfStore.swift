@@ -156,6 +156,48 @@ final class ShelfStore: ObservableObject {
         }
     }
 
+    // MARK: - Finder Action arrivals
+
+    /// Reserve shelf slots before the extension asks Finder for any bytes.
+    /// The response persisted in the App Group is the admission receipt; its
+    /// IDs also make pending reservations recoverable across an app relaunch.
+    func admitFinderItems(_ offered: [FinderActionItem]) -> [FinderActionItem] {
+        let accepted = admit(offered)
+        resumeFinderItems(accepted)
+        return accepted
+    }
+
+    func resumeFinderItems(_ accepted: [FinderActionItem]) {
+        for item in accepted where !items.contains(where: { $0.id == item.id })
+            && !pendingTransfers.contains(where: { $0.id == item.id }) {
+            pendingTransfers.append(
+                PendingTransfer(id: item.id, displayName: item.displayName, phase: .copying)
+            )
+        }
+    }
+
+    func completeFinderImport(_ offered: FinderActionItem, stagedAt url: URL) async {
+        guard pendingTransfers.contains(where: { $0.id == offered.id }) else { return }
+        do {
+            let item = try await pipeline.adoptPreparedFile(
+                at: url,
+                suggestedName: offered.displayName,
+                itemID: offered.id
+            )
+            finishTransfer(offered.id, with: .success(item))
+        } catch {
+            finishTransfer(offered.id, with: .failure(error))
+        }
+    }
+
+    func failFinderImport(_ offered: FinderActionItem) {
+        guard pendingTransfers.contains(where: { $0.id == offered.id }) else { return }
+        finishTransfer(
+            offered.id,
+            with: .failure(FinderActionImportError.unavailable(offered.displayName))
+        )
+    }
+
     func beginPromisedImports(_ receivers: [NSFilePromiseReceiver]) {
         // Trim before asking the source for anything: an unadmitted promise is
         // one we never ask the other app to write, so the cap costs no work on
@@ -527,6 +569,17 @@ final class ShelfStore: ObservableObject {
         queue.maxConcurrentOperationCount = 2
         return queue
     }()
+}
+
+private enum FinderActionImportError: LocalizedError {
+    case unavailable(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .unavailable(name):
+            "Finder could not add \(name) to the shelf."
+        }
+    }
 }
 
 private final class PromiseBatchTracker: @unchecked Sendable {

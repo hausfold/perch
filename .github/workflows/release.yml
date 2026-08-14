@@ -93,12 +93,20 @@ jobs:
           # guarantees the hardened runtime, a secure timestamp, and exactly the
           # declared entitlements (no get-task-allow, which notarization rejects).
           APP="dd/Build/Products/Release/Perch.app"
+          FINDER_ACTION="$APP/Contents/PlugIns/PerchFinderAction.appex"
           IDENTITY="$(security find-identity -v -p codesigning "$RUNNER_TEMP/signing.keychain-db" \
             | awk -F'"' '/Developer ID Application/{print $2; exit}')"
+          # Nested code is always signed inside-out. The Finder Action and app
+          # must carry the same Team-ID-prefixed App Group entitlement.
+          codesign --force --options runtime --timestamp \
+            --entitlements PerchFinderAction/PerchFinderAction.entitlements \
+            --sign "$IDENTITY" \
+            "$FINDER_ACTION"
           codesign --force --options runtime --timestamp \
             --entitlements Perch/Config/Perch.entitlements \
             --sign "$IDENTITY" \
             "$APP"
+          codesign --verify --strict --verbose=2 "$FINDER_ACTION"
           codesign --verify --strict --verbose=2 "$APP"
 
       - name: Notarize + staple

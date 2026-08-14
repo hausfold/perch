@@ -36,6 +36,15 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Finder") {
+                Button("Open Finder Extension Settings…") {
+                    openFinderExtensionSettings()
+                }
+                Text("Enable “Add to Perch Shelf” once under Finder extensions. It then appears in Finder’s Quick Actions menu whenever files or folders are selected.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             // Everything licensing, in one place and in plain words: what this
             // Mac is entitled to, which builds the entitlement covers, and the
             // two buttons (import, remove) that move a seat between machines.
@@ -138,7 +147,7 @@ struct SettingsView: View {
         .formStyle(.grouped)
         // Tall enough for the Updates section's explanation without the form
         // scrolling — a settings window this small should show everything at once.
-        .frame(width: 470, height: 840)
+        .frame(width: 470, height: 920)
         .navigationTitle("Perch Settings")
     }
 
@@ -155,5 +164,15 @@ struct SettingsView: View {
         }
         guard panel.runModal() == .OK, let url = panel.url else { return }
         license.importLicense(from: url)
+    }
+
+    private func openFinderExtensionSettings() {
+        // Tahoe places extensions under General › Login Items & Extensions.
+        // Older supported releases still accept this pane identifier and land
+        // close enough for the Finder extension toggle to be obvious.
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"
+        ) else { return }
+        NSWorkspace.shared.open(url)
     }
 }

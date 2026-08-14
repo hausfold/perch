@@ -113,6 +113,38 @@ final class TransferPipeline: @unchecked Sendable {
         }
     }
 
+    /// Moves a complete representation prepared by another Perch process into
+    /// the shelf. Finder Action bytes reach here only after `ShelfStore`
+    /// reserved their slots, and the App Group source is already complete.
+    func adoptPreparedFile(
+        at preparedURL: URL,
+        suggestedName: String,
+        itemID: UUID
+    ) async throws -> ShelfItem {
+        try await enqueue {
+            let fileManager = FileManager()
+            let container = try self.repository.allocateImportDirectory(id: itemID)
+            let destination = container.appending(
+                path: Self.safeFilename(suggestedName)
+            )
+            do {
+                do {
+                    try fileManager.moveItem(at: preparedURL, to: destination)
+                } catch {
+                    // App Group and app containers normally share a volume, but
+                    // copy remains a correct fallback if the filesystem refuses
+                    // a cross-container rename. This queue is never main.
+                    try fileManager.copyItem(at: preparedURL, to: destination)
+                    try? fileManager.removeItem(at: preparedURL)
+                }
+                return try self.repository.item(forStagedURL: destination, id: itemID)
+            } catch {
+                try? fileManager.removeItem(at: container)
+                throw error
+            }
+        }
+    }
+
     func stageData(_ data: Data, suggestedName: String, itemID: UUID) async throws -> ShelfItem {
         try await enqueue {
             let container = try self.repository.allocateImportDirectory(id: itemID)

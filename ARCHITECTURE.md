@@ -12,6 +12,8 @@
    outside the container.
 8. The free-tier cap is decided before staging starts, so a refused item is
    never copied and no drag is interrupted.
+9. The Finder Action persists no source URL and asks Finder for bytes only
+   after the containing app has persisted an admission response.
 
 ## Boundaries
 
@@ -63,6 +65,28 @@ directions:
 - `ShelfItemEntity` (`Perch/Importing/ShelfItemEntity.swift`) is the
   `AppEntity` both intents and Spotlight resolve shelf items through — a
   thin, live view onto `ShelfStore.items`, not a stored copy.
+
+Finder's right-click Quick Actions menu is a fourth door, implemented as a
+non-UI Action Extension (`PerchFinderAction`). macOS requires the user to enable
+it once under Login Items & Extensions; Perch exposes a Settings shortcut to
+that pane. The extension cannot call its containing app, so `PerchFinderBridge/`
+defines a Mac App Group mailbox with a two-phase transaction:
+
+1. The extension writes UUIDs, safe display names, and in-memory attachment
+   indexes — never source URLs.
+2. The running app's `FinderActionReceiver` asks `ShelfStore` to reserve slots
+   and atomically writes the accepted IDs. This response is also the relaunch
+   recovery receipt for pending reservations.
+3. Only then does the extension load accepted providers and coordinate/copy
+   their bytes off-main into its request directory. A completion file exposes
+   only paths relative to that directory.
+4. The app adopts each completed representation through `TransferPipeline`,
+   commits the visible `ShelfItem`, and removes the request. Ten-minute stale
+   transactions release reservations and are discarded.
+
+The shared group is `88M28542LQ.com.hausfold.perch`, the Team-ID-prefixed form
+for a directly distributed macOS app. It is deliberately separate from the iOS
+companion's App Store group.
 
 ## The hard cases
 
@@ -255,7 +279,7 @@ True move-original semantics are still not inferred from modifier keys.
 - Multiple named shelves: replace `ActiveShelf` with repository IDs.
 - Expiration while running: scheduler calling the existing prune operation.
 - Explicit move workflow: extend the promise `ExportTransaction`, never a change to importing.
-- Finder actions and share actions: commands over completed staged URLs.
+- Additional share actions: commands over completed staged URLs.
 - Push from the Mac (a phone that learns of a new tile without asking): needs a
   wake path — a relay or a notification — not a change to the wire.
 - An opt-in encrypted relay for delivery while both devices are away: slots
