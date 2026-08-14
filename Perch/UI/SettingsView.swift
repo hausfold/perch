@@ -9,6 +9,8 @@ struct SettingsView: View {
     @AppStorage("automaticUpdateChecks") private var automaticUpdateChecks = true
     @ObservedObject private var update: UpdateCheck = .shared
     @ObservedObject private var license: LicenseStore = .shared
+    /// Evaluated once per window, not once per redraw. See `fittingHeight()`.
+    @State private var windowHeight = SettingsView.fittingHeight()
 
     var body: some View {
         Form {
@@ -47,7 +49,7 @@ struct SettingsView: View {
                 Button("Open Finder Extension Settings…") {
                     openFinderExtensionSettings()
                 }
-                Text("Enable “Add to Perch Shelf” once under Finder extensions; it then appears in Finder’s Quick Actions whenever files are selected.")
+                Text("Enable “Add to Perch Shelf” once under Finder extensions; it then appears in Finder’s Quick Actions whenever files or folders are selected.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -82,7 +84,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                 }
-                Text("Your license is a signed file — import it here, or drop it on the shelf. It is verified on this Mac and never sent anywhere: no account, no activation server. It covers every build released within a year of your purchase, forever.")
+                Text("Your license is a signed file — import it here, or drop it on the shelf. It is verified on this Mac and never sent anywhere: no account, no activation server. It covers every build released within a year of your purchase, and keeps working on those builds forever.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -152,22 +154,24 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        // Opens at the height the content wants, but never taller than the
-        // screen it opens on — a settings window whose bottom rows sit under
-        // the Dock, or above the menu bar, can't be reached at all. `Form`
-        // already supplies the scroll view; the fix is to stop insisting on a
-        // height the display can't give, and let it scroll when it can't.
-        .frame(width: Self.windowWidth, height: Self.windowHeight)
+        // Sized once, when the window is made — not on every body pass, or an
+        // update check landing an hour later would resize the window under
+        // whoever is reading it.
+        .frame(width: Self.windowWidth, height: windowHeight)
         .navigationTitle(Self.windowTitle)
     }
 
     static let windowTitle = "Perch Settings"
     private static let windowWidth: CGFloat = 470
 
-    /// Tall enough for most of the form at once, never taller than the screen
-    /// can show. `visibleFrame` already excludes the menu bar and the Dock, so
-    /// the slack is only the title bar and a little breathing room.
-    private static var windowHeight: CGFloat {
+    /// A settings window whose last rows sit under the Dock can't be reached at
+    /// all, so the height is whatever the screen can actually show, minus the
+    /// title bar — `visibleFrame` has already taken out the menu bar and the
+    /// Dock. The 700 ceiling is a deliberate stop short of "one screenful of
+    /// everything": a pane with six sections reads better scrolled than
+    /// stretched the full height of a large display. `Form` supplies the
+    /// scrolling.
+    private static func fittingHeight() -> CGFloat {
         let room = (NSScreen.main?.visibleFrame.height ?? 800) - 60
         return max(320, min(700, room))
     }
