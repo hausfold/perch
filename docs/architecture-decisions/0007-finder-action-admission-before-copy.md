@@ -6,9 +6,17 @@ Status: accepted
 
 Perch's App Intents make files available to Shortcuts, but macOS does not place
 an App Intent in Finder's right-click Quick Actions menu automatically. The
-public Finder integration for that surface is a macOS Action Extension. It is
-disabled until the user explicitly enables it in System Settings, and its
+public Finder integration for that surface is a macOS Action Extension, whose
 process cannot call the containing application directly.
+
+This ADR was written expecting the extension to ship disabled, awaiting one
+explicit enable in System Settings. That is not what macOS does: checked on
+26.6 (2026-08-14), the Quick Action is admitted with no user step —
+`defaults read pbs` shows `FinderActive` ▸
+`APPEXTENSION-com.hausfold.perch.finder-action = 1` — and its checkbox is
+filed under the **System Services** row of Login Items & Extensions ▸
+Extensions, not under Perch's own name. The Settings shortcut is therefore a
+recovery path, not a required first run.
 
 The Finder entry point still inherits every shelf invariant: originals are
 untouched, copies and file coordination stay off main, the free-tier decision
@@ -20,8 +28,8 @@ item always points at a completed private representation.
 **Ship a non-UI `com.apple.services` Action Extension named Add to Perch Shelf.**
 It accepts Finder file selections, returns Finder's original providers
 unchanged, and uses the supported Finder preview label/icon attributes. Perch
-links Settings to the extensions pane, but the one-time enable remains a user
-choice owned by macOS.
+links Settings to the extensions pane; whether the entry is on, and where its
+checkbox lives, remains owned by macOS.
 
 **Use a two-phase App Group mailbox, with the app as admission authority.** The
 extension first atomically writes a request containing only transaction/item
@@ -52,8 +60,8 @@ not need a shared entitlement.
 
 ## Consequences
 
-- Finder gains a native right-click/Quick Actions entry after one explicit
-  enable; App Intents remain the Shortcuts and Spotlight integration.
+- Finder gains a native right-click/Quick Actions entry, on by default; App
+  Intents remain the Shortcuts and Spotlight integration.
 - A refused free-tier item is never requested from Finder and never copied.
 - App Group JSON cannot reveal an original source path, and completion paths are
   rejected unless they remain below their transaction directory.

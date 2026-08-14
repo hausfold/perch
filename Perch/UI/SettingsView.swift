@@ -46,10 +46,14 @@ struct SettingsView: View {
             }
 
             Section("Finder") {
-                Button("Open Finder Extension Settings…") {
+                Button("Open Login Items & Extensions…") {
                     openFinderExtensionSettings()
                 }
-                Text("Enable “Add to Perch Shelf” once under Finder extensions; it then appears in Finder’s Quick Actions whenever files or folders are selected.")
+                // macOS has no anchor that lands on the Extensions section, so
+                // the button opens the top of a long pane. Name every step of
+                // the walk instead — and name the row it hides behind, which is
+                // "System Services", not "Perch".
+                Text("“Add to Perch Shelf” is normally on already; it appears in Finder’s Quick Actions whenever files or folders are selected. If it goes missing, scroll that pane to Extensions, click ⓘ next to System Services, and tick “Add to Perch Shelf” there.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -212,9 +216,14 @@ struct SettingsView: View {
     }
 
     private func openFinderExtensionSettings() {
-        // Tahoe places extensions under General › Login Items & Extensions.
-        // Older supported releases still accept this pane identifier and land
-        // close enough for the Finder extension toggle to be obvious.
+        // Tahoe places extensions under General › Login Items & Extensions,
+        // and this is as close as macOS lets an app land: the pane opens at
+        // its top, above Open at Login and the whole background-activity list,
+        // with Extensions far below. Verified on 26.6 that there is no anchor
+        // for that section — com.apple.ExtensionsPreferences (with and without
+        // ?extensionPointIdentifier=com.apple.services) and ?extension-points
+        // all open the same pane at the same top. The caption above walks the
+        // rest of the way; don't "fix" this URL without re-testing the anchors.
         guard let url = URL(
             string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"
         ) else { return }

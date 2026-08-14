@@ -67,10 +67,14 @@ directions:
   thin, live view onto `ShelfStore.items`, not a stored copy.
 
 Finder's right-click Quick Actions menu is a fourth door, implemented as a
-non-UI Action Extension (`PerchFinderAction`). macOS requires the user to enable
-it once under Login Items & Extensions; Perch exposes a Settings shortcut to
-that pane. The extension cannot call its containing app, so `PerchFinderBridge/`
-defines a Mac App Group mailbox with a two-phase transaction:
+non-UI Action Extension (`PerchFinderAction`). macOS registers it as a Finder
+Quick Action and turns it on by default; its checkbox lives under Login Items &
+Extensions ▸ Extensions ▸ **System Services** (the OS files every app's Quick
+Action under that row, not under the app's own name). Perch exposes a Settings
+shortcut to that pane — the top of it, since macOS publishes no anchor for the
+Extensions section. The extension cannot call its containing app, so
+`PerchFinderBridge/` defines a Mac App Group mailbox with a two-phase
+transaction:
 
 1. The extension writes UUIDs, safe display names, and in-memory attachment
    indexes — never source URLs.
