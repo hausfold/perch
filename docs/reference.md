@@ -46,7 +46,11 @@ rm -rf ~/Library/Containers/com.nebelhaus.perch
 Each import gets its own UUID directory — that's what prevents name collisions
 without renaming your file. The manifest records only **staged relative paths**
 and file metadata; original source paths are never persisted, and never logged.
-Clearing an item deletes its whole import directory.
+Clearing an item deletes its whole import directory — the staged copy is deleted
+outright rather than moved to the Trash, so **Clear asks first**: the shelf's
+Clear button arms and needs a second click, and the menu bar's *Clear Shelf…*
+raises an alert. The expiry timer under Settings ▸ Shelf is **off by default**
+(`Never discard old items`); turn it on and pinned items are still exempt.
 
 ## Colors
 

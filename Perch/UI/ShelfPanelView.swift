@@ -26,10 +26,15 @@ struct ShelfPanelView: View {
     /// own parent can vanish out from under it — and on the notch panel that is
     /// a sheet with nowhere to sit. Two clicks on the same button needs no
     /// window, cannot be orphaned, and is the same gesture people already know
-    /// from compact toolbars. It disarms itself after a few seconds, whenever
-    /// the shelf's contents change, and whenever the panel collapses, so it can
-    /// never sit armed waiting to catch a later click.
-    @State private var clearArmed = false
+    /// from compact toolbars. (The menu bar's Clear Shelf, which has no armed
+    /// state to leave on screen, raises a real alert instead — see `PerchApp`.)
+    ///
+    /// The rules live in `ClearConfirmation`; the timeout lives below. Note
+    /// where the guards are attached: on the **root**, not on `header`. The
+    /// panel is not torn down when it hides — `ShelfPanelController.hide()`
+    /// only collapses it — so `header` unmounts while this state survives, and
+    /// a guard mounted alongside `header` would go with it.
+    @State private var clearConfirmation = ClearConfirmation()
 
     /// The palette this pass paints with. Published down the tree as well, for
     /// the tiles and the ember, which observe nothing else.
@@ -46,6 +51,27 @@ struct ShelfPanelView: View {
             }
         }
         .animation(.snappy(duration: 0.24, extraBounce: 0.08), value: state.isExpanded)
+        // The Clear arming's three guards, deliberately on the root rather than
+        // beside the button they guard. `header` is only in the tree while the
+        // panel is expanded and non-empty, but the panel is never destroyed on
+        // hide — `ShelfPanelController.hide()` collapses it and leaves the
+        // NSPanel ordered front — so `clearConfirmation` outlives `header` by a
+        // long way. Guards mounted on `header` unmount with it: the timeout task
+        // is cancelled without ever disarming, the collapse `onChange` is
+        // removed by the very change it watches for, and nothing at all is
+        // listening while items arrive from a paired iPhone or the Finder
+        // action. Armed would then survive a collapse and greet the next
+        // expansion pointed at a shelf nobody confirmed.
+        .task(id: clearConfirmation.isArmed) {
+            guard clearConfirmation.isArmed else { return }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            clearConfirmation.disarm()
+        }
+        .onChange(of: store.items.map(\.id)) {
+            clearConfirmation.revalidate(against: store.items.map(\.id))
+        }
+        .onChange(of: state.isExpanded) { clearConfirmation.disarm() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Perch file shelf")
         .environment(\.rice, rice)
@@ -188,20 +214,18 @@ struct ShelfPanelView: View {
             }
             if !store.items.isEmpty {
                 ShelfHeaderButton(
-                    title: clearArmed ? "Sure?" : "Clear",
-                    systemImage: clearArmed ? "exclamationmark.triangle.fill" : "trash",
+                    title: clearConfirmation.isArmed ? "Sure?" : "Clear",
+                    systemImage: clearConfirmation.isArmed
+                        ? "exclamationmark.triangle.fill" : "trash",
                     tint: rice.red,
                     action: {
-                        if clearArmed {
+                        if clearConfirmation.activate(itemIDs: store.items.map(\.id)) {
                             store.clear()
-                            clearArmed = false
-                        } else {
-                            clearArmed = true
                         }
                     }
                 )
                 .accessibilityHint(
-                    clearArmed
+                    clearConfirmation.isArmed
                         ? "Confirms deleting every staged copy"
                         : "Deletes every staged copy. Asks once more first."
                 )
@@ -213,18 +237,7 @@ struct ShelfPanelView: View {
             )
             .accessibilityHint("Dismisses the shelf until you move away and return")
         }
-        .animation(.snappy(duration: 0.16), value: clearArmed)
-        // Armed is a momentary state, never a resting one. It lapses on its own,
-        // and any change to what "everything" means disarms it immediately — so
-        // a click meant for a shelf of two can't land on a shelf of nine.
-        .task(id: clearArmed) {
-            guard clearArmed else { return }
-            try? await Task.sleep(for: .seconds(4))
-            guard !Task.isCancelled else { return }
-            clearArmed = false
-        }
-        .onChange(of: store.items.count) { clearArmed = false }
-        .onChange(of: state.isExpanded) { clearArmed = false }
+        .animation(.snappy(duration: 0.16), value: clearConfirmation.isArmed)
     }
 
     // Grabs the whole shelf at once — the popular flow. Individual tiles drag

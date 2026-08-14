@@ -548,8 +548,9 @@ final class ShelfStore: ObservableObject {
     /// is off and nothing expires at all.
     ///
     /// Static and pure so the rule that actually matters — *is expiry even on* —
-    /// can be tested without standing up `AppSettings`, which touches
-    /// `SMAppService` on init and so drags login-item state into a unit test.
+    /// is a value question rather than a live-store one: it can be asked of a
+    /// bare integer, at whatever `now` a test likes, with no shelf, no
+    /// repository and no settings object in the way.
     ///
     /// Note the `nil` on failed date arithmetic. This used to be
     /// `?? .distantPast`, which is the wrong direction to fail in: a cutoff of
