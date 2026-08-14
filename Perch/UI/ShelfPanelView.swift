@@ -18,6 +18,19 @@ struct ShelfPanelView: View {
     let onExpand: () -> Void
     let onHide: () -> Void
 
+    /// Clear asks first, and asks *in place*: the button becomes "Sure?" and
+    /// only the second click empties the shelf.
+    ///
+    /// Not a `confirmationDialog`. The shelf is a transient panel that hides
+    /// itself when the pointer leaves, so a modal sheet would be a dialog whose
+    /// own parent can vanish out from under it — and on the notch panel that is
+    /// a sheet with nowhere to sit. Two clicks on the same button needs no
+    /// window, cannot be orphaned, and is the same gesture people already know
+    /// from compact toolbars. It disarms itself after a few seconds, whenever
+    /// the shelf's contents change, and whenever the panel collapses, so it can
+    /// never sit armed waiting to catch a later click.
+    @State private var clearArmed = false
+
     /// The palette this pass paints with. Published down the tree as well, for
     /// the tiles and the ember, which observe nothing else.
     private var rice: RicePalette { theme.palette }
@@ -175,12 +188,23 @@ struct ShelfPanelView: View {
             }
             if !store.items.isEmpty {
                 ShelfHeaderButton(
-                    title: "Clear",
-                    systemImage: "trash",
+                    title: clearArmed ? "Sure?" : "Clear",
+                    systemImage: clearArmed ? "exclamationmark.triangle.fill" : "trash",
                     tint: rice.red,
-                    action: { store.clear() }
+                    action: {
+                        if clearArmed {
+                            store.clear()
+                            clearArmed = false
+                        } else {
+                            clearArmed = true
+                        }
+                    }
                 )
-                .accessibilityHint("Deletes every staged copy")
+                .accessibilityHint(
+                    clearArmed
+                        ? "Confirms deleting every staged copy"
+                        : "Deletes every staged copy. Asks once more first."
+                )
             }
             ShelfHeaderButton(
                 title: "Hide",
@@ -189,6 +213,18 @@ struct ShelfPanelView: View {
             )
             .accessibilityHint("Dismisses the shelf until you move away and return")
         }
+        .animation(.snappy(duration: 0.16), value: clearArmed)
+        // Armed is a momentary state, never a resting one. It lapses on its own,
+        // and any change to what "everything" means disarms it immediately — so
+        // a click meant for a shelf of two can't land on a shelf of nine.
+        .task(id: clearArmed) {
+            guard clearArmed else { return }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            clearArmed = false
+        }
+        .onChange(of: store.items.count) { clearArmed = false }
+        .onChange(of: state.isExpanded) { clearArmed = false }
     }
 
     // Grabs the whole shelf at once — the popular flow. Individual tiles drag

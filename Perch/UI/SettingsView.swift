@@ -14,11 +14,18 @@ struct SettingsView: View {
         Form {
             Section("Shelf") {
                 Toggle("Show a drop target on every display", isOn: $settings.showOnAllDisplays)
+                // 0 is "never", and it is where the stepper starts. See
+                // AppSettings.retentionDays for why the default is off: a
+                // staged copy that expires is deleted outright, and for a
+                // promised file, a link or typed text it was the only copy.
                 Stepper(
-                    "Discard items older than \(settings.retentionDays) day\(settings.retentionDays == 1 ? "" : "s")",
+                    retentionDescription,
                     value: $settings.retentionDays,
-                    in: 1...30
+                    in: 0...30
                 )
+                Text(retentionNote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("System") {
@@ -149,6 +156,26 @@ struct SettingsView: View {
         // scrolling — a settings window this small should show everything at once.
         .frame(width: 470, height: 920)
         .navigationTitle("Perch Settings")
+    }
+
+    private var retentionDescription: String {
+        guard settings.retentionDays > 0 else { return "Never discard old items" }
+        let days = settings.retentionDays
+        return "Discard items older than \(days) day\(days == 1 ? "" : "s")"
+    }
+
+    /// The note says what discarding actually *does*, not that it happens.
+    /// "Discard" reads like taking something off a shelf; this is a delete, and
+    /// a staged copy is often the only copy there is.
+    private var retentionNote: String {
+        guard settings.retentionDays > 0 else {
+            return "Nothing leaves the shelf until you take it out or clear it."
+        }
+        return """
+            Discarding deletes the staged copy — it does not go to the Trash, \
+            and for a dragged-in promise, a link or typed text it is the only \
+            copy there is.
+            """
     }
 
     /// The standard picker — a file the user chose is inside the sandbox's
