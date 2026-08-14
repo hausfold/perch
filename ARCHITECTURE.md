@@ -225,6 +225,18 @@ entries, and scans two-level UUID containers for completed but uncommitted
 files. Promise callbacks and ordinary copies converge on the same `ShelfItem`
 commit path.
 
+Startup prunes **only when retention is explicitly enabled**, and the default is
+never. Deleting a staged copy is final — perch is sandboxed, so a delete has
+nowhere recoverable to go, and its Trash sits inside its own container where
+Finder will not show it — while for a dragged-in promise, a link, typed text or
+an iPhone delivery the staged copy is the only copy. So a timer that deletes is
+something the user switches on, not something they must notice and switch off,
+and pinned items are exempt even then. The other destructive path, Clear, asks
+first: in place on the shelf header, and as an alert from the menu bar. Nothing
+in perch deletes a staged copy without either a confirmation or a setting the
+user turned on themselves — `ShelfStore.confirmCopied` excepted, which deletes
+only after the destination has reported that it holds its own copy.
+
 Recovery is a fallback, never an overwrite. It invents a fresh UUID, a fresh
 `addedAt` and an unpinned item for every file it adopts, so a manifest that
 *exists but could not be read* must never be written back over — "unreadable"

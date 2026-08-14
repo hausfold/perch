@@ -2,19 +2,73 @@ import XCTest
 
 @testable import Perch
 
-/// Retention is the one path that can delete a staged copy without anyone
-/// asking for it, so the rule it turns on is worth pinning down.
+/// The two paths that could destroy the only copy of something with nobody
+/// asking: the expiry timer, and Clear.
 ///
 /// A staged copy is deleted outright rather than trashed — perch is sandboxed,
 /// so its Trash is inside its own container and Finder never shows it — and for
 /// a dragged-in promise, a link, typed text, or anything a paired iPhone sent,
-/// the shelf copy is the only copy. Hence: off unless asked for, and no way to
-/// fall into an expiry by accident.
+/// the shelf copy is the only copy. Hence: the timer is off unless asked for,
+/// pinned items are exempt even when it is on, and Clear asks first.
 @MainActor
 final class ShelfRetentionTests: XCTestCase {
+    private var suiteNames: [String] = []
+    private var roots: [URL] = []
+
+    // The async variant, because the sync `tearDown()` is nonisolated and this
+    // class is `@MainActor` — reaching the stored properties from it is a
+    // concurrency warning, and the fixture it is trying to clean up is exactly
+    // the state that must not leak between tests.
+    override func tearDown() async throws {
+        // Each test mints a throwaway suite; without this they accumulate as
+        // real plists for the test host, and a leaked suite is a test that can
+        // pass because of what a previous run left behind.
+        for name in suiteNames {
+            UserDefaults().removePersistentDomain(forName: name)
+        }
+        suiteNames = []
+        for root in roots {
+            try? FileManager.default.removeItem(at: root)
+        }
+        roots = []
+        try await super.tearDown()
+    }
+
     private func makeDefaults() throws -> UserDefaults {
-        let suite = "PerchRetention-\(UUID().uuidString)"
-        return try XCTUnwrap(UserDefaults(suiteName: suite))
+        let name = "PerchRetention-\(UUID().uuidString)"
+        suiteNames.append(name)
+        return try XCTUnwrap(UserDefaults(suiteName: name))
+    }
+
+    private func makeRepository() throws -> StagingRepository {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "PerchRetention-\(UUID().uuidString)", directoryHint: .isDirectory)
+        roots.append(root)
+        return try StagingRepository(rootURL: root)
+    }
+
+    /// A real staged file, dated however the test needs it.
+    private func stage(
+        _ name: String,
+        in repository: StagingRepository,
+        addedAt: Date,
+        pinned: Bool = false
+    ) throws -> (item: ShelfItem, url: URL) {
+        let directory = try repository.allocateImportDirectory()
+        let url = directory.appending(path: name)
+        try Data(name.utf8).write(to: url)
+        let staged = try repository.item(forStagedURL: url)
+        let item = ShelfItem(
+            id: staged.id,
+            displayName: staged.displayName,
+            relativePath: staged.relativePath,
+            kind: staged.kind,
+            contentTypeIdentifier: staged.contentTypeIdentifier,
+            byteCount: staged.byteCount,
+            addedAt: addedAt,
+            isPinned: pinned
+        )
+        return (item, url)
     }
 
     // MARK: - The cutoff rule
@@ -35,22 +89,11 @@ final class ShelfRetentionTests: XCTestCase {
     func testPositiveRetentionCutsAtThatManyDaysBack() throws {
         let now = Date(timeIntervalSince1970: 1_760_000_000)
         let cutoff = try XCTUnwrap(ShelfStore.expiryCutoff(retentionDays: 7, now: now))
-        let expected = Calendar.current.date(byAdding: .day, value: -7, to: now)
-        XCTAssertEqual(cutoff, try XCTUnwrap(expected))
+        XCTAssertEqual(cutoff, try XCTUnwrap(Calendar.current.date(byAdding: .day, value: -7, to: now)))
         XCTAssertLessThan(cutoff, now)
     }
 
-    /// The regression this replaces: the old code fell back to `.distantPast` on
-    /// failed date arithmetic. `.distantPast` is older than every item, so the
-    /// filter kept nothing — a date-math failure would have emptied the shelf.
-    /// Failing to `nil` fails the other way.
-    func testCutoffIsNeverOlderThanEveryItem() throws {
-        let now = Date(timeIntervalSince1970: 1_760_000_000)
-        let cutoff = try XCTUnwrap(ShelfStore.expiryCutoff(retentionDays: 30, now: now))
-        XCTAssertGreaterThan(cutoff, .distantPast)
-    }
-
-    // MARK: - The default
+    // MARK: - The default, and the one-time migration
 
     func testRetentionIsOffOnAFreshInstall() throws {
         let settings = AppSettings(defaults: try makeDefaults())
@@ -63,16 +106,151 @@ final class ShelfRetentionTests: XCTestCase {
 
     /// A stored 0 has to survive the read. The old init clamped with `max(1,)`,
     /// which made "never" unrepresentable — anyone who chose it got a one-day
-    /// expiry instead, which is the most destructive setting available.
+    /// expiry instead, the most destructive setting on the stepper.
     func testStoredNeverIsNotClampedUpToOneDay() throws {
         let defaults = try makeDefaults()
         defaults.set(0, forKey: "retentionDays")
         XCTAssertEqual(AppSettings(defaults: defaults).retentionDays, 0)
     }
 
-    func testAnExplicitRetentionIsKept() throws {
+    /// Every stored retention was chosen against a stepper that said "Discard",
+    /// started at 1, and never mentioned that discarding is a delete with no
+    /// Trash behind it. That consent doesn't carry forward, so it is handed back
+    /// once.
+    func testARetentionChosenUnderTheOldUIIsTurnedOffOnce() throws {
         let defaults = try makeDefaults()
         defaults.set(14, forKey: "retentionDays")
-        XCTAssertEqual(AppSettings(defaults: defaults).retentionDays, 14)
+
+        XCTAssertEqual(AppSettings(defaults: defaults).retentionDays, 0)
+        XCTAssertTrue(defaults.bool(forKey: "retentionOptInMigrated"))
+    }
+
+    /// …and only once. A choice made *after* the migration, against the new
+    /// wording, is the user's and stands.
+    func testARetentionChosenAfterTheMigrationIsKept() throws {
+        let defaults = try makeDefaults()
+        defaults.set(14, forKey: "retentionDays")
+        _ = AppSettings(defaults: defaults)
+
+        defaults.set(30, forKey: "retentionDays")
+        XCTAssertEqual(AppSettings(defaults: defaults).retentionDays, 30)
+    }
+
+    // MARK: - What prune actually does to the bytes
+
+    func testPruneDeletesTheBytesOfAnExpiredItem() throws {
+        let repository = try makeRepository()
+        let now = Date(timeIntervalSince1970: 1_760_000_000)
+        let old = try stage("old.txt", in: repository, addedAt: now.addingTimeInterval(-40 * 86_400))
+        let fresh = try stage("fresh.txt", in: repository, addedAt: now)
+
+        let cutoff = try XCTUnwrap(ShelfStore.expiryCutoff(retentionDays: 30, now: now))
+        let retained = try repository.prune(olderThan: cutoff, items: [old.item, fresh.item])
+
+        XCTAssertEqual(retained.map(\.id), [fresh.item.id])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: old.url.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fresh.url.path))
+    }
+
+    /// `prune` keeps `addedAt >= cutoff`, so an item dated exactly on the line
+    /// survives. Worth pinning: the off-by-one here is a deleted file.
+    func testAnItemDatedExactlyAtTheCutoffSurvives() throws {
+        let repository = try makeRepository()
+        let now = Date(timeIntervalSince1970: 1_760_000_000)
+        let cutoff = try XCTUnwrap(ShelfStore.expiryCutoff(retentionDays: 30, now: now))
+        let edge = try stage("edge.txt", in: repository, addedAt: cutoff)
+
+        let retained = try repository.prune(olderThan: cutoff, items: [edge.item])
+
+        XCTAssertEqual(retained.map(\.id), [edge.item.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: edge.url.path))
+    }
+
+    /// A pin means "this one stays" to drag-out, to the tile drag and to the
+    /// take-everything handle. Expiry has to mean it too, or the timer takes
+    /// exactly the tiles someone pinned because they mattered.
+    func testPruneSparesPinnedItems() throws {
+        let repository = try makeRepository()
+        let now = Date(timeIntervalSince1970: 1_760_000_000)
+        let ancient = now.addingTimeInterval(-400 * 86_400)
+        let pinned = try stage("pinned.txt", in: repository, addedAt: ancient, pinned: true)
+        let loose = try stage("loose.txt", in: repository, addedAt: ancient)
+
+        let cutoff = try XCTUnwrap(ShelfStore.expiryCutoff(retentionDays: 30, now: now))
+        let retained = try repository.prune(olderThan: cutoff, items: [pinned.item, loose.item])
+
+        XCTAssertEqual(retained.map(\.id), [pinned.item.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: pinned.url.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: loose.url.path))
+    }
+
+    // MARK: - Clear asks first
+
+    func testFirstPressOnlyArms() {
+        var confirmation = ClearConfirmation()
+        let shelf = [UUID(), UUID()]
+
+        XCTAssertFalse(confirmation.activate(itemIDs: shelf), "The first press must not clear.")
+        XCTAssertTrue(confirmation.isArmed)
+    }
+
+    func testSecondPressOnTheSameShelfClears() {
+        var confirmation = ClearConfirmation()
+        let shelf = [UUID(), UUID()]
+
+        _ = confirmation.activate(itemIDs: shelf)
+        XCTAssertTrue(confirmation.activate(itemIDs: shelf))
+        XCTAssertFalse(confirmation.isArmed, "Firing must leave it disarmed, not armed for the next click.")
+    }
+
+    /// The panel is collapsed, not destroyed, when the shelf hides — and items
+    /// arrive while it is collapsed. An arming made against two items must not
+    /// greet the next expansion pointed at nine.
+    func testAnArmingDoesNotSurviveItemsArriving() {
+        var confirmation = ClearConfirmation()
+        let shelf = [UUID(), UUID()]
+        _ = confirmation.activate(itemIDs: shelf)
+
+        confirmation.revalidate(against: shelf + [UUID()])
+
+        XCTAssertFalse(confirmation.isArmed)
+    }
+
+    /// The reason this compares identities rather than a count: a remove and an
+    /// add inside the same window leave the count untouched while changing
+    /// every part of what "clear everything" would mean.
+    func testAnArmingDoesNotSurviveASwapThatKeepsTheCount() {
+        var confirmation = ClearConfirmation()
+        let kept = UUID()
+        _ = confirmation.activate(itemIDs: [kept, UUID()])
+
+        confirmation.revalidate(against: [kept, UUID()])
+
+        XCTAssertFalse(confirmation.isArmed)
+    }
+
+    func testRevalidatingAgainstTheSameShelfLeavesItArmed() {
+        var confirmation = ClearConfirmation()
+        let shelf = [UUID(), UUID()]
+        _ = confirmation.activate(itemIDs: shelf)
+
+        confirmation.revalidate(against: shelf)
+
+        XCTAssertTrue(confirmation.isArmed)
+    }
+
+    /// What the timeout and the collapse both call.
+    func testDisarmClearsTheRememberedShelf() {
+        var confirmation = ClearConfirmation()
+        let shelf = [UUID()]
+        _ = confirmation.activate(itemIDs: shelf)
+
+        confirmation.disarm()
+
+        XCTAssertFalse(confirmation.isArmed)
+        XCTAssertFalse(
+            confirmation.activate(itemIDs: shelf),
+            "After disarming, the next press is a first press again."
+        )
     }
 }

@@ -200,9 +200,16 @@ final class StagingRepository: @unchecked Sendable {
         try persist([])
     }
 
+    /// Drops items older than `cutoff`, **except pinned ones**.
+    ///
+    /// A pin means "this one stays" everywhere else in the app — `liftForExport`
+    /// spares pinned items, the tile drag spares them, the take-everything
+    /// handle spares them. Expiry honouring it too is what keeps that word
+    /// meaning one thing; without it the timer takes exactly the tiles someone
+    /// pinned because they mattered.
     func prune(olderThan cutoff: Date, items: [ShelfItem]) throws -> [ShelfItem] {
-        let retained = items.filter { $0.addedAt >= cutoff }
-        let removed = items.filter { $0.addedAt < cutoff }
+        let retained = items.filter { $0.addedAt >= cutoff || $0.isPinned }
+        let removed = items.filter { $0.addedAt < cutoff && !$0.isPinned }
         for item in removed {
             try? remove(item)
         }

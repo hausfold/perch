@@ -7,6 +7,8 @@ final class AppSettings: ObservableObject {
         static let showOnAllDisplays = "showOnAllDisplays"
         static let retentionDays = "retentionDays"
         static let mobileEnabled = "mobileEnabled"
+        /// One-shot marker for the retention opt-in migration below.
+        static let retentionOptInMigrated = "retentionOptInMigrated"
     }
 
     private let defaults: UserDefaults
@@ -42,6 +44,11 @@ final class AppSettings: ObservableObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        // Before `register`, and that ordering is load-bearing: `object(forKey:)`
+        // consults the registration domain too, so once the defaults are
+        // registered there is no way left to ask "did the user ever actually
+        // store this?" — every key answers yes.
+        Self.migrateRetentionToOptIn(defaults)
         defaults.register(defaults: [
             Key.showOnAllDisplays: true,
             Key.retentionDays: 0,
@@ -53,6 +60,28 @@ final class AppSettings: ObservableObject {
         retentionDays = max(0, defaults.integer(forKey: Key.retentionDays))
         mobileEnabled = defaults.bool(forKey: Key.mobileEnabled)
         refreshLaunchAtLogin()
+    }
+
+    /// Clears any retention a user chose under the old UI, exactly once.
+    ///
+    /// Every stored value was chosen against a stepper that said "Discard items
+    /// older than N days" and started at **1** — so it never offered "never",
+    /// and it never said that discarding is an outright delete with no Trash to
+    /// fish it back out of. Someone who wanted the shelf left alone had no way
+    /// to say so and may well have parked it at 30 as the nearest thing.
+    ///
+    /// Consent gathered under a description that wrong isn't consent to this,
+    /// so the choice is handed back rather than carried forward: the timer goes
+    /// off once, and the Settings pane now describes what turning it on costs.
+    /// The marker means this happens on one launch only — set it again
+    /// afterwards and the user's new choice stands untouched.
+    private static func migrateRetentionToOptIn(_ defaults: UserDefaults) {
+        guard !defaults.bool(forKey: Key.retentionOptInMigrated) else { return }
+        defaults.set(true, forKey: Key.retentionOptInMigrated)
+        // Only touches an explicitly stored value. Someone who never opened
+        // Settings has no key here, already reads 0, and is left alone.
+        guard defaults.object(forKey: Key.retentionDays) != nil else { return }
+        defaults.set(0, forKey: Key.retentionDays)
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
