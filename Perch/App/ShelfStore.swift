@@ -544,12 +544,32 @@ final class ShelfStore: ObservableObject {
         }
     }
 
+    /// The date an item must be newer than to survive, or `nil` when retention
+    /// is off and nothing expires at all.
+    ///
+    /// Static and pure so the rule that actually matters — *is expiry even on* —
+    /// can be tested without standing up `AppSettings`, which touches
+    /// `SMAppService` on init and so drags login-item state into a unit test.
+    ///
+    /// Note the `nil` on failed date arithmetic. This used to be
+    /// `?? .distantPast`, which is the wrong direction to fail in: a cutoff of
+    /// `.distantPast` is newer than nothing, so it would have expired the entire
+    /// shelf. When we can't say what's old, nothing is old.
+    static func expiryCutoff(
+        retentionDays: Int,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Date? {
+        guard retentionDays > 0 else { return nil }
+        return calendar.date(byAdding: .day, value: -retentionDays, to: now)
+    }
+
     private func pruneExpiredItems() {
-        let cutoff = Calendar.current.date(
-            byAdding: .day,
-            value: -settings.retentionDays,
-            to: Date()
-        ) ?? .distantPast
+        // Retention is off by default (see `AppSettings.retentionDays`), and off
+        // means off: nothing on the shelf is removed unless you remove it.
+        guard let cutoff = Self.expiryCutoff(retentionDays: settings.retentionDays) else {
+            return
+        }
         do {
             items = try repository.prune(olderThan: cutoff, items: items)
         } catch {

@@ -13,6 +13,8 @@ screen until you know where they're going.
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-b9a8e0?labelColor=202020)
 ![license](https://img.shields.io/badge/license-FSL--1.1--ALv2-d7d7d7?labelColor=202020)
 
+<sub>**pre-release** · your originals are never moved, renamed or touched, and nothing leaves the shelf on its own — clearing it asks first, and the expiry timer is off unless you turn it on. that's the intent, not a warranty — tell us what breaks.</sub>
+
 </div>
 
 ---
