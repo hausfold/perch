@@ -11,6 +11,9 @@ final class AppRuntime: ObservableObject {
     let windowSystem: ShelfWindowSystem
     let mobile: MobileReceiver
     let finderActions: FinderActionReceiver
+    /// Held here, not handed to `NSApp` and forgotten: the services provider is
+    /// the receiver for every later Finder invocation, and nothing else retains it.
+    let services: ShelfServicesProvider
 
     private init() {
         settings = AppSettings()
@@ -28,11 +31,13 @@ final class AppRuntime: ObservableObject {
         windowSystem = ShelfWindowSystem(store: store, settings: settings, theme: theme)
         mobile = MobileReceiver(store: store, settings: settings)
         finderActions = FinderActionReceiver(store: store)
+        services = ShelfServicesProvider(store: store)
     }
 
     func start() {
         NSApp.setActivationPolicy(.accessory)
         store.restore()
+        services.register()
         finderActions.start()
         windowSystem.start()
         UpdateCheck.shared.start()

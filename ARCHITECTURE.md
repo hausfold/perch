@@ -92,6 +92,29 @@ The shared group is `88M28542LQ.com.hausfold.perch`, the Team-ID-prefixed form
 for a directly distributed macOS app. It is deliberately separate from the iOS
 companion's App Store group.
 
+A **classic Service** is the fifth door, and it exists because of where macOS
+draws the fourth one: an Action Extension is always nested inside the Finder
+menu's "Quick Actions" submenu, while an `NSServices` entry in the app's own
+Info.plist is eligible for the menu's top level, beside "New Terminal Tab
+Here". `Perch/Config/Info.plist` declares it — the one key with no
+`INFOPLIST_KEY_` build setting, so that partial plist exists solely to carry it
+and Xcode merges the generated keys into it.
+
+The handler is trivial by design. A Service is delivered to the *running* app,
+not to an extension, so `ShelfServicesProvider`
+(`Perch/Importing/ShelfServicesProvider.swift`) hands the pasteboard straight
+to `ShelfDropHandler.accept(_:)` — the same call a drop onto the shelf makes.
+No mailbox, no second staging path, and promises, file URLs, images, links and
+plain text all behave exactly as they do on a drag, because it is the same
+code. `NSUpdateDynamicServices()` at launch is what makes a newly installed
+build's menu item appear without a logout.
+
+The two Finder doors are complementary, not redundant. The extension has to be
+enabled once under Login Items & Extensions and runs without waking Perch; the
+Service needs no enabling — macOS registers it from the installed bundle and
+launches Perch to deliver — but it costs a launch and puts the copy in the
+app's own process rather than the extension's.
+
 ## The hard cases
 
 ### Multiple displays and fullscreen Spaces
