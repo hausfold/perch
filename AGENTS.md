@@ -35,6 +35,16 @@ xcodebuild -project Perch.xcodeproj -scheme PerchIOS \
   -derivedDataPath DerivedData build
 ```
 
+One perch owns the notch: a copy launched while another is running exits
+immediately (two panels stack pixel-for-pixel and the top one silently eats
+every click). Quit the installed app before running a dev build, or set
+`PERCH_ALLOW_MULTIPLE=1` to run them side by side on purpose — that one only
+reaches a process that inherits your shell (`.../Contents/MacOS/Perch`,
+`open --env`, an Xcode scheme); a plain `open -a` gets launchd's environment
+instead and stands down anyway. The test host is this same app, so a test run
+starts no shelf at all — `xcodebuild test` never puts a panel on the notch or
+restores/prunes the live staging repository.
+
 Don't pass `CODE_SIGNING_ALLOWED=NO` to the **iOS** build you intend to run:
 it strips the App Group entitlement and the app aborts at launch. Simulator
 ad-hoc signing needs no team or provisioning.

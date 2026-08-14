@@ -8,6 +8,9 @@ final class ShelfWindowSystem {
     private let theme: ShelfTheme
     private let dropHandler: ShelfDropHandler
     private var panels: [String: ShelfPanelController] = [:]
+    /// Panels currently on screen. Exposed for the test that pins down "nothing
+    /// reaches the notch before `start()`" — see `ShelfWindowSystemTests`.
+    var panelCount: Int { panels.count }
     private var cancellables: Set<AnyCancellable> = []
     private var screenObserver: NSObjectProtocol?
     private var armTimer: Timer?
@@ -18,7 +21,15 @@ final class ShelfWindowSystem {
         self.theme = theme
         dropHandler = ShelfDropHandler(store: store)
 
+        // dropFirst: a @Published publisher replays its current value the
+        // instant you subscribe, so without it merely *constructing* the window
+        // system builds every panel and orders it onto the notch — before
+        // `start()`, and before anything that runs at launch can decide this
+        // process should not own a shelf at all (a second copy standing down, a
+        // test host). Panels are `start()`'s job; this sink is only for the
+        // setting changing later.
         settings.$showOnAllDisplays
+            .dropFirst()
             .removeDuplicates()
             .sink { [weak self] _ in self?.rebuildPanels() }
             .store(in: &cancellables)
