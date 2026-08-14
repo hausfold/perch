@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Everything else in perch's Info.plist is generated (GENERATE_INFOPLIST_FILE
+  is still YES; Xcode merges its keys into this file). This partial exists for
+  one key that has no INFOPLIST_KEY_ build setting: NSServices.
+
+  macOS has two doors into the Finder context menu and they land in different
+  places. A modern `com.apple.services` app extension — PerchFinderAction —
+  shows up nested inside the "Quick Actions" submenu. A classic NSServices
+  declaration in the app's own Info.plist is eligible for the menu's TOP level,
+  beside "New Terminal Tab Here". Perch keeps both: the extension runs without
+  waking the app, this one is two clicks shorter.
+
+  NSRequiredContext is deliberately empty — every restricting key you add is
+  another reason for macOS to hide the item, and the send types below are
+  already the filter.
+
+  Those send types are wider than Finder on purpose. Keeping the text and URL
+  types means selected text or a link in Mail, Safari or an editor offers the
+  same command from that app's Services menu, and it lands on the shelf as the
+  same staged text a drag would make. Narrowing this to file URLs would buy a
+  tidier menu at the cost of the one place a Service beats a drag: sending a
+  selection from an app you cannot drag out of.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Add to Perch Shelf</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>addToShelf</string>
+			<key>NSPortName</key>
+			<string>Perch</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendTypes</key>
+			<array>
+				<string>NSFilenamesPboardType</string>
+				<string>public.file-url</string>
+				<string>public.url</string>
+				<string>public.plain-text</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
