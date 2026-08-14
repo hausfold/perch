@@ -15,6 +15,13 @@
   NSRequiredContext is deliberately empty — every restricting key you add is
   another reason for macOS to hide the item, and the send types below are
   already the filter.
+
+  Those send types are wider than Finder on purpose. Keeping the text and URL
+  types means selected text or a link in Mail, Safari or an editor offers the
+  same command from that app's Services menu, and it lands on the shelf as the
+  same staged text a drag would make. Narrowing this to file URLs would buy a
+  tidier menu at the cost of the one place a Service beats a drag: sending a
+  selection from an app you cannot drag out of.
 -->
 <plist version="1.0">
 <dict>

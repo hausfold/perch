@@ -40,9 +40,19 @@ final class ShelfServicesProvider: NSObject {
         userData: String?,
         error: AutoreleasingUnsafeMutablePointer<NSString?>
     ) {
-        guard dropHandler.accept(pasteboard) else {
-            error.pointee = "Perch could not read what Finder handed over."
-            return
+        if let failure = handle(pasteboard) {
+            error.pointee = failure as NSString
         }
+    }
+
+    /// The selector's body, minus the out-parameter. Split out so tests can
+    /// reach it without hand-forging an `NSString **`, which is exactly the
+    /// kind of bridging a test should not be proving anything about.
+    ///
+    /// Returns the message to show, or `nil` on success.
+    func handle(_ pasteboard: NSPasteboard) -> String? {
+        dropHandler.accept(pasteboard)
+            ? nil
+            : "Perch could not read what Finder handed over."
     }
 }

@@ -14,7 +14,8 @@ collect several items and then drag the group to one destination.
 - Finder files and folders, file promises, images, URLs, and text.
 - A Finder Action extension that adds selected files and folders from Finder's
   Quick Actions menu, on by default, with a Settings shortcut to the pane that
-  holds its checkbox.
+  holds its checkbox — and a classic Service that puts the same command at the
+  context menu's top level, and in any app's Services menu for text and links.
 - Background staging with visible pending state.
 - Explicit iCloud placeholder handling and a bounded failure.
 - Collision-proof staging and atomic completed-item persistence.
@@ -46,6 +47,9 @@ collect several items and then drag the group to one destination.
     Extensions ▸ System Services, invoke it on three files while the free shelf
     has one open slot, and verify only one source is copied while every original
     remains unchanged.
+11. Invoke the top-level **Add to Perch Shelf** on the same three files and get
+    the same outcome — one copy admitted, three originals untouched — proving
+    the Service shares the drag path's admission rather than its own.
 
 ## Deferred without refactor
 

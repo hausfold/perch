@@ -109,11 +109,12 @@ plain text all behave exactly as they do on a drag, because it is the same
 code. `NSUpdateDynamicServices()` at launch is what makes a newly installed
 build's menu item appear without a logout.
 
-The two Finder doors are complementary, not redundant. The extension has to be
-enabled once under Login Items & Extensions and runs without waking Perch; the
-Service needs no enabling — macOS registers it from the installed bundle and
-launches Perch to deliver — but it costs a launch and puts the copy in the
-app's own process rather than the extension's.
+The two Finder doors are complementary, not redundant. The extension runs
+without waking Perch, but only inside the submenu and only while the app is up
+to answer its mailbox. The Service is at the top level and macOS launches Perch
+to deliver it, which costs that launch and puts the copy in the app's own
+process rather than the extension's. Both are on with no user action; neither
+supersedes the other.
 
 ## The hard cases
 

@@ -11,8 +11,10 @@ final class AppRuntime: ObservableObject {
     let windowSystem: ShelfWindowSystem
     let mobile: MobileReceiver
     let finderActions: FinderActionReceiver
-    /// Held here, not handed to `NSApp` and forgotten: the services provider is
-    /// the receiver for every later Finder invocation, and nothing else retains it.
+    /// `NSApp.servicesProvider` is a strong property, so this is not the only
+    /// thing keeping the provider alive — it is held here because every other
+    /// long-lived collaborator is, and a provider reachable only through
+    /// `NSApp` is one nobody thinks to look for.
     let services: ShelfServicesProvider
 
     private init() {
