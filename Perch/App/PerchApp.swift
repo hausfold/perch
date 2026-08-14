@@ -67,7 +67,7 @@ struct PerchApp: App {
             }
 
             Divider()
-            SettingsLink()
+            SettingsMenuItem()
             Button("Quit Perch") {
                 NSApp.terminate(nil)
             }
@@ -117,6 +117,44 @@ struct PerchApp: App {
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         runtime.store.clear()
+    }
+}
+
+/// The menu's way into Settings.
+///
+/// `SettingsLink` would do it in one line, but it gives no hook to run
+/// anything first — and Perch is an accessory app, so the window it opens
+/// lands *behind* whatever has focus. Same reason
+/// `MobilePairingWindowController.present` activates. So the item drives
+/// `openSettings()` itself, activates around it, and orders the window front
+/// on the next runloop turn, once SwiftUI has actually made it.
+private struct SettingsMenuItem: View {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button("Settings…") {
+            NSApp.activate(ignoringOtherApps: true)
+            openSettings()
+            DispatchQueue.main.async {
+                raiseSettingsWindow()
+                // A second turn: on a cold open SwiftUI can still be building
+                // the window when the first one runs.
+                DispatchQueue.main.async { raiseSettingsWindow() }
+            }
+        }
+        .keyboardShortcut(",")
+    }
+
+    /// SwiftUI names the Settings window `com_apple_SwiftUI_Settings_window`;
+    /// the title is the fallback for the day that identifier changes.
+    private func raiseSettingsWindow() {
+        let window = NSApp.windows.first { window in
+            window.identifier?.rawValue.contains("Settings") == true
+                || window.title == SettingsView.windowTitle
+        }
+        guard let window else { return }
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 }
 

@@ -47,7 +47,7 @@ struct SettingsView: View {
                 Button("Open Finder Extension Settings…") {
                     openFinderExtensionSettings()
                 }
-                Text("Enable “Add to Perch Shelf” once under Finder extensions. It then appears in Finder’s Quick Actions menu whenever files or folders are selected.")
+                Text("Enable “Add to Perch Shelf” once under Finder extensions; it then appears in Finder’s Quick Actions whenever files are selected.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -82,7 +82,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                 }
-                Text("Your license is a signed file — import it here, or just drop it on the shelf. Perch verifies it on this Mac and never sends it anywhere; there is no activation server and nothing to sign in to. It covers every build released within a year of your purchase and keeps working on those builds forever.")
+                Text("Your license is a signed file — import it here, or drop it on the shelf. It is verified on this Mac and never sent anywhere: no account, no activation server. It covers every build released within a year of your purchase, forever.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -118,7 +118,7 @@ struct SettingsView: View {
                         .controlSize(.small)
                     }
                 }
-                Text("Anything you put on Perch on a paired iPhone lands on this shelf when both are on your network. Transfers are end-to-end encrypted with a key made at pairing; nothing goes through a server, and revoking a device ends it instantly.")
+                Text("Anything you put on Perch on a paired iPhone lands on this shelf when both are on your network — end-to-end encrypted with a key made at pairing, never through a server. Revoking a device ends it instantly.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -140,22 +140,36 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Text("\(update.installKind.settingsNote) Perch asks GitHub for the latest tag once an hour — one request carrying nothing but an IP, and the only network call it ever makes. Being sandboxed, it never installs the update itself: the shelf hands you the command for this install instead.")
+                Text("\(update.installKind.settingsNote) Perch asks GitHub for the latest tag once an hour — its only network call. Sandboxed, it never installs the update itself; the shelf hands you the command for this install instead.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Text("Perch always stages a private copy and only offers copy operations when dragging out. Dragging an item out removes it from the shelf; your original files are never moved or deleted.")
+                Text("Perch always stages a private copy and only ever offers copy when you drag out. Dragging an item out removes it from the shelf; your originals are never moved or deleted.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        // Tall enough for the Updates section's explanation without the form
-        // scrolling — a settings window this small should show everything at once.
-        .frame(width: 470, height: 920)
-        .navigationTitle("Perch Settings")
+        // Opens at the height the content wants, but never taller than the
+        // screen it opens on — a settings window whose bottom rows sit under
+        // the Dock, or above the menu bar, can't be reached at all. `Form`
+        // already supplies the scroll view; the fix is to stop insisting on a
+        // height the display can't give, and let it scroll when it can't.
+        .frame(width: Self.windowWidth, height: Self.windowHeight)
+        .navigationTitle(Self.windowTitle)
+    }
+
+    static let windowTitle = "Perch Settings"
+    private static let windowWidth: CGFloat = 470
+
+    /// Tall enough for most of the form at once, never taller than the screen
+    /// can show. `visibleFrame` already excludes the menu bar and the Dock, so
+    /// the slack is only the title bar and a little breathing room.
+    private static var windowHeight: CGFloat {
+        let room = (NSScreen.main?.visibleFrame.height ?? 800) - 60
+        return max(320, min(700, room))
     }
 
     private var retentionDescription: String {
