@@ -9,6 +9,8 @@ struct SettingsView: View {
     @AppStorage("automaticUpdateChecks") private var automaticUpdateChecks = true
     @ObservedObject private var update: UpdateCheck = .shared
     @ObservedObject private var license: LicenseStore = .shared
+    /// Evaluated once per window, not once per redraw. See `fittingHeight()`.
+    @State private var windowHeight = SettingsView.fittingHeight()
 
     var body: some View {
         Form {
@@ -47,7 +49,7 @@ struct SettingsView: View {
                 Button("Open Finder Extension Settings…") {
                     openFinderExtensionSettings()
                 }
-                Text("Enable “Add to Perch Shelf” once under Finder extensions. It then appears in Finder’s Quick Actions menu whenever files or folders are selected.")
+                Text("Enable “Add to Perch Shelf” once under Finder extensions; it then appears in Finder’s Quick Actions whenever files or folders are selected.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -82,7 +84,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                 }
-                Text("Your license is a signed file — import it here, or just drop it on the shelf. Perch verifies it on this Mac and never sends it anywhere; there is no activation server and nothing to sign in to. It covers every build released within a year of your purchase and keeps working on those builds forever.")
+                Text("Your license is a signed file — import it here, or drop it on the shelf. It is verified on this Mac and never sent anywhere: no account, no activation server. It covers every build released within a year of your purchase, and keeps working on those builds forever.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -118,7 +120,7 @@ struct SettingsView: View {
                         .controlSize(.small)
                     }
                 }
-                Text("Anything you put on Perch on a paired iPhone lands on this shelf when both are on your network. Transfers are end-to-end encrypted with a key made at pairing; nothing goes through a server, and revoking a device ends it instantly.")
+                Text("Anything you put on Perch on a paired iPhone lands on this shelf when both are on your network — end-to-end encrypted with a key made at pairing, never through a server. Revoking a device ends it instantly.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -140,22 +142,38 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Text("\(update.installKind.settingsNote) Perch asks GitHub for the latest tag once an hour — one request carrying nothing but an IP, and the only network call it ever makes. Being sandboxed, it never installs the update itself: the shelf hands you the command for this install instead.")
+                Text("\(update.installKind.settingsNote) Perch asks GitHub for the latest tag once an hour — its only network call. Sandboxed, it never installs the update itself; the shelf hands you the command for this install instead.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Text("Perch always stages a private copy and only offers copy operations when dragging out. Dragging an item out removes it from the shelf; your original files are never moved or deleted.")
+                Text("Perch always stages a private copy and only ever offers copy when you drag out. Dragging an item out removes it from the shelf; your originals are never moved or deleted.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        // Tall enough for the Updates section's explanation without the form
-        // scrolling — a settings window this small should show everything at once.
-        .frame(width: 470, height: 920)
-        .navigationTitle("Perch Settings")
+        // Sized once, when the window is made — not on every body pass, or an
+        // update check landing an hour later would resize the window under
+        // whoever is reading it.
+        .frame(width: Self.windowWidth, height: windowHeight)
+        .navigationTitle(Self.windowTitle)
+    }
+
+    static let windowTitle = "Perch Settings"
+    private static let windowWidth: CGFloat = 470
+
+    /// A settings window whose last rows sit under the Dock can't be reached at
+    /// all, so the height is whatever the screen can actually show, minus the
+    /// title bar — `visibleFrame` has already taken out the menu bar and the
+    /// Dock. The 700 ceiling is a deliberate stop short of "one screenful of
+    /// everything": a pane with six sections reads better scrolled than
+    /// stretched the full height of a large display. `Form` supplies the
+    /// scrolling.
+    private static func fittingHeight() -> CGFloat {
+        let room = (NSScreen.main?.visibleFrame.height ?? 800) - 60
+        return max(320, min(700, room))
     }
 
     private var retentionDescription: String {
