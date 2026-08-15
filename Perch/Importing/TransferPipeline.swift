@@ -188,15 +188,35 @@ final class TransferPipeline: @unchecked Sendable {
     func copyOut(from stagedURL: URL, to destination: URL) async throws {
         try await enqueue {
             let fileManager = FileManager()
+            guard fileManager.fileExists(atPath: destination.path) else {
+                try fileManager.copyItem(at: stagedURL, to: destination)
+                return
+            }
             // The panel already asked before overwriting, but asking is all it
             // does — it never removes the file, and `copyItem` refuses a
-            // destination that exists. Only a pre-existing file at the chosen
-            // path is at stake in that window; the shelf's own copy is the
-            // source here and survives any failure below.
-            if fileManager.fileExists(atPath: destination.path) {
-                try fileManager.removeItem(at: destination)
-            }
-            try fileManager.copyItem(at: stagedURL, to: destination)
+            // destination that exists.
+            //
+            // Deleting it first would put the *user's* file in a window this
+            // app has no business opening: a copy that then fails — a full
+            // volume, a folder that copies halfway — leaves them with neither
+            // their old file nor a new one, and perch is sandboxed so nothing
+            // went to the Trash. Replace is a promise of replacement, not of
+            // deletion-then-maybe. So copy into the volume's own replacement
+            // directory and swap the finished copy in atomically; a failure
+            // anywhere before the swap leaves the destination exactly as it
+            // was. `.itemReplacementDirectory` is deliberate — it is the
+            // temporary location the panel's grant reaches, whereas a sibling
+            // temp file beside the destination is not covered by it.
+            let scratch = try fileManager.url(
+                for: .itemReplacementDirectory,
+                in: .userDomainMask,
+                appropriateFor: destination,
+                create: true
+            )
+            defer { try? fileManager.removeItem(at: scratch) }
+            let pending = scratch.appending(path: destination.lastPathComponent)
+            try fileManager.copyItem(at: stagedURL, to: pending)
+            _ = try fileManager.replaceItemAt(destination, withItemAt: pending)
         }
     }
 

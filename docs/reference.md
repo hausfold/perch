@@ -46,6 +46,7 @@ rm -rf ~/Library/Containers/com.nebelhaus.perch
 Each import gets its own UUID directory — that's what prevents name collisions
 without renaming your file. The manifest records only **staged relative paths**
 and file metadata; original source paths are never persisted, and never logged.
+
 To get a copy out without dragging — the destination is a folder nothing has
 open, or the item is pinned and you just want it on disk — right-click a tile
 and pick **Save to…**. It writes a copy wherever you point the panel and leaves

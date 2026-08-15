@@ -70,5 +70,18 @@ final class TransferPipelineTests: XCTestCase {
 
         XCTAssertEqual(try String(contentsOf: destination, encoding: .utf8), "saved")
         XCTAssertTrue(FileManager.default.fileExists(atPath: stagedURL.path))
+
+        // And the replace is all-or-nothing. A copy that fails must leave what
+        // was already at the destination untouched — deleting first and then
+        // failing would take the user's file and give nothing back, and perch
+        // is sandboxed, so it would not be in the Trash either.
+        try "theirs".write(to: destination, atomically: true, encoding: .utf8)
+        let vanished = repository.rootURL.appending(path: "gone-\(UUID().uuidString)")
+        do {
+            try await pipeline.copyOut(from: vanished, to: destination)
+            XCTFail("Copying from a missing staged file should fail")
+        } catch {
+            XCTAssertEqual(try String(contentsOf: destination, encoding: .utf8), "theirs")
+        }
     }
 }

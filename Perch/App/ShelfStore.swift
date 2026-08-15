@@ -475,10 +475,19 @@ final class ShelfStore: ObservableObject {
         panel.nameFieldStringValue = item.displayName
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
-        // Pin the extension for real files so the saved copy stays openable by
-        // the app that owns it. A folder has no extension to hold on to, and
-        // constraining the panel to `public.folder` would fight the name field.
-        if item.kind != .folder, let contentType = item.contentType {
+        // Pin the extension the staged name already carries, so the saved copy
+        // stays openable by the app that owns it even if the name is edited.
+        //
+        // Only when there *is* one. A folder has no extension to hold on to,
+        // and an extensionless file — LICENSE, README, Makefile — has a
+        // content type that was sniffed rather than read off the name, whose
+        // preferred extension is therefore something the file never had. The
+        // panel enforces the constraint on a name without one, so pinning it
+        // here would save `Makefile` as `Makefile.make`: a rename, which is the
+        // one thing perch's staging exists not to do.
+        if item.kind != .folder,
+           !(item.displayName as NSString).pathExtension.isEmpty,
+           let contentType = item.contentType {
             panel.allowedContentTypes = [contentType]
         }
 
