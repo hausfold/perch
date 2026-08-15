@@ -27,8 +27,10 @@ container, and publishes relative paths.
 mailbox.** `perch add <path>...` runs the identical four-step transaction the
 Finder Action runs, against the same directory, with the same JSON. The app
 side gains nothing: `FinderActionReceiver` cannot tell the two apart, and must
-not be able to — admission, path validation, adoption, and the free-tier cap
-are decided in one place for every sender there will ever be.
+not be able to — admission, path validation, and adoption are decided in one
+place for every sender there will ever be. (This also said "and the free-tier
+cap"; the cap is gone as of [ADR 0009](0009-perch-stays-free-and-mit.md), the
+single admission point is not.)
 
 The sender half of that protocol therefore moves into
 `PerchFinderBridge/HandoffClient.swift`, shared verbatim by the extension and

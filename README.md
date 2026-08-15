@@ -11,7 +11,7 @@ screen until you know where they're going.
 ![part of hausfold](https://img.shields.io/badge/part_of-hausfold-f2c4e5?labelColor=202020)
 ![themed by nebelung](https://img.shields.io/badge/themed_by-nebelung-c9a8f1?labelColor=202020)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-b9a8e0?labelColor=202020)
-![license](https://img.shields.io/badge/license-FSL--1.1--ALv2-d7d7d7?labelColor=202020)
+![license](https://img.shields.io/badge/license-MIT-d7d7d7?labelColor=202020)
 
 <sub>**pre-release** · your originals are never moved, renamed or touched, and nothing leaves the shelf on its own — clearing it asks first, and the expiry timer is off unless you turn it on. that's the intent, not a warranty — tell us what breaks.</sub>
 
@@ -96,17 +96,11 @@ Each one stands alone. Together they're a house.
 
 ## license
 
-Perch is **fair source**, not open source: [FSL-1.1-ALv2](LICENSE) © hausfold —
-the Functional Source License 1.1 with an Apache-2.0 future license.
+[MIT](LICENSE) © hausfold — free and open source, and free of charge. Read it,
+hack on it, build it yourself, ship your own builds. No paid tier, no license
+key, no cap on what the shelf holds.
 
-In practice:
-
-- the source stays public, right here, and always will.
-- read it, hack on it, build it yourself, run your build on your own machines —
-  all fine, no strings.
-- what you can't do is turn it into a competing product or hand out your own
-  builds of it. that's the one thing MIT couldn't stop.
-- **every release converts to Apache-2.0 two years after that release ships** —
-  the restriction has an expiry date baked in, not a promise.
-- **every tag cut before this change stays MIT, forever.** relicensing is not
-  retroactive; those releases are already out under MIT and stay that way.
+Perch was briefly licensed FSL-1.1-ALv2 (`v2026.08.04` through `v2026.08.14-1`)
+while a paid tier was on the table. That's off the table — those tags are
+relicensed MIT along with everything since, so every release of perch, past and
+future, is MIT.

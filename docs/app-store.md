@@ -10,11 +10,11 @@ everything here is the half only a person with the account can do. It's ordered
 by how often you'll need it — the release loop first, the standing facts in the
 middle, and the once-per-decade Apple setup as an appendix at the bottom.
 
-The companion is **free**, and stays free. Perch's money is the Mac app
-([`going-paid.md`](going-paid.md), ADR 0004); the phone is the second half of a
-product you already bought, so it carries no purchase, no IAP, and no account.
-That also keeps the review simple: nothing to restore, no subscription screens,
-no receipts.
+The companion is **free**, and stays free — so is the Mac app it belongs to
+([ADR 0009](architecture-decisions/0009-perch-stays-free-and-mit.md)). The phone
+is the second half of perch, so it carries no purchase, no IAP, and no account.
+That keeps the review simple: nothing to restore, no subscription screens, no
+receipts.
 
 ## The shipping loop
 
@@ -159,8 +159,8 @@ the app with no Mac on their desk; say so before they conclude it's broken.
 > • Networking is local only: Bonjour discovery of `_perch._tcp` plus a direct
 >   TCP connection to the paired Mac, end-to-end encrypted. The app contacts no
 >   server of ours and no third party.
-> • The app is free with no in-app purchases. The Mac app is paid, sold on our
->   website, and never mentioned as a purchase inside this app.
+> • The app is free with no in-app purchases. The Mac half is free too, and
+>   nothing is ever sold inside this app.
 
 Also fill in: no demo account needed, contact = `hi@hausfold.co`. (Not
 `support@…` on either domain. A review contact that bounces is the one field
@@ -179,7 +179,7 @@ field.)
 | 4.2 "minimum functionality / it's a companion" | It is a functional shelf and a Share extension target on its own, not a remote control. Lead with that framing in the description too. |
 | 5.1.1 local network permission | `NSLocalNetworkUsageDescription` and `NSBonjourServices` are declared, and the prompt only appears when the user taps Pair. |
 | 5.1.1 camera permission | `NSCameraUsageDescription` is specific: it reads the pairing QR, nothing else. |
-| 3.1.1 "steering to an outside purchase" | The app never sells anything or links to a checkout. The description's one mention of the Mac app is a factual statement about a separate product, not a purchase link. Keep it that way. |
+| 3.1.1 "steering to an outside purchase" | Nothing in the family is sold at all: no checkout exists to steer to. The description's one mention of the Mac app is a factual statement about a free companion product. Keep it that way. |
 | Missing privacy manifest | Both bundles carry one; if you add a shared source file that touches a required-reason API, update **both**. |
 
 ## Screenshots
@@ -311,10 +311,10 @@ your own test devices.
 **The Mac app followed, separately.** This section once said the Mac half kept
 `com.nebelhaus.perch` "for now" — it was under no App Store deadline, and renaming
 it moves `~/Library/Containers/com.nebelhaus.perch/`, where the real shelf lives.
-It was renamed to `com.hausfold.perch` on 2026-08-08 anyway, before the licence
-public key gets baked in: the bundle id *is* the sandbox container **and** the
-`defaults` domain `LicenseStore` writes the licence to, so renaming it after
-anyone has paid would deactivate their licence. Same reasoning as above, same
+It was renamed to `com.hausfold.perch` on 2026-08-08 anyway — the bundle id *is*
+the sandbox container, so the sooner it settles the less there is to strand.
+(The urgency at the time was a licence file keyed to that `defaults` domain;
+that licence no longer exists, see ADR 0009.) Same reasoning as above, same
 accepted cost — empty shelf, Settings back to defaults, pairings broken, the
 local-network prompt re-appears. What breaks pairing is the Keychain *service*
 strings moving on both sides at once (`Perch/Mobile/PairedDeviceStore.swift` on
@@ -324,10 +324,9 @@ phone) — not the container move; they die together, which is the safe half.
 No migration shim, by decision. The Mac app *is* released (cask + `nix/release.nix`,
 and the rice enables it by default), so a live install's shelf under
 `~/Library/Containers/com.nebelhaus.perch/` is orphaned, not migrated — the
-upgrade comes up empty, and the old container is yours to delete. That is
-affordable only because nobody has *paid* yet: the licence public key isn't baked
-in, so no licence is de-activated. After that it stops being affordable, which is
-why this landed before Phase 2 rather than after.
+upgrade comes up empty, and the old container is yours to delete. It was
+affordable because perch was days old and barely installed anywhere; the same
+move today would want a migration, whatever the licensing story.
 
 ## Appendix: the one-time Apple side
 

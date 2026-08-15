@@ -19,9 +19,11 @@ Extensions, not under Perch's own name. The Settings shortcut is therefore a
 recovery path, not a required first run.
 
 The Finder entry point still inherits every shelf invariant: originals are
-untouched, copies and file coordination stay off main, the free-tier decision
-happens before staging, no original path is persisted or logged, and a visible
-item always points at a completed private representation.
+untouched, copies and file coordination stay off main, admission happens before
+staging, no original path is persisted or logged, and a visible item always
+points at a completed private representation. (Admission was also the free-tier
+decision when this was written; the cap is gone as of
+[ADR 0009](0009-perch-stays-free-and-mit.md), the ordering it relied on is not.)
 
 ## Decision
 
@@ -62,7 +64,8 @@ not need a shared entitlement.
 
 - Finder gains a native right-click/Quick Actions entry, on by default; App
   Intents remain the Shortcuts and Spotlight integration.
-- A refused free-tier item is never requested from Finder and never copied.
+- An item the app does not admit is never requested from Finder and never
+  copied. (Nothing refuses one today — see ADR 0009.)
 - App Group JSON cannot reveal an original source path, and completion paths are
   rejected unless they remain below their transaction directory.
 - The release workflow must sign the nested extension before re-signing the app,

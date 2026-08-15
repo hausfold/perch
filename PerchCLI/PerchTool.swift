@@ -17,7 +17,9 @@ struct PerchTool {
         case success = 0
         /// Bad usage, or a path that isn't there.
         case usage = 1
-        /// Perch is running but turned items away — the shelf is full.
+        /// Perch is running but turned items away. Nothing in a free, uncapped
+        /// perch refuses an offer today; the code stays because the admission
+        /// receipt can say no and a caller shouldn't have to guess it can't.
         case refused = 2
         /// No Perch answered in time.
         case unavailable = 3
@@ -251,7 +253,7 @@ struct PerchTool {
             case let .added(name, _):
                 if !options.quiet { print("added \(name)") }
             case let .refused(name, _):
-                complain("refused \(name) — the shelf is full")
+                complain("refused \(name) — Perch turned it away")
             case let .failed(name, _, reason):
                 complain("failed \(name) — \(reason)")
             }
@@ -268,7 +270,7 @@ struct PerchTool {
             },
             "refused": entries {
                 if case let .refused(name, path) = $0 {
-                    ["name": name, "path": path, "reason": "shelf-full"]
+                    ["name": name, "path": path, "reason": "refused"]
                 } else {
                     nil
                 }
@@ -375,7 +377,7 @@ struct PerchTool {
           --                treat every remaining argument as a path
 
         exit status:
-          0 added   1 usage   2 shelf full   3 no Perch   4 copy failed
+          0 added   1 usage   2 refused   3 no Perch   4 copy failed
         """
         switch stream {
         case .standardOutput:

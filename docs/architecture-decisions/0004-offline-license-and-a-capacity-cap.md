@@ -1,6 +1,11 @@
 # ADR 0004: An offline license file and a capacity cap, never a download gate
 
-Status: accepted
+Status: **superseded by [ADR 0009](0009-perch-stays-free-and-mit.md)**
+(2026-08-15) — perch is free of charge and MIT; the licence subsystem, the
+capacity cap, and the FSL relicence described below are all reverted, and the
+code they name is deleted. Nothing here ever shipped switched on: the production
+key was never minted, so no build ever capped a shelf or sold a licence. Kept as
+the record of what was tried and why.
 
 ## Context
 
@@ -75,7 +80,8 @@ no input taps, and no screen reading. A licensing phone-home would spend it.
 
 The runbook for the day that switch is flipped — minting the keypair, the exact
 signing contract the Worker must honour, and what to verify before and after —
-is [`docs/going-paid.md`](../going-paid.md).
+was `docs/going-paid.md`, deleted with the rest of this decision; `git show
+v2026.08.14-1:docs/going-paid.md` still has it.
 
 ## Consequences
 

@@ -6,9 +6,10 @@ import Foundation
 /// protocol played out in order — publish names, wait for Perch's admission
 /// receipt, copy only what it reserved, then publish the relative paths.
 ///
-/// The ordering is the point. Perch decides the free-tier cap *before* a
-/// single byte is copied, and a source URL never crosses into the App Group:
-/// only display names go in the request, only relative staged paths come back.
+/// The ordering is the point. Perch reserves the slots *before* a single byte
+/// is copied — a running app is the only thing that can promise to adopt them —
+/// and a source URL never crosses into the App Group: only display names go in
+/// the request, only relative staged paths come back.
 struct HandoffClient: Sendable {
     let mailbox: FinderActionMailbox
 

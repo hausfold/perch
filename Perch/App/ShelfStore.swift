@@ -13,10 +13,6 @@ final class ShelfStore: ObservableObject {
 
     private let pipeline: TransferPipeline
     private let settings: AppSettings
-    /// Admission policy, not display: the free tier caps how many tiles the
-    /// shelf holds, and that decision has to happen before staging starts so a
-    /// refused item is never copied and then thrown away.
-    private let license: LicenseStore
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "Shelf")
     // The live `qlmanage -p` preview, if any, so a new double-click can replace
     // it instead of stacking another window on top.
@@ -28,37 +24,11 @@ final class ShelfStore: ObservableObject {
 
     init(
         repository: StagingRepository,
-        settings: AppSettings,
-        license: LicenseStore = .shared
+        settings: AppSettings
     ) {
         self.repository = repository
         self.settings = settings
-        self.license = license
         pipeline = TransferPipeline(repository: repository)
-    }
-
-    // MARK: - Free-tier admission
-    //
-    // Decided here, before a single byte is staged. An item that doesn't fit is
-    // never copied, so nothing is written and then deleted, and the original —
-    // which perch never touches anyway — stays exactly where it was.
-
-    /// How many of `count` incoming items the current license lets on.
-    private func admissible(_ count: Int) -> Int {
-        LicenseStore.admissible(
-            requested: count,
-            onShelf: items.count + pendingTransfers.count,
-            capacity: license.capacity
-        )
-    }
-
-    /// Trim an incoming batch to what fits, telling the shelf's strip about
-    /// whatever didn't.
-    private func admit<T>(_ incoming: [T]) -> [T] {
-        let room = admissible(incoming.count)
-        guard room < incoming.count else { return incoming }
-        license.noteCapReached(refused: incoming.count - room)
-        return Array(incoming.prefix(room))
     }
 
     var exportedURLs: [URL] {
@@ -72,7 +42,7 @@ final class ShelfStore: ObservableObject {
     }
 
     func importFileURLs(_ urls: [URL]) {
-        for url in admit(urls) {
+        for url in urls {
             let transferID = UUID()
             pendingTransfers.append(
                 PendingTransfer(
@@ -101,7 +71,6 @@ final class ShelfStore: ObservableObject {
     }
 
     func importText(_ text: String, suggestedName: String = "Text.txt") {
-        guard admit([text]).count == 1 else { return }
         let transferID = UUID()
         pendingTransfers.append(
             PendingTransfer(id: transferID, displayName: suggestedName, phase: .copying)
@@ -121,7 +90,6 @@ final class ShelfStore: ObservableObject {
     }
 
     func importData(_ data: Data, suggestedName: String) {
-        guard admit([data]).count == 1 else { return }
         let transferID = UUID()
         pendingTransfers.append(
             PendingTransfer(id: transferID, displayName: suggestedName, phase: .copying)
@@ -141,7 +109,6 @@ final class ShelfStore: ObservableObject {
     }
 
     func importImage(_ image: NSImage) {
-        guard admit([image]).count == 1 else { return }
         let transferID = UUID()
         pendingTransfers.append(
             PendingTransfer(id: transferID, displayName: "Image.png", phase: .copying)
@@ -161,10 +128,13 @@ final class ShelfStore: ObservableObject {
     /// Reserve shelf slots before the extension asks Finder for any bytes.
     /// The response persisted in the App Group is the admission receipt; its
     /// IDs also make pending reservations recoverable across an app relaunch.
+    ///
+    /// The running app takes everything it is offered — the handshake exists so
+    /// the extension never copies bytes perch isn't there to adopt, not to
+    /// ration tiles.
     func admitFinderItems(_ offered: [FinderActionItem]) -> [FinderActionItem] {
-        let accepted = admit(offered)
-        resumeFinderItems(accepted)
-        return accepted
+        resumeFinderItems(offered)
+        return offered
     }
 
     func resumeFinderItems(_ accepted: [FinderActionItem]) {
@@ -199,10 +169,6 @@ final class ShelfStore: ObservableObject {
     }
 
     func beginPromisedImports(_ receivers: [NSFilePromiseReceiver]) {
-        // Trim before asking the source for anything: an unadmitted promise is
-        // one we never ask the other app to write, so the cap costs no work on
-        // either side of the drag.
-        let receivers = admit(receivers)
         guard !receivers.isEmpty else { return }
         let batchID = UUID()
         let batchDirectory: URL
@@ -289,20 +255,15 @@ final class ShelfStore: ObservableObject {
         _ offered: [OfferedItem],
         deviceName: String
     ) -> (accepted: [OfferedItem], refused: [RefusedItem]) {
-        let room = admissible(offered.count)
-        let accepted = Array(offered.prefix(room))
-        let refused = offered.dropFirst(room).map {
-            RefusedItem(id: $0.id, reason: "The shelf is full.")
-        }
-        if !refused.isEmpty {
-            license.noteCapReached(refused: refused.count)
-        }
-        for item in accepted {
+        for item in offered {
             pendingTransfers.append(
                 PendingTransfer(id: item.id, displayName: item.displayName, phase: .copying)
             )
         }
-        return (accepted, refused)
+        // The wire keeps a refusal channel — the phone knows how to hear one —
+        // but the Mac has nothing left to refuse an offer for: every item a
+        // paired device sends gets a pending tile and a slot.
+        return (offered, [])
     }
 
     /// A verified, complete arrival: move it out of the spool into its own

@@ -8,11 +8,7 @@
 4. A manifest never contains an absolute source path.
 5. Every exported dragging session advertises copy only.
 6. Display topology is replaceable without touching storage or import logic.
-7. Licensing is offline: it adds no network call, no entitlement, and no file
-   outside the container.
-8. The free-tier cap is decided before staging starts, so a refused item is
-   never copied and no drag is interrupted.
-9. No sender on the App Group mailbox — the Finder Action, the `perch` command
+7. No sender on the App Group mailbox — the Finder Action, the `perch` command
    line tool, or anything else that speaks it — persists a source URL, and none
    copies a byte before the containing app has persisted an admission response.
 
@@ -25,15 +21,11 @@ NSDraggingDestination                 paired iPhone / iPad
 ShelfDropHandler                      MobileReceiver ── pairing, Keychain,
         │  distinguishes promises /           │         spool + digest verify
         │  file URLs / images / links /       │         (PerchWire/, ADR 0005)
-        │  text (a .perchlicense is           │
-        │  a key, not cargo — it goes to      │
-        │  LicenseStore and is never staged)  │
+        │  text                               │
         ▼                                     ▼
 ShelfStore ─────── main-actor state, pending/completed/error transitions
-        │           admission is checked here, before any bytes are copied
-        │           (mobile offers included — a refused item is never sent)
-        │
-        ├── LicenseStore ────── offline Ed25519 verify, CalVer coverage, the cap
+        │           admission (a slot reserved before any bytes are copied)
+        │           is granted here — mobile offers and mailbox senders alike
         │
         ├── TransferPipeline ── bounded background work, iCloud + coordination
         │
@@ -55,8 +47,8 @@ directions:
 
 - **In** — `AddToShelfIntent` (`Perch/Importing/AddToShelfIntent.swift`)
   resolves each `IntentFile` to a URL or raw data and hands it to the same
-  `ShelfStore.importFileURLs` / `importData` admission path `ShelfDropHandler`
-  uses — no separate cap check, no separate staging logic.
+  `ShelfStore.importFileURLs` / `importData` path `ShelfDropHandler` uses — no
+  separate staging logic.
 - **Out** — `ExportFromShelfIntent` (same file's neighbor) returns staged
   items as `[IntentFile]` through the exact `liftForExport` + `handOff`
   transaction a drag-out to a terminal or editor already goes through: the
@@ -204,31 +196,19 @@ never run it. See ADR 0003. (The mobile listener below is the app's other
 network surface — local-network only, paired devices only, its own toggle, and
 the sole reason for `network.server`. See ADR 0005.)
 
-### Knowing whether this Mac paid
+### Admission, and why it survived the free tier
 
-`LicenseStore` verifies a `.perchlicense` — a small signed JSON blob — with
-CryptoKit against an Ed25519 public key baked into the app, and stores the file
-verbatim in the container's defaults. There is no activation call, no sign-in,
-and nothing to revoke: licensing adds no network traffic and no entitlement, so
-the update poll above stays the app's only network call. The signature covers a
-canonical fixed-order `key=value` payload rather than the JSON, because the
-signer (a Worker) and the verifier (this app) share no code and JSON
-canonicalization is where that kind of pair silently drifts apart.
+Perch is free software (MIT) with no paid tier, no license file, and no ceiling
+on what the shelf holds — see ADR 0009, which reverses ADR 0004.
 
-Entitlement is a date comparison: a license covers builds stamped on or before
-`purchased + 1 year`, so `bench release` needs no version bookkeeping and a
-build a license covered keeps working forever. A build with no CalVer date — an
-Xcode build, or a `bench try` branch build — stays covered rather than reading
-as lapsed.
-
-Unlicensed, the shelf holds two tiles. Admission is computed in `ShelfStore`
-against `items + pendingTransfers` **before** staging begins, so an item that
-doesn't fit is never copied and no drag is interrupted; a batch is trimmed
-rather than refused wholesale. The ask appears only once a drop has actually hit
-the ceiling, on the same bottom strip the release nudge uses, and outranks it
-while both are live. Until the public key constant is filled in, `canSell` is
-false and there is no cap at all — a paywall with no purchasable door is worse
-than no paywall. See ADR 0004.
+The **admission step** it left behind is not a leftover: a sender that is not
+the app — the Finder Action, the `perch` tool, a paired iPhone — asks for a slot
+by name and waits for `ShelfStore` to persist a receipt *before* it copies a
+byte. That ordering is what makes the app the single authority on what is on the
+shelf: it can't adopt bytes it never reserved a pending tile for, and a sender
+that finds perch not running fails cleanly instead of filling a container nobody
+is watching. Admission now always says yes; the wire keeps a refusal channel
+(`RefusedItem`) that the Mac no longer populates.
 
 ### One shelf, two windows onto it
 

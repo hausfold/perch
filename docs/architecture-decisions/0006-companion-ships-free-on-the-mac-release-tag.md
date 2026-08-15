@@ -2,6 +2,12 @@
 
 Status: accepted
 
+> Amended 2026-08-15 by [ADR 0009](0009-perch-stays-free-and-mit.md): the Mac
+> app is free of charge and MIT too, so "the second half of a Mac app you
+> already bought" is now just "the second half of perch". Every decision below
+> stands as written — the companion was always free, with no purchase and no
+> IAP — and the cap this ADR carved the phone out of no longer exists at all.
+
 ## Context
 
 [ADR 0005](0005-mobile-companion-wire.md) built the phone side and explicitly
@@ -12,26 +18,26 @@ of this ADR."* This is that ADR.
 Three things are decided at once because they constrain each other: what the
 companion costs, which tag builds it, and how far automation is allowed to go.
 
-The inherited constraints are real. The Mac app is sold direct with an offline
-license (ADR 0004, [`going-paid.md`](../going-paid.md)) and is distributed
-outside the App Store as a notarized ZIP. The wire between the two halves is
+The inherited constraints are real. The Mac app was, at decision time, sold
+direct with an offline license (ADR 0004, since reversed by ADR 0009) and is
+distributed outside the App Store as a notarized ZIP. The wire between the two halves is
 versioned by the code on both ends, not negotiated — a phone far ahead of its
 Mac is a support problem no one asked for.
 
 ## Decision
 
 **The companion is free, with no purchase and no in-app purchase — ever.** It is
-the second half of a Mac app you already bought, not a product. Consequences
-that follow and are load-bearing:
+the second half of perch, not a product of its own. Consequences that follow and
+are load-bearing:
 
 - The app never mentions a price, never links to a checkout, and never shows a
   paywall. It states, once, in the store description, that Perch for Mac is a
   separate app on our site. That is a fact about a different product, not
   steering (App Store 3.1.1), and it is the whole reason a reviewer can make
   sense of the app.
-- ADR 0004's capacity cap is a *Mac-side* mechanism. The phone's shelf is not
-  capped by the licence; admission for a transfer is still decided by the Mac
-  before any bytes move, which is where the cap already lives.
+- ADR 0004's capacity cap was a *Mac-side* mechanism, and the phone's shelf was
+  never subject to it. With ADR 0009 there is no cap on either side; admission
+  for a transfer is still decided by the Mac before any bytes move.
 
 **The same `v<VERSION>` tag ships both halves.** `bench release perch` cuts one
 tag; `release.yml` notarizes the Mac ZIP and `testflight.yml` archives, exports,

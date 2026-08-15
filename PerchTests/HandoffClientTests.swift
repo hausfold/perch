@@ -15,7 +15,7 @@ final class HandoffClientTests: XCTestCase {
         let client: HandoffClient
     }
 
-    private func makeFixture(forceFree: Bool = false) throws -> Fixture {
+    private func makeFixture() throws -> Fixture {
         let token = UUID().uuidString
         let temporary = FileManager.default.temporaryDirectory
         let shelfRoot = temporary
@@ -27,15 +27,10 @@ final class HandoffClientTests: XCTestCase {
         try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
         let defaultsName = "PerchHandoffSettings-\(token)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsName))
-        defaults.set(forceFree, forKey: "licenseDebugForceFree")
 
         let store = ShelfStore(
             repository: try StagingRepository(rootURL: shelfRoot),
-            settings: AppSettings(defaults: defaults),
-            license: LicenseStore(
-                defaults: defaults,
-                verifier: LicenseVerifier(publicKey: Data([0x01]))
-            )
+            settings: AppSettings(defaults: defaults)
         )
         let mailbox = try FinderActionMailbox(rootURL: mailboxRoot)
         addTeardownBlock {
@@ -103,11 +98,11 @@ final class HandoffClientTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
     }
 
-    /// The cap is answered in the admission receipt, before the tool has copied
-    /// a single byte — which is what lets `perch add` exit 2 without ever
-    /// touching the files it was refused.
-    func testRefusedItemsAreNeverCopied() async throws {
-        let fixture = try makeFixture(forceFree: true)
+    /// The running app admits everything it is offered: the handshake exists so
+    /// the tool never copies bytes perch isn't there to adopt, and there is no
+    /// ceiling left for it to trim a batch against.
+    func testEveryOfferedItemIsAdmitted() async throws {
+        let fixture = try makeFixture()
         let sources = try (0..<3).map {
             try makeSource("item\($0).txt", contents: "item \($0)", in: fixture)
         }
@@ -120,28 +115,8 @@ final class HandoffClientTests: XCTestCase {
             fixture.client.waitForAdmission(request.id, deadline: Date().addingTimeInterval(1))
         )
         let accepted = fixture.client.acceptedItems(in: request, response: response)
-        XCTAssertEqual(accepted.map(\.displayName), ["item0.txt", "item1.txt"])
-
-        for item in accepted {
-            _ = try fixture.client.stage(
-                sourceURL: sources[item.attachmentIndex],
-                item: item,
-                requestID: request.id
-            )
-        }
-        let refused = request.items.filter { item in
-            !accepted.contains(where: { $0.id == item.id })
-        }
-        for item in refused {
-            XCTAssertNil(
-                try? fixture.client.mailbox.stagedURL(
-                    relativePath: "\(FinderActionProtocol.stagedDirectoryName)/"
-                        + "\(item.id.uuidString)/\(item.displayName)",
-                    requestID: request.id
-                ).checkResourceIsReachable(),
-                "a refused item is never copied into the container"
-            )
-        }
+        XCTAssertEqual(accepted.map(\.displayName), ["item0.txt", "item1.txt", "item2.txt"])
+        XCTAssertEqual(fixture.store.pendingTransfers.count, 3)
     }
 
     /// No original path may reach the shared container — not in the request, not

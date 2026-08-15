@@ -11,8 +11,10 @@ extension) stages copies on the phone and hands them to the paired Mac's shelf.
 The constraints are inherited, not invented:
 
 - **No account, no relay.** The Mac's only network call today is the update
-  poll (ADR 0003), and licensing is offline by contract (ADR 0004). A Hausfold
-  sync server would spend that trust for a v1 no one asked to be cloudy.
+  poll (ADR 0003). (This also cited ADR 0004's offline licensing; there is no
+  licensing at all since [ADR 0009](0009-perch-stays-free-and-mit.md), which
+  only makes the constraint easier to keep.) A Hausfold sync server would spend
+  that trust for a v1 no one asked to be cloudy.
 - **Copies only, admission before bytes, atomic commits** — the shelf's
   invariants (ADR 0001) don't bend because the source is a phone.
 - **The Share extension must work while the Mac is asleep, away, or unpaired.**
@@ -46,7 +48,7 @@ retried when the app next runs otherwise. Honest states, no fake "sent".
   truncation all fail decryption rather than needing protocol police. File
   bytes travel as binary chunks behind a one-byte tag — never through JSON.
 - Transfers mirror the drag-in pipeline: `offer` (names, sizes, SHA-256s) →
-  admission on the main actor *before any bytes* (free-tier cap included) →
+  admission on the main actor *before any bytes* →
   chunks spooled to a dot-dir on the shelf's volume → digest verified → atomic
   move into a UUID container → `stored`. The phone deletes its copy only on
   `stored`, and keeps a dated receipt.
