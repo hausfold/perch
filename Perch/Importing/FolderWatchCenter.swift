@@ -42,10 +42,13 @@ final class FolderWatchCenter: ObservableObject {
     }
 
     func addFolder(at url: URL) {
-        let standardized = url.standardizedFileURL.path
-        guard !resolvedPaths.values.contains(standardized) else { return }
+        // Compare through symlinks, or the same directory picked via an alias
+        // would get a second watcher — and every arrival two tiles.
+        let canonical = url.standardizedFileURL.resolvingSymlinksInPath().path
+        guard !resolvedPaths.values.contains(canonical) else { return }
         do {
             let folder = try folderStore.add(folderAt: url)
+            resolvedPaths[folder.id] = canonical
             startWatching(folder, seedExisting: true)
             refreshRows()
         } catch {
@@ -62,20 +65,57 @@ final class FolderWatchCenter: ObservableObject {
     }
 
     private func startWatching(_ folder: WatchedFolder, seedExisting: Bool) {
-        let url: URL
-        do {
-            let resolved = try folderStore.bookmarking.resolve(folder.bookmark)
-            url = resolved.url
-            if resolved.isStale, let refreshed = try? folderStore.bookmarking.make(url) {
-                folderStore.updateBookmark(folder.id, to: refreshed)
+        let bookmarking = folderStore.bookmarking
+        let bookmark = folder.bookmark
+        let folderID = folder.id
+        // Resolving a bookmark can block while the system tries to reach an
+        // unmounted volume, and this is called from `AppRuntime.start()` —
+        // so resolution runs detached, never on the main actor.
+        Task.detached(priority: .utility) { [weak self] in
+            guard let resolved = try? bookmarking.resolve(bookmark) else {
+                await MainActor.run { [weak self] in
+                    // No path in the log — the bookmark is the only place it lives.
+                    self?.logger.error("A watched folder's bookmark no longer resolves")
+                    self?.markUnavailable(folderID)
+                }
+                return
             }
-        } catch {
-            // No path in the log — the bookmark is the only place it lives.
-            logger.error("A watched folder's bookmark no longer resolves")
+            var refreshed: Data?
+            if resolved.isStale {
+                // Minting an app-scoped bookmark needs the resource
+                // accessible, so scope the URL around the remint.
+                let scoped = resolved.url.startAccessingSecurityScopedResource()
+                refreshed = try? bookmarking.make(resolved.url)
+                if scoped {
+                    resolved.url.stopAccessingSecurityScopedResource()
+                }
+            }
+            await MainActor.run { [weak self] in
+                self?.attachWatcher(
+                    folderID: folderID,
+                    url: resolved.url,
+                    refreshedBookmark: refreshed,
+                    seedExisting: seedExisting
+                )
+            }
+        }
+    }
+
+    private func attachWatcher(
+        folderID: UUID,
+        url: URL,
+        refreshedBookmark: Data?,
+        seedExisting: Bool
+    ) {
+        // The folder may have been removed (or re-added) while resolving.
+        guard watchers[folderID] == nil,
+              let folder = folderStore.folders.first(where: { $0.id == folderID })
+        else {
             return
         }
-
-        let folderID = folder.id
+        if let refreshedBookmark {
+            folderStore.updateBookmark(folderID, to: refreshedBookmark)
+        }
         let watcher = FolderWatcher(
             folderID: folderID,
             folderURL: url,
@@ -91,14 +131,25 @@ final class FolderWatchCenter: ObservableObject {
                 Task { @MainActor in
                     self?.folderStore.setTokens(tokens, for: folderID)
                 }
+            },
+            onUnavailable: { [weak self] in
+                Task { @MainActor in
+                    self?.logger.error("A watched folder could not be opened")
+                    self?.markUnavailable(folderID)
+                }
             }
         )
-        guard watcher.start(seedExisting: seedExisting) else {
-            logger.error("A watched folder could not be opened")
-            return
-        }
         watchers[folderID] = watcher
-        resolvedPaths[folderID] = url.standardizedFileURL.path
+        resolvedPaths[folderID] = url.standardizedFileURL.resolvingSymlinksInPath().path
+        refreshRows()
+        watcher.start(seedExisting: seedExisting)
+    }
+
+    private func markUnavailable(_ id: UUID) {
+        watchers[id]?.stop()
+        watchers[id] = nil
+        resolvedPaths[id] = nil
+        refreshRows()
     }
 
     private func refreshRows() {

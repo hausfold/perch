@@ -4,7 +4,7 @@ import OSLog
 /// One folder the user asked perch to watch. The bookmark is the persisted
 /// panel grant; the tokens are the hashed identities of files already shelved
 /// from it (see `FolderWatchRules.identityToken` — no name or path in them).
-struct WatchedFolder: Identifiable, Codable, Equatable {
+struct WatchedFolder: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     var bookmark: Data
     var importedTokens: Set<String>
@@ -62,6 +62,13 @@ final class WatchedFolderStore: ObservableObject {
 
     private let fileURL: URL?
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "WatchedFolders")
+    /// Config writes happen here, in order, off the main actor — an arrival
+    /// burst into a watched Downloads marks one import per file, and the
+    /// shelf must not hitch on the disk for it.
+    private let writeQueue = DispatchQueue(
+        label: "com.hausfold.perch.watchedfolders.persist",
+        qos: .utility
+    )
 
     init(fileURL: URL? = nil, bookmarking: FolderBookmarking = .securityScoped) {
         self.bookmarking = bookmarking
@@ -129,16 +136,24 @@ final class WatchedFolderStore: ObservableObject {
 
     private func persist() {
         guard let fileURL else { return }
-        do {
-            let data = try JSONEncoder().encode(folders)
-            try FileManager.default.createDirectory(
-                at: fileURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-        } catch {
-            logger.error("Could not persist watched-folder config: \(error.localizedDescription, privacy: .public)")
+        let snapshot = folders
+        writeQueue.async { [logger] in
+            do {
+                let data = try JSONEncoder().encode(snapshot)
+                try FileManager.default.createDirectory(
+                    at: fileURL.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            } catch {
+                logger.error("Could not persist watched-folder config: \(error.localizedDescription, privacy: .public)")
+            }
         }
+    }
+
+    /// Test hook: block until every queued config write has hit the disk.
+    func flushPendingWrites() {
+        writeQueue.sync {}
     }
 
     private static func defaultFileURL() -> URL? {

@@ -22,7 +22,14 @@ enum FolderWatchRules {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         let inode = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
         let created = (attributes[.creationDate] as? Date)?.timeIntervalSinceReferenceDate ?? 0
-        let digest = SHA256.hash(data: Data("\(inode):\(created)".utf8))
+        // A mount reporting neither inode nor birth date (some network
+        // filesystems) would collapse every file into one identity and shelve
+        // only the first arrival ever. Fall back to the name — hashed, never
+        // stored — and give up rename-stability there instead.
+        let identity = (inode == 0 && created == 0)
+            ? "name:\(url.lastPathComponent)"
+            : "\(inode):\(created)"
+        let digest = SHA256.hash(data: Data(identity.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
@@ -48,6 +55,8 @@ final class FolderWatcher: @unchecked Sendable {
     private let onImport: @Sendable (URL, String) -> Void
     /// Seeding or launch pruning rewrote the ledger. Called on the watcher queue.
     private let onLedgerReplaced: @Sendable (Set<String>) -> Void
+    /// The folder could not be opened for watching. Called on the watcher queue.
+    private let onUnavailable: @Sendable () -> Void
 
     private let queue: DispatchQueue
     private var source: DispatchSourceFileSystemObject?
@@ -70,7 +79,8 @@ final class FolderWatcher: @unchecked Sendable {
         probeInterval: TimeInterval = 0.5,
         requiredStableProbes: Int = 2,
         onImport: @escaping @Sendable (URL, String) -> Void,
-        onLedgerReplaced: @escaping @Sendable (Set<String>) -> Void
+        onLedgerReplaced: @escaping @Sendable (Set<String>) -> Void,
+        onUnavailable: @escaping @Sendable () -> Void = {}
     ) {
         self.folderID = folderID
         self.folderURL = folderURL
@@ -80,42 +90,53 @@ final class FolderWatcher: @unchecked Sendable {
         self.requiredStableProbes = requiredStableProbes
         self.onImport = onImport
         self.onLedgerReplaced = onLedgerReplaced
+        self.onUnavailable = onUnavailable
         queue = DispatchQueue(label: "com.hausfold.perch.folderwatch.\(folderID.uuidString)")
     }
 
     /// Opens the directory and begins watching. `seedExisting` marks
     /// everything already present as imported without shelving it — the
     /// just-added case; a relaunch instead prunes the ledger and catches up
-    /// on unledgered arrivals.
+    /// on unledgered arrivals. A folder that cannot be opened reports through
+    /// `onUnavailable`.
     ///
-    /// Returns false when the folder cannot be opened at all.
-    func start(seedExisting: Bool) -> Bool {
-        if holdsSecurityScope {
-            scopeActive = folderURL.startAccessingSecurityScopedResource()
+    /// All of it happens on the watcher queue: `open` on an unreachable
+    /// network volume can block, and the caller may be the main actor.
+    func start(seedExisting: Bool) {
+        queue.async { [self] in
+            guard !stopped, source == nil else { return }
+            if holdsSecurityScope {
+                scopeActive = folderURL.startAccessingSecurityScopedResource()
+            }
+            let descriptor = open(folderURL.path, O_EVTONLY)
+            guard descriptor >= 0 else {
+                releaseScope()
+                onUnavailable()
+                return
+            }
+            let source = DispatchSource.makeFileSystemObjectSource(
+                fileDescriptor: descriptor,
+                eventMask: [.write, .rename, .delete],
+                queue: queue
+            )
+            source.setEventHandler { [weak self] in
+                self?.scan()
+            }
+            // The cancel handler captures the URL and scope flag by value,
+            // never `self` — by the time it runs, the last strong reference
+            // to a stopped watcher is usually gone, and a weakly-captured
+            // `self` would silently skip releasing the scope, leaking one
+            // kernel security-scope grant per stop.
+            let scopedURL = scopeActive ? folderURL : nil
+            source.setCancelHandler {
+                close(descriptor)
+                scopedURL?.stopAccessingSecurityScopedResource()
+            }
+            scopeActive = false
+            self.source = source
+            source.resume()
+            initialScan(seedExisting: seedExisting)
         }
-        let descriptor = open(folderURL.path, O_EVTONLY)
-        guard descriptor >= 0 else {
-            releaseScope()
-            return false
-        }
-        let source = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: descriptor,
-            eventMask: [.write, .rename, .delete],
-            queue: queue
-        )
-        source.setEventHandler { [weak self] in
-            self?.scan()
-        }
-        source.setCancelHandler { [weak self] in
-            close(descriptor)
-            self?.releaseScope()
-        }
-        self.source = source
-        source.resume()
-        queue.async { [weak self] in
-            self?.initialScan(seedExisting: seedExisting)
-        }
-        return true
     }
 
     func stop() {

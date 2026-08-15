@@ -80,7 +80,10 @@ report — are the stability probe's job, not the event stream's.
 3. *Stability.* The candidate's size and modification date must hold still for
    two consecutive probes 500 ms apart. A file still growing keeps being
    probed until it settles — a probe is one `stat`, so a slow multi-gigabyte
-   download costs a poll every half-second, not a truncated import.
+   download costs a poll every half-second rather than a truncated import.
+   The window is a heuristic, not a proof: a writer that stalls longer than
+   it can still be shelved early. The in-progress name rules are the primary
+   completion signal; the probe is the net under them.
 
 **A per-folder ledger of hashed identities decides what "new" means.** Each
 imported file is remembered as a SHA-256 token of its inode and creation date

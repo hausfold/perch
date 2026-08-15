@@ -55,6 +55,7 @@ final class WatchedFolderStoreTests: XCTestCase {
         let folder = try store.add(folderAt: watched)
         store.markImported("token-1", for: folder.id)
         store.setTokens(["token-2", "token-3"], for: folder.id)
+        store.flushPendingWrites()
 
         let reloaded = WatchedFolderStore(fileURL: configURL, bookmarking: .plain)
         XCTAssertEqual(reloaded.folders.count, 1)
@@ -67,6 +68,7 @@ final class WatchedFolderStoreTests: XCTestCase {
         )
 
         store.remove(folder.id)
+        store.flushPendingWrites()
         XCTAssertTrue(store.folders.isEmpty)
         XCTAssertTrue(WatchedFolderStore(fileURL: configURL, bookmarking: .plain).folders.isEmpty)
     }
@@ -126,7 +128,7 @@ final class FolderWatcherTests: XCTestCase {
         let log = ImportLog()
         let landed = expectation(description: "new file imported")
         let watcher = makeWatcher(over: directory, log: log, onImport: landed)
-        XCTAssertTrue(watcher.start(seedExisting: false))
+        watcher.start(seedExisting: false)
 
         try Data("hello".utf8).write(to: directory.appending(path: "fresh.txt"))
         wait(for: [landed], timeout: 5)
@@ -142,7 +144,7 @@ final class FolderWatcherTests: XCTestCase {
         let log = ImportLog()
         let landed = expectation(description: "only the new file imported")
         let watcher = makeWatcher(over: directory, log: log, onImport: landed)
-        XCTAssertTrue(watcher.start(seedExisting: true))
+        watcher.start(seedExisting: true)
 
         // The seed pass must complete (and ledger the history) before the
         // arrival, or this would just be racing the initial scan.
@@ -166,7 +168,7 @@ final class FolderWatcherTests: XCTestCase {
             log: log,
             onImport: landed
         )
-        XCTAssertTrue(watcher.start(seedExisting: false))
+        watcher.start(seedExisting: false)
 
         let url = directory.appending(path: "big.bin")
         let chunk = Data(repeating: 7, count: 1024)
@@ -191,7 +193,7 @@ final class FolderWatcherTests: XCTestCase {
         let log = ImportLog()
         let landed = expectation(description: "renamed download imported")
         let watcher = makeWatcher(over: directory, log: log, onImport: landed)
-        XCTAssertTrue(watcher.start(seedExisting: false))
+        watcher.start(seedExisting: false)
 
         let partial = directory.appending(path: "archive.zip.crdownload")
         try Data("bytes".utf8).write(to: partial)
@@ -224,7 +226,7 @@ final class FolderWatcherTests: XCTestCase {
             log: log,
             onImport: landed
         )
-        XCTAssertTrue(watcher.start(seedExisting: false))
+        watcher.start(seedExisting: false)
 
         wait(for: [landed], timeout: 5)
         XCTAssertEqual(log.importedNames, ["arrived-while-quit.png"])
