@@ -125,8 +125,8 @@ a companion, not a standalone.
 > • Nothing is collected. No analytics, no ads, no tracking, and your file names
 >   never appear in a log.
 >
-> The Mac half is a separate app, downloaded from hausfold.co/perch. This
-> companion is free and always will be.
+> The Mac half is a separate app, downloaded free from hausfold.co/perch. Both
+> halves are free, and always will be.
 
 The listing is *named* `Perch Companion`, so never write "the companion" as if it
 were something else — inside this listing that points at itself. Say "the Mac
@@ -154,8 +154,8 @@ cannot be pasted from here.
 
 Four things to know before pasting it, three of them learned the annoying way:
 
-- **The Notes field caps at 4,000 characters.** The block below is 3,973 — it
-  fits with 27 to spare, so anything you add has to buy its space from
+- **The Notes field caps at 4,000 characters.** The block below is 3,968 — it
+  fits with 32 to spare, so anything you add has to buy its space from
   something else. Check with
   `awk '/^## Review notes/{f=1} f&&/^>/{sub(/^> ?/,"");print} f&&/^Also fill in:/{exit}' docs/app-store.md | wc -m`.
 - **It is a plain-text field**, which is why the block below carries no
@@ -230,8 +230,8 @@ Four things to know before pasting it, three of them learned the annoying way:
 > are our own.
 >
 > FREE, AND PRIVATE. No in-app purchases, no subscriptions, nothing to restore.
-> The Mac app is paid, sold on our own website, and is never offered for sale or
-> linked as a purchase inside this app. Nothing a user adds is ever visible to
+> The Mac half is free too, and nothing is sold anywhere in Perch — there is no
+> checkout to steer anyone towards. Nothing a user adds is ever visible to
 > anyone else — no feed, no upload, no server, no other user — so there is no
 > reporting or blocking mechanism.
 

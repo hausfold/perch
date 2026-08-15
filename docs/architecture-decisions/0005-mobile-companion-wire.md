@@ -113,5 +113,8 @@ relay slots in without a model rewrite.
   hands over a page as both `public.url` and `public.plain-text`, and staging
   every attachment put the page on the Mac twice; loose text alongside a link is
   that link's title, so it is dropped (files and images never are).
-- The iOS targets ship nothing yet — App Store distribution, icons, and the
-  free-companion/paid-Mac story are deliberately out of this ADR.
+- The iOS targets ship nothing yet — App Store distribution and icons are
+  deliberately out of this ADR. (This once also deferred "the
+  free-companion/paid-Mac story"; both halves are free since
+  [ADR 0009](0009-perch-stays-free-and-mit.md), so there is no story left to
+  defer.)
