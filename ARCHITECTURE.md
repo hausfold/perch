@@ -199,7 +199,9 @@ the sole reason for `network.server`. See ADR 0005.)
 ### Admission, and why it survived the free tier
 
 Perch is free software (MIT) with no paid tier, no license file, and no ceiling
-on what the shelf holds — see ADR 0009, which reverses ADR 0004.
+on what the shelf holds — see
+[ADR 0009](docs/architecture-decisions/0009-perch-stays-free-and-mit.md), which
+reverses [ADR 0004](docs/architecture-decisions/0004-offline-license-and-a-capacity-cap.md).
 
 The **admission step** it left behind is not a leftover: a sender that is not
 the app — the Finder Action, the `perch` tool, a paired iPhone — asks for a slot

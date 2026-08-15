@@ -62,7 +62,8 @@ absent one means Perch has never run, and the app makes its own.
 - Every invariant of a drag holds for a script: originals are only read, the
   cap is decided before staging, no original path reaches the container or a
   log, and a tile appears only after a complete copy is adopted.
-- The exit status carries the outcome a script needs — 2 for a full shelf, 3
+- The exit status carries the outcome a script needs — 2 for an item Perch
+  turned away (nothing refuses one today — see ADR 0009), 3
   for no shelf listening, 4 for a copy that failed — so `perch add` is usable
   in a pipeline without parsing output. `--json` reports per item.
 - The App Group directory keeps its `FinderActionRequests` name and JSON shape.
