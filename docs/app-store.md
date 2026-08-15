@@ -254,16 +254,32 @@ through the core features — including every permission prompt.
 Perch has a problem no single-screen recording solves: half the product is a
 Mac. Record both at once rather than filming a screen with another phone:
 
-1. Wire the iPhone to the Mac. QuickTime Player → **File → New Movie
-   Recording** → pick the iPhone as the source. That mirrors the *device screen*
-   (not its camera) into a window, camera preview and permission alerts
-   included.
+1. **Wire the iPhone to the Mac with a cable, unlock it, and tap Trust.** Then
+   QuickTime Player → **File → New Movie Recording** → click the ⌄ next to the
+   record button and pick the iPhone as the source. That mirrors the *device
+   screen* into a window, camera preview and permission alerts included.
+
+   ⚠️ **Check which iPhone entry you're picking.** Under *Camera* the menu
+   lists **`Julien's iPhone 16 Camera`** — that is Continuity Camera, the
+   phone's rear camera pointed at the room, and it is useless here. Screen
+   mirroring is a *separate* entry with the bare device name and **no "Camera"
+   suffix**, and it only appears while the phone is plugged in, awake, unlocked
+   and trusted. If the only iPhone row says "Camera", the phone isn't actually
+   connected — `xcrun xctrace list devices` will show it under **Devices
+   Offline**, which is the same fact from the other side.
 2. Put the Perch shelf and that QuickTime window on the same display, then
    record the **Mac's** screen (⇧⌘5). One file, both halves, the tile visibly
    landing at the notch.
 3. Delete and reinstall the app on the phone first, and unpair it from the Mac.
    The permission prompts and the empty state only happen once, and they are
    precisely what Apple asked to see.
+
+**If the cable route won't cooperate**, don't fight it — record the two halves
+separately and attach both. iOS Control Center → Screen Recording gives an
+unimpeachably "captured on a physical device" file (it lands in Photos; AirDrop
+it over), and a plain ⇧⌘5 of the Mac during the same run covers the delivery
+beat. Two files in Resolution Center is a weaker story than one, but a
+Continuity-Camera video of a phone lying on a desk is a much weaker one.
 
 The shot list, in order — this *is* the "typical user flow", and skipping the
 permission prompts is what invites a second round:
