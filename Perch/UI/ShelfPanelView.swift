@@ -348,6 +348,7 @@ struct ShelfPanelView: View {
                         exportItems: exportItem(for: item).map { [$0] } ?? [],
                         isExiting: state.draggingOutIDs.contains(item.id) && !item.isPinned,
                         onReveal: { store.reveal(item) },
+                        onSave: { store.save(item) },
                         onRemove: { withAnimation(Self.reflow) { store.remove(item) } },
                         onSetPinned: { store.setPinned($0, for: item) },
                         onOpen: { store.open(item) },
@@ -637,6 +638,7 @@ private struct FileTile: View {
     // survives to receive the drop result. See ShelfPanelState.draggingOutIDs.
     var isExiting: Bool = false
     let onReveal: () -> Void
+    let onSave: () -> Void
     let onRemove: () -> Void
     let onSetPinned: (Bool) -> Void
     let onOpen: () -> Void
@@ -712,6 +714,9 @@ private struct FileTile: View {
         .contextMenu {
             Button(item.kind == .image ? "Quick Look" : "Open", action: onOpen)
             Button("Show in Finder", action: onReveal)
+            // Copies out and leaves the tile alone, unlike a drag-out — so it
+            // sits with the other non-destructive rows, above the divider.
+            Button("Save to…", action: onSave)
             Divider()
             Button(
                 item.isPinned ? "Unpin" : "Pin",

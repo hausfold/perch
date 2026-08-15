@@ -442,6 +442,67 @@ final class ShelfStore: ObservableObject {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
+    /// Save to…: copies a staged item out to a folder the user picks, without
+    /// taking it off the shelf.
+    ///
+    /// Dragging a tile out is the fast path and stays the primary one. This is
+    /// the path for when there is no window to drop on — the destination is a
+    /// folder nothing has open — and it is the only way a *pinned* item's bytes
+    /// reach an ordinary folder without a drag at all.
+    ///
+    /// The panel is not merely UI here: it is the whole permission story. A
+    /// save panel is what grants a sandboxed app a path outside its container
+    /// (`com.apple.security.files.user-selected.read-write`, already present for
+    /// the same reason), so the destination has to come from the user every
+    /// time. That is why there is no *Save to Downloads* beside this — a fixed
+    /// folder would mean a new entitlement, and Perch opening a path no drag or
+    /// picker handed it.
+    ///
+    /// Unlike a drag-out this is non-destructive: the item is never lifted and
+    /// its staged bytes are never deleted, so Save leaves the shelf exactly as
+    /// it found it — the same contract as Show in Finder.
+    ///
+    /// `activate()` first, for the reason `confirmClearFromMenu` does it: the
+    /// shelf rides a non-activating panel that never takes key, so a modal
+    /// raised without activating lands behind the frontmost app and reads as a
+    /// hang with no visible cause.
+    func save(_ item: ShelfItem) {
+        guard let source = item.fileURL(inside: repository.rootURL) else { return }
+
+        let panel = NSSavePanel()
+        // `displayName` is the staged file's own name — sanitized at import and
+        // carrying the right extension — so it is already a valid filename.
+        panel.nameFieldStringValue = item.displayName
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        // Pin the extension the staged name already carries, so the saved copy
+        // stays openable by the app that owns it even if the name is edited.
+        //
+        // Only when there *is* one. A folder has no extension to hold on to,
+        // and an extensionless file — LICENSE, README, Makefile — has a
+        // content type that was sniffed rather than read off the name, whose
+        // preferred extension is therefore something the file never had. The
+        // panel enforces the constraint on a name without one, so pinning it
+        // here would save `Makefile` as `Makefile.make`: a rename, which is the
+        // one thing perch's staging exists not to do.
+        if item.kind != .folder,
+           !(item.displayName as NSString).pathExtension.isEmpty,
+           let contentType = item.contentType {
+            panel.allowedContentTypes = [contentType]
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+
+        Task { [pipeline] in
+            do {
+                try await pipeline.copyOut(from: source, to: destination)
+            } catch {
+                report(error)
+            }
+        }
+    }
+
     /// Double-click behaviour: preview quick-lookable content (images) in the
     /// slim Quick Look panel rather than launching a heavyweight viewer app;
     /// hand everything else to its default app.
