@@ -12,8 +12,9 @@
    outside the container.
 8. The free-tier cap is decided before staging starts, so a refused item is
    never copied and no drag is interrupted.
-9. The Finder Action persists no source URL and asks Finder for bytes only
-   after the containing app has persisted an admission response.
+9. No sender on the App Group mailbox — the Finder Action, the `perch` command
+   line tool, or anything else that speaks it — persists a source URL, and none
+   copies a byte before the containing app has persisted an admission response.
 
 ## Boundaries
 
@@ -108,6 +109,25 @@ No mailbox, no second staging path, and promises, file URLs, images, links and
 plain text all behave exactly as they do on a drag, because it is the same
 code. `NSUpdateDynamicServices()` at launch is what makes a newly installed
 build's menu item appear without a logout.
+
+A **command line tool** is the sixth door, and it is not a new mechanism: it is
+a second sender on the mailbox above. `perch add <path>...`
+(`PerchCLI/`, shipped inside the bundle as `Contents/MacOS/perch-cli`) runs the
+identical four-step transaction, so `FinderActionReceiver` cannot tell it from
+the extension — which is the point, since admission, path validation, and
+adoption stay in one place. The sender half both of them run is
+`PerchFinderBridge/HandoffClient.swift`.
+
+The tool has to exist because the app is sandboxed: a URL scheme or Apple Event
+could name a path, but Perch may not open one it was merely told about. The
+tool is unsandboxed and runs as you, so it does the reading — and reaches the
+group container by its documented path, since
+`containerURL(forSecurityApplicationGroupIdentifier:)` answers nil without the
+entitlement. It treats the mailbox, not a process list, as the liveness test: a
+dev build owns the notch under its own bundle identifier and would fail a
+bundle-id check while answering perfectly well. See
+[ADR 0008](docs/architecture-decisions/0008-command-line-joins-the-handoff-mailbox.md)
+and [docs/cli.md](docs/cli.md).
 
 The two Finder doors are complementary, not redundant. The extension runs
 without waking Perch, but only inside the submenu and only while the app is up

@@ -50,11 +50,22 @@ it strips the App Group entitlement and the app aborts at launch. Simulator
 ad-hoc signing needs no team or provisioning.
 
 Targets: `Perch` (macOS) · `PerchFinderAction` (Finder Quick Action) ·
-`PerchIOS` (iPhone/iPad app) · `PerchShare` (Share extension) · `PerchTests`.
+`PerchCLI` (the `perch` tool, embedded in the app bundle) · `PerchIOS`
+(iPhone/iPad app) · `PerchShare` (Share extension) · `PerchTests`.
 Shared sources, compiled into their consumers directly: `PerchWire/` (wire
 protocol + crypto + the staging layer both platforms use), `PerchMobileCore/`
 (iOS-only shelf/pairing/delivery, app + extension), and `PerchFinderBridge/`
-(Mac App Group mailbox shared by the macOS app + Finder Action).
+(Mac App Group mailbox shared by the macOS app, the Finder Action, and the CLI —
+`HandoffClient` is the sender half both of them run).
+
+The CLI product is `perch-cli`, not `perch`, and that is load-bearing: macOS
+filesystems are case-insensitive, so `Contents/MacOS/perch` *is*
+`Contents/MacOS/Perch` and silently replaces the app's own executable — the app
+you launch then prints CLI usage and exits 1. Installers put it on `PATH` as
+`perch` (see `nix/package.nix`, and the cask's `binary` stanza). Same class of
+trap: a Swift target named `perch` emits a `perch.swiftmodule` that collides
+with the app's `Perch.swiftmodule`, so it sets `PRODUCT_MODULE_NAME = PerchCLI`.
+[`docs/cli.md`](./docs/cli.md) · [ADR 0008](docs/architecture-decisions/0008-command-line-joins-the-handoff-mailbox.md)
 
 Read `PRD.md`, `ARCHITECTURE.md`, and the ADRs before changing transfer
 semantics. Update them when a product boundary changes.

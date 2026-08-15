@@ -6,6 +6,9 @@ import Foundation
 /// answers with the IDs it admitted before the extension asks Finder for bytes.
 enum FinderActionProtocol {
     static let appGroupIdentifier = "88M28542LQ.com.hausfold.perch"
+    /// Only senders that live outside the app bundle's extension points need
+    /// this — the `perch` tool, to tell whether a shelf is listening at all.
+    static let appBundleIdentifier = "com.hausfold.perch"
     static let requestsDirectoryName = "FinderActionRequests"
     static let requestFilename = "request.json"
     static let responseFilename = "response.json"

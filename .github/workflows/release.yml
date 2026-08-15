@@ -94,6 +94,7 @@ jobs:
           # declared entitlements (no get-task-allow, which notarization rejects).
           APP="dd/Build/Products/Release/Perch.app"
           FINDER_ACTION="$APP/Contents/PlugIns/PerchFinderAction.appex"
+          CLI="$APP/Contents/MacOS/perch-cli"
           IDENTITY="$(security find-identity -v -p codesigning "$RUNNER_TEMP/signing.keychain-db" \
             | awk -F'"' '/Developer ID Application/{print $2; exit}')"
           # Nested code is always signed inside-out. The Finder Action and app
@@ -102,11 +103,19 @@ jobs:
             --entitlements PerchFinderAction/PerchFinderAction.entitlements \
             --sign "$IDENTITY" \
             "$FINDER_ACTION"
+          # The `perch` tool, deliberately with NO entitlements: it is the
+          # unsandboxed half of the handoff (ADR 0008) and reads your files as
+          # you. Sandboxing it would defeat the point; the App Group it writes
+          # into is addressed by path, not by entitlement.
+          codesign --force --options runtime --timestamp \
+            --sign "$IDENTITY" \
+            "$CLI"
           codesign --force --options runtime --timestamp \
             --entitlements Perch/Config/Perch.entitlements \
             --sign "$IDENTITY" \
             "$APP"
           codesign --verify --strict --verbose=2 "$FINDER_ACTION"
+          codesign --verify --strict --verbose=2 "$CLI"
           codesign --verify --strict --verbose=2 "$APP"
 
       - name: Notarize + staple

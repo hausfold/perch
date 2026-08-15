@@ -64,10 +64,22 @@ stdenvNoCC.mkDerivation {
   dontConfigure = true;
   dontBuild = true;
 
+  # `bin/perch` is a symlink, never a copy: the tool is signed and notarized as
+  # part of the bundle (ADR 0008), and a copy outside it would be nested code
+  # torn out of the seal it was signed under. It is `perch-cli` in the bundle
+  # because a `Contents/MacOS/perch` would overwrite `Contents/MacOS/Perch` on a
+  # case-insensitive volume — which is every stock Mac.
   installPhase = ''
     runHook preInstall
     mkdir -p $out/Applications
     /usr/bin/ditto Perch.app $out/Applications/Perch.app
+    # Guarded because the pin lags the source: releases cut before the tool
+    # existed have no such binary, and a dangling bin/perch would be worse than
+    # no bin/perch at all.
+    if [ -x "$out/Applications/Perch.app/Contents/MacOS/perch-cli" ]; then
+      mkdir -p $out/bin
+      ln -s $out/Applications/Perch.app/Contents/MacOS/perch-cli $out/bin/perch
+    fi
     runHook postInstall
   '';
 
