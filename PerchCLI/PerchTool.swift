@@ -132,9 +132,13 @@ struct PerchTool {
             // be running under a dev bundle identifier, and either way only the
             // app that answers can admit anything. Give a live one a moment
             // first — its scan loop is 150ms — and launch only if none does.
+            // With --no-launch there is no second window, so that first one is
+            // the whole `--wait` the caller asked for.
             var response = try client.waitForAdmission(
                 request.id,
-                deadline: min(deadline, Date().addingTimeInterval(2))
+                deadline: options.launch
+                    ? min(deadline, Date().addingTimeInterval(2))
+                    : deadline
             )
             if response == nil, options.launch {
                 launchPerch()
