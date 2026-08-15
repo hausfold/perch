@@ -14,7 +14,9 @@ xcodebuild -project Perch.xcodeproj -scheme Perch \
 ```
 
 Or open `Perch.xcodeproj`, pick the **Perch** scheme, and run **My Mac** for an
-interactive build.
+interactive build. Either way you also get the `perch` command line tool, built
+into the bundle at `Perch.app/Contents/MacOS/perch-cli` — see
+[the CLI](cli.md).
 
 If you build or copy the app by hand instead of installing the cask, macOS may
 quarantine your copy. Clear it with:

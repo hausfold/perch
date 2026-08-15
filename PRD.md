@@ -16,6 +16,10 @@ collect several items and then drag the group to one destination.
   Quick Actions menu, on by default, with a Settings shortcut to the pane that
   holds its checkbox — and a classic Service that puts the same command at the
   context menu's top level, and in any app's Services menu for text and links.
+- A `perch add` command line tool, shipped inside the app bundle and put on
+  `PATH` by whatever installed it, so a script or an agent can stage files
+  without a human present — same admission, same staging, same untouched
+  originals, with an exit status a pipeline can branch on.
 - Background staging with visible pending state.
 - Explicit iCloud placeholder handling and a bounded failure.
 - Collision-proof staging and atomic completed-item persistence.
@@ -50,6 +54,9 @@ collect several items and then drag the group to one destination.
 11. Invoke the top-level **Add to Perch Shelf** on the same three files and get
     the same outcome — one copy admitted, three originals untouched — proving
     the Service shares the drag path's admission rather than its own.
+12. Run `perch add` on those three files with one free slot left: it exits 2,
+    one tile lands, and the two refused sources were never read. Quit Perch and
+    run it again: it launches the shelf and the file still lands.
 
 ## Deferred without refactor
 

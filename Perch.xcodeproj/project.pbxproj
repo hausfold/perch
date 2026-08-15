@@ -27,11 +27,19 @@
 			remoteGlobalIDString = A20000000000000000000080;
 			remoteInfo = PerchFinderAction;
 		};
+		A2000000000000000000009A = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A20000000000000000000010;
+			proxyType = 1;
+			remoteGlobalIDString = A20000000000000000000091;
+			remoteInfo = PerchCLI;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXBuildFile section */
 		A20000000000000000000067 = {isa = PBXBuildFile; fileRef = A20000000000000000000051; settings = {ATTRIBUTES = (RemoveHeadersOnCopy,);};};
 		A20000000000000000000077 = {isa = PBXBuildFile; fileRef = A20000000000000000000079; settings = {ATTRIBUTES = (RemoveHeadersOnCopy,);};};
+		A20000000000000000000099 = {isa = PBXBuildFile; fileRef = A20000000000000000000092;};
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -53,6 +61,15 @@
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A20000000000000000000098 = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "Contents/MacOS";
+			dstSubfolderSpec = 1;
+			files = (A20000000000000000000099,);
+			name = "Embed Command Line Tool";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -61,6 +78,7 @@
 		A20000000000000000000050 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PerchIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000051 = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PerchShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000079 = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PerchFinderAction.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000092 = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "perch-cli"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -131,6 +149,11 @@
 			path = PerchFinderAction;
 			sourceTree = "<group>";
 		};
+		A20000000000000000000090 = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PerchCLI;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -139,6 +162,7 @@
 		A20000000000000000000062 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A2000000000000000000006A = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A2000000000000000000007D = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A20000000000000000000094 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -149,6 +173,7 @@
 				A20000000000000000000052,
 				A2000000000000000000007B,
 				A2000000000000000000007C,
+				A20000000000000000000090,
 				A20000000000000000000055,
 				A20000000000000000000053,
 				A20000000000000000000054,
@@ -159,7 +184,7 @@
 		};
 		A2000000000000000000000C = {
 			isa = PBXGroup;
-			children = (A20000000000000000000004, A20000000000000000000005, A20000000000000000000050, A20000000000000000000051, A20000000000000000000079,);
+			children = (A20000000000000000000004, A20000000000000000000005, A20000000000000000000050, A20000000000000000000051, A20000000000000000000079, A20000000000000000000092,);
 			name = Products;
 			sourceTree = "<group>";
 		};
@@ -169,9 +194,9 @@
 		A20000000000000000000011 = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A20000000000000000000030;
-			buildPhases = (A20000000000000000000013, A20000000000000000000009, A20000000000000000000014, A20000000000000000000078,);
+			buildPhases = (A20000000000000000000013, A20000000000000000000009, A20000000000000000000014, A20000000000000000000078, A20000000000000000000098,);
 			buildRules = ();
-			dependencies = (A20000000000000000000081,);
+			dependencies = (A20000000000000000000081, A2000000000000000000009B,);
 			fileSystemSynchronizedGroups = (A20000000000000000000007, A20000000000000000000052, A2000000000000000000007B,);
 			name = Perch;
 			packageProductDependencies = ();
@@ -218,6 +243,19 @@
 			productReference = A20000000000000000000079;
 			productType = "com.apple.product-type.app-extension";
 		};
+		A20000000000000000000091 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A20000000000000000000097;
+			buildPhases = (A20000000000000000000093, A20000000000000000000094,);
+			buildRules = ();
+			dependencies = ();
+			fileSystemSynchronizedGroups = (A20000000000000000000090, A2000000000000000000007B,);
+			name = PerchCLI;
+			packageProductDependencies = ();
+			productName = "perch-cli";
+			productReference = A20000000000000000000092;
+			productType = "com.apple.product-type.tool";
+		};
 		A20000000000000000000012 = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A20000000000000000000031;
@@ -246,6 +284,7 @@
 					A20000000000000000000060 = {CreatedOnToolsVersion = 26.6;};
 					A20000000000000000000068 = {CreatedOnToolsVersion = 26.6;};
 					A20000000000000000000080 = {CreatedOnToolsVersion = 26.6;};
+					A20000000000000000000091 = {CreatedOnToolsVersion = 26.6;};
 				};
 			};
 			buildConfigurationList = A20000000000000000000032;
@@ -258,7 +297,7 @@
 			productRefGroup = A2000000000000000000000C;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (A20000000000000000000011, A20000000000000000000012, A20000000000000000000060, A20000000000000000000068, A20000000000000000000080,);
+			targets = (A20000000000000000000011, A20000000000000000000012, A20000000000000000000060, A20000000000000000000068, A20000000000000000000080, A20000000000000000000091,);
 		};
 /* End PBXProject section */
 
@@ -276,12 +315,14 @@
 		A20000000000000000000061 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A20000000000000000000069 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A2000000000000000000007E = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A20000000000000000000093 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
 		A20000000000000000000017 = {isa = PBXTargetDependency; target = A20000000000000000000011; targetProxy = A20000000000000000000003;};
 		A20000000000000000000065 = {isa = PBXTargetDependency; target = A20000000000000000000068; targetProxy = A20000000000000000000066;};
 		A20000000000000000000081 = {isa = PBXTargetDependency; target = A20000000000000000000080; targetProxy = A20000000000000000000076;};
+		A2000000000000000000009B = {isa = PBXTargetDependency; target = A20000000000000000000091; targetProxy = A2000000000000000000009A;};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -569,6 +610,44 @@
 			};
 			name = Release;
 		};
+		A20000000000000000000095 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 88M28542LQ;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hausfold.perch.cli;
+				PRODUCT_MODULE_NAME = PerchCLI;
+				PRODUCT_NAME = "perch-cli";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = targeted;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A20000000000000000000096 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 88M28542LQ;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hausfold.perch.cli;
+				PRODUCT_MODULE_NAME = PerchCLI;
+				PRODUCT_NAME = "perch-cli";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = targeted;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -578,6 +657,7 @@
 		A20000000000000000000074 = {isa = XCConfigurationList; buildConfigurations = (A20000000000000000000070, A20000000000000000000071,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
 		A20000000000000000000075 = {isa = XCConfigurationList; buildConfigurations = (A20000000000000000000072, A20000000000000000000073,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
 		A20000000000000000000084 = {isa = XCConfigurationList; buildConfigurations = (A20000000000000000000082, A20000000000000000000083,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+		A20000000000000000000097 = {isa = XCConfigurationList; buildConfigurations = (A20000000000000000000095, A20000000000000000000096,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
 /* End XCConfigurationList section */
 	};
 	rootObject = A20000000000000000000010;

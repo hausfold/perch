@@ -79,37 +79,24 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling, @uncheck
             attachments: attachments
         )
 
-        let request = FinderActionRequest(
-            id: UUID(),
-            createdAt: Date(),
-            items: attachments.enumerated().map { index, provider in
-                FinderActionItem(
-                    id: UUID(),
-                    displayName: FinderActionProtocol.safeFilename(
-                        provider.suggestedName ?? "Item \(index + 1)"
-                    ),
-                    attachmentIndex: index
-                )
-            }
-        )
+        let displayNames = attachments.enumerated().map { index, provider in
+            provider.suggestedName ?? "Item \(index + 1)"
+        }
 
         workQueue.addOperation { [weak self] in
             guard let self else { return }
             do {
-                let mailbox = try FinderActionMailbox()
-                try mailbox.createRequest(request)
-                guard let response = try self.waitForAdmission(
-                    requestID: request.id,
-                    mailbox: mailbox
+                let client = try HandoffClient()
+                let request = try client.openRequest(displayNames: displayNames)
+                guard let response = try client.waitForAdmission(
+                    request.id,
+                    deadline: Date().addingTimeInterval(5)
                 ) else {
                     // Do not delete the request here: the app may have reserved
                     // slots while its atomic response was racing this timeout.
                     // An empty completion lets it release any such reservation
                     // on the next scan; an unopened app reaps it as stale later.
-                    try? mailbox.writeCompletion(
-                        FinderActionCompletion(stagedItems: [], failedItemIDs: []),
-                        for: request.id
-                    )
+                    client.abandon(request.id)
                     self.cancel(
                         invocation.context,
                         message: "Open Perch and try the Finder action again."
@@ -120,10 +107,10 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling, @uncheck
                     request: request,
                     response: response,
                     attachments: invocation.attachments,
-                    mailbox: mailbox
+                    client: client
                 ) { completion in
                     do {
-                        try mailbox.writeCompletion(completion, for: request.id)
+                        try client.finish(completion, for: request.id)
                         self.complete(
                             invocation.context,
                             returning: [invocation.inputItem]
@@ -144,29 +131,14 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling, @uncheck
         }
     }
 
-    private func waitForAdmission(
-        requestID: UUID,
-        mailbox: FinderActionMailbox
-    ) throws -> FinderActionResponse? {
-        let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline {
-            if let response = try mailbox.readResponse(for: requestID) {
-                return response
-            }
-            Thread.sleep(forTimeInterval: 0.1)
-        }
-        return nil
-    }
-
     private func stageAcceptedItems(
         request: FinderActionRequest,
         response: FinderActionResponse,
         attachments: [NSItemProvider],
-        mailbox: FinderActionMailbox,
+        client: HandoffClient,
         completion: @escaping @Sendable (FinderActionCompletion) -> Void
     ) {
-        let acceptedIDs = Set(response.acceptedItemIDs)
-        let accepted = request.items.filter { acceptedIDs.contains($0.id) }
+        let accepted = client.acceptedItems(in: request, response: response)
         guard !accepted.isEmpty else {
             completion(FinderActionCompletion(stagedItems: [], failedItemIDs: []))
             return
@@ -190,18 +162,13 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling, @uncheck
 
             group.enter()
             let providerReference = ProviderReference(provider)
-            workQueue.addOperation { [weak self] in
-                guard let self else {
-                    accumulator.recordFailure(item.id)
-                    group.leave()
-                    return
-                }
+            workQueue.addOperation {
                 let loaded = DispatchSemaphore(value: 0)
                 providerReference.provider.loadInPlaceFileRepresentation(
                     forTypeIdentifier: typeIdentifier
-                ) { [weak self] sourceURL, _, _ in
+                ) { sourceURL, _, _ in
                     defer { loaded.signal() }
-                    guard let self, let sourceURL else {
+                    guard let sourceURL else {
                         accumulator.recordFailure(item.id)
                         return
                     }
@@ -209,18 +176,12 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling, @uncheck
                     DispatchQueue.global(qos: .userInitiated).async {
                         defer { copied.signal() }
                         do {
-                            let destination = try self.copyIntoMailbox(
-                                sourceURL: sourceURL,
-                                item: item,
-                                requestID: request.id,
-                                mailbox: mailbox
-                            )
-                            let relativePath = try mailbox.relativePath(
-                                for: destination,
-                                requestID: request.id
-                            )
                             accumulator.recordStaged(
-                                FinderActionStagedItem(id: item.id, relativePath: relativePath)
+                                try client.stage(
+                                    sourceURL: sourceURL,
+                                    item: item,
+                                    requestID: request.id
+                                )
                             )
                         } catch {
                             accumulator.recordFailure(item.id)
@@ -242,38 +203,6 @@ final class ActionRequestHandler: NSObject, NSExtensionRequestHandling, @uncheck
         group.notify(queue: .global(qos: .userInitiated)) {
             completion(accumulator.completion())
         }
-    }
-
-    private func copyIntoMailbox(
-        sourceURL: URL,
-        item: FinderActionItem,
-        requestID: UUID,
-        mailbox: FinderActionMailbox
-    ) throws -> URL {
-        let fileManager = FileManager()
-        let directory = try mailbox.stagedDirectory(for: requestID, itemID: item.id)
-        let destination = directory.appending(path: item.displayName)
-        let partial = directory.appending(path: ".\(item.id.uuidString).partial")
-        let scoped = sourceURL.startAccessingSecurityScopedResource()
-        defer {
-            if scoped { sourceURL.stopAccessingSecurityScopedResource() }
-        }
-
-        var coordinationError: NSError?
-        var copyResult: Result<Void, Error> = .success(())
-        NSFileCoordinator().coordinate(
-            readingItemAt: sourceURL,
-            options: [.withoutChanges],
-            error: &coordinationError
-        ) { coordinatedURL in
-            copyResult = Result {
-                try fileManager.copyItem(at: coordinatedURL, to: partial)
-                try fileManager.moveItem(at: partial, to: destination)
-            }
-        }
-        if let coordinationError { throw coordinationError }
-        try copyResult.get()
-        return destination
     }
 
     private func complete(_ context: NSExtensionContext, returning items: [Any]) {
