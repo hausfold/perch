@@ -285,6 +285,15 @@ letting go is the gesture, and a shelf still counting the item reads as stuck.
 The item is *lifted*, not deleted: its staged bytes stay put, and a destination
 that then refuses it or fails its copy puts the item back in its old slot.
 
+**Save to…** is the non-destructive way out, and deliberately not an export at
+all: it copies the staged bytes to a location the user picks in an `NSSavePanel`
+and touches no shelf state — nothing lifted, nothing deleted, no manifest write.
+The same contract as Show in Finder, which is why it sits with it in the context
+menu. The panel is also the permission: it is what grants a sandboxed app a
+destination outside its container, so a fixed folder would mean a new
+entitlement and a path no drag or picker handed us. The copy runs on
+`TransferPipeline`'s bounded queue, never main.
+
 A pinned item is the explicit exception: it never enters the lifted export
 transaction, so every destination receives a copy while the tile and staged
 bytes stay available for another drag. Pin state lives in the manifest and

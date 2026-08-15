@@ -46,6 +46,12 @@ rm -rf ~/Library/Containers/com.nebelhaus.perch
 Each import gets its own UUID directory — that's what prevents name collisions
 without renaming your file. The manifest records only **staged relative paths**
 and file metadata; original source paths are never persisted, and never logged.
+To get a copy out without dragging — the destination is a folder nothing has
+open, or the item is pinned and you just want it on disk — right-click a tile
+and pick **Save to…**. It writes a copy wherever you point the panel and leaves
+the tile exactly where it was; only the panel can hand a sandboxed Perch a path
+outside its container, which is why there is no fixed *Save to Downloads*.
+
 Clearing an item deletes its whole import directory — the staged copy is deleted
 outright rather than moved to the Trash, so **Clear asks first**: the shelf's
 Clear button arms and needs a second click, and the menu bar's *Clear Shelf…*

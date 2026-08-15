@@ -178,6 +178,28 @@ final class TransferPipeline: @unchecked Sendable {
         }
     }
 
+    /// Writes a staged representation out to a location the user picked in a
+    /// save panel. The staged copy is only read — saving is not an export, so
+    /// nothing is lifted, deleted, or detached, and the tile stays put.
+    ///
+    /// Runs on the same bounded queue as importing for the same reason imports
+    /// do: this is a copy of arbitrary size and the main actor never performs
+    /// one.
+    func copyOut(from stagedURL: URL, to destination: URL) async throws {
+        try await enqueue {
+            let fileManager = FileManager()
+            // The panel already asked before overwriting, but asking is all it
+            // does — it never removes the file, and `copyItem` refuses a
+            // destination that exists. Only a pre-existing file at the chosen
+            // path is at stake in that window; the shelf's own copy is the
+            // source here and survives any failure below.
+            if fileManager.fileExists(atPath: destination.path) {
+                try fileManager.removeItem(at: destination)
+            }
+            try fileManager.copyItem(at: stagedURL, to: destination)
+        }
+    }
+
     private func enqueue<T: Sendable>(
         _ operation: @escaping @Sendable () throws -> T
     ) async throws -> T {
