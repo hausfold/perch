@@ -15,6 +15,13 @@
 	</array>
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
+	<!-- Watched folders: the grant a folder picker hands over dies with the
+	     process, and watching ~/Downloads across relaunches means keeping it.
+	     This lets perch persist each picked folder as an app-scoped security
+	     bookmark — still only folders the user chose in a panel, one bookmark
+	     each, revocable in Settings. See ADR 0010. -->
+	<key>com.apple.security.files.bookmarks.app-scope</key>
+	<true/>
 	<!-- The update check, and nothing else: one hourly GET to
 	     api.github.com for the latest release tag, off by a Settings
 	     toggle — see Perch/Platform/UpdateCheck.swift. Perch never

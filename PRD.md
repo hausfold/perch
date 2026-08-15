@@ -20,6 +20,10 @@ collect several items and then drag the group to one destination.
   `PATH` by whatever installed it, so a script or an agent can stage files
   without a human present — same admission, same staging, same untouched
   originals, with an exit status a pipeline can branch on.
+- Watched folders: user-picked folders (Downloads, the screenshot folder)
+  whose new files are copied onto the shelf automatically — existing contents
+  seeded silently, half-written downloads held until they settle, originals
+  never moved.
 - Background staging with visible pending state.
 - Explicit iCloud placeholder handling and a bounded failure.
 - Collision-proof staging and atomic completed-item persistence.
@@ -55,6 +59,9 @@ collect several items and then drag the group to one destination.
     proving the Service shares the drag path's admission rather than its own.
 12. Run `perch add` on those three files: it exits 0 and three tiles land. Quit
     Perch and run it again: it launches the shelf and the file still lands.
+13. Watch a folder holding two files; neither lands. Download into it and one
+    tile appears only after the download completes; the original stays put.
+    Quit perch, drop a file in, relaunch — that file lands too, exactly once.
 
 ## Deferred without refactor
 

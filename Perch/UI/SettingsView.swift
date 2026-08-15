@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var mobile: MobileReceiver
+    @ObservedObject var folderWatch: FolderWatchCenter
     /// Read by `UpdateCheck.automaticChecksEnabled`; defaults to on.
     @AppStorage("automaticUpdateChecks") private var automaticUpdateChecks = true
     @ObservedObject private var update: UpdateCheck = .shared
@@ -24,6 +25,26 @@ struct SettingsView: View {
                     in: 0...30
                 )
                 Text(retentionNote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Watched Folders") {
+                ForEach(folderWatch.rows) { row in
+                    HStack {
+                        Text(row.displayPath ?? "Folder unavailable")
+                            .foregroundStyle(row.displayPath == nil ? .secondary : .primary)
+                        Spacer()
+                        Button("Stop Watching") {
+                            folderWatch.removeFolder(row.id)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+                Button("Watch a Folder…") {
+                    addWatchedFolder()
+                }
+                Text("New files that land in a watched folder are copied onto the shelf. The originals never move, and taking a tile off the shelf never touches them. macOS won’t tell perch where screenshots are saved — to catch them, pick that folder here.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -160,6 +181,23 @@ struct SettingsView: View {
             and for a dragged-in promise, a link or typed text it is the only \
             copy there is.
             """
+    }
+
+    /// The panel is the whole permission model: the grant it returns is what
+    /// the watcher keeps (as an app-scoped bookmark — ADR 0010), so there is
+    /// nothing to pre-authorize and nothing typed in by hand.
+    private func addWatchedFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Watch"
+        panel.message = "Perch will copy new files from this folder onto the shelf."
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls {
+            folderWatch.addFolder(at: url)
+        }
     }
 
     private func openFinderExtensionSettings() {
