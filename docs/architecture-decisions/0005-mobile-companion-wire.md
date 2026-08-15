@@ -37,8 +37,8 @@ retried when the app next runs otherwise. Honest states, no fake "sent".
 - Pairing: the Mac shows a QR (`perch-pair:` + one-shot 32-byte secret, also
   pasteable for camera-less pairing). Both sides prove possession with HMACs
   over the handshake transcript, run X25519, and derive a long-term per-device
-  key; a six-digit code derived from the transcript is confirmed by a human on
-  both screens. The secret dies with the pairing window; the device key IS the
+  key; a six-digit code derived from the transcript is shown on both screens
+  for a human to compare, and approved on the Mac. The secret dies with the pairing window; the device key IS the
   relationship — revoking = deleting a Keychain row. On the phone, identity and
   pairing live in the *same* keychain store deliberately: splitting them across
   keychain and App Group produced a reinstall that looked paired but presented
@@ -99,9 +99,13 @@ relay slots in without a model rewrite.
 - ADR 0003's "the update poll is the only network call" sentence narrows to
   *outbound internet*: the listener speaks only to explicitly paired devices on
   the local network, end-to-end encrypted, off by a Settings toggle.
-- The Mac approval sheet and the phone's six-digit confirm are load-bearing
-  (they are the MITM defense); `PERCH_AUTOPAIR=1` bypasses both in DEBUG
-  builds only, for automated end-to-end runs.
+- The Mac approval sheet is load-bearing — it is the MITM defense, and it is
+  the *only* approval control. The phone shows the same six digits and returns
+  immediately (`MobileAppModel.swift:20`): possession of the QR secret already
+  authenticated both ends, so the digits exist for a human to compare, not to
+  tap. Don't document a phone-side confirm that isn't there.
+  `PERCH_AUTOPAIR=1` bypasses the Mac sheet in DEBUG builds only, for automated
+  end-to-end runs.
 - A phone can delete from the Mac's shelf. That is the point of a shared shelf,
   and the pairing ceremony is what gates it: a device key is the relationship,
   and revoking it in Settings ends the ability.

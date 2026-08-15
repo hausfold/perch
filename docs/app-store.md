@@ -54,8 +54,8 @@ The first submission is the slow one; everything after it is the loop below.
   Nothing to do; the build in TestFlight is already installable on your own
   devices while you wait.
 - **A reviewer question** arrives in **Resolution Center**, not by email thread —
-  reply there. The review-note bullets below are the answers to the likely ones;
-  the offer to arrange a paired Mac is genuine, so honor it if they take it.
+  reply there. The seven review-note answers below cover the likely ones; the
+  offer to arrange a paired Mac is genuine, so honor it if they take it.
 - **Rejection is not a re-upload.** Most rejections are metadata or explanation,
   fixed in App Store Connect and resubmitted with the same build. Only rebuild
   (new tag or `gh workflow run`) when the *binary* has to change.
@@ -119,8 +119,9 @@ a companion, not a standalone.
 >   network and talks to it directly, end-to-end encrypted with a key the two
 >   devices agreed on when you paired them. There is no relay, no server, and no
 >   account.
-> • Pairing is deliberate. Scan the QR your Mac shows, then confirm the same six
->   digits on both screens. Unpairing is one tap, and it deletes the key.
+> • Pairing is deliberate. Scan the QR your Mac shows, check that the same six
+>   digits appear on both screens, and approve it on the Mac. Unpairing is one
+>   tap, and it deletes the key.
 > • Nothing is collected. No analytics, no ads, no tracking, and your file names
 >   never appear in a log.
 >
@@ -151,77 +152,86 @@ The screen recording Apple asks for as item 1 is
 [its own section](#the-screen-recording-apple-asks-for); it is a human act and
 cannot be pasted from here.
 
-Two mechanical constraints on this text, both learned the annoying way:
+Four things to know before pasting it, three of them learned the annoying way:
 
-- **The Notes field caps at 4,000 characters.** The block below is 3,968 — it
-  fits with ~30 characters to spare, so anything you add has to buy its space
-  from something else. Check with
+- **The Notes field caps at 4,000 characters.** The block below is 3,973 — it
+  fits with 27 to spare, so anything you add has to buy its space from
+  something else. Check with
   `awk '/^## Review notes/{f=1} f&&/^>/{sub(/^> ?/,"");print} f&&/^Also fill in:/{exit}' docs/app-store.md | wc -m`.
 - **It is a plain-text field**, which is why the block below carries no
   Markdown emphasis and uses ALL-CAPS headings. Keep it that way; `**bold**`
   pastes as literal asterisks in front of a reviewer.
+- **Items 1 and 2 are the only two that go stale**, and both are statements of
+  fact to Apple: item 1 promises an attached recording (attach it, or cut the
+  word), and item 2 names the devices and OS versions *you actually ran*.
+  Re-read those two every submission; paste 3–7 unchanged.
+- **Everything else in the block was checked against the code** on 2026-08-15 —
+  the UI strings, the framework list, the "no third-party SDK / no backend"
+  claim, the crypto primitives. If you change what the app does, this text is
+  part of the change.
 
 > Perch Companion is the iPhone/iPad half of Perch, a Mac shelf that lives at
 > the notch. The Mac app is separate, distributed outside the App Store at
-> https://hausfold.co/perch. This app does NOT need a Mac to be reviewed — see 4.
+> https://hausfold.co/perch. This app does NOT need a Mac to be reviewed — see
+> 4.
 >
-> 1. SCREEN RECORDING. Attached in Resolution Center, captured on a physical
-> iPhone 16 running iOS 27.0. It begins at the Home Screen, launches the app, and
-> shows the whole flow: adding items with no Mac present, the Share extension,
-> both permission prompts (camera, local network), pairing, and delivery. The app
-> has no registration, login, account deletion, purchase, subscription, or
-> user-generated content, so none appear; see the last paragraph.
+> 1. SCREEN RECORDING. Attached. Captured from a physical iPhone 16 running iOS
+> 27.0 mirrored to a Mac so both halves of the product are visible in one file.
+> It begins at the Home Screen, launches the app, and shows the whole flow: the
+> local-network and camera prompts, adding items with no Mac present, the Share
+> extension, pairing, and delivery. It shows no registration, login, purchase or
+> user-generated-content flow because the app has none; see the last paragraph.
 >
 > 2. TESTED ON. iPhone 16, iOS 27.0 (physical device) — every flow, including
 > pairing and delivery over Wi-Fi. iPad Pro 13-inch (M5) and iPad Air 11-inch
-> (M4), iPadOS 26.5 (Simulator) — layout and shelf behaviour. The Mac side:
-> macOS 26 running the Perch desktop app.
+> (M4), iPadOS 26.5 (Simulator) — layout and shelf behaviour. Mac side: macOS 26
+> running the Perch desktop app.
 >
 > 3. WHAT IT DOES, AND FOR WHOM. A shelf in your pocket. Share a file, photo,
 > link or scrap of text to Perch from any app: it lands on the phone's shelf at
 > once and waits until your Mac is reachable, then is handed over and appears on
-> the Mac's shelf. For Mac owners who move small things between their own two
-> devices all day. AirDrop needs both devices awake and in range at the same
-> moment; cloud alternatives want an account and your file on a server. Perch
-> decouples the two — sharing always succeeds now, delivery happens whenever the
-> Mac comes back — with no account and no server in the path.
+> the Mac's shelf. For Mac owners who move small things between their own
+> devices all day. AirDrop needs both devices awake and in range at once; cloud
+> alternatives want an account and your file on a server. Perch decouples them —
+> sharing always succeeds now, delivery happens when the Mac comes back — with
+> no account and no server in the path.
 >
 > 4. SETUP AND ACCESS. No login, no credentials, no sample files, and no account
-> of any kind, so there is no demo account to provide. On a clean install with no
-> Mac at all: launch the app — the shelf reads "Nothing waiting", the correct
+> of any kind, so there is no demo account to provide. On a clean install with
+> no Mac at all: launch the app — the shelf reads "Nothing waiting", the correct
 > empty state, not an error; tap Add (+) and choose From Photos, From Files or
-> Paste, and the item appears under "On this iPhone" and survives relaunch; or
-> share to Perch from Photos, Safari or Files and find it on the shelf. Items
-> read "Waiting" while no Mac is paired — nothing is ever labelled sent when it
-> hasn't been. Swipe a row to remove it. Nothing is gated or paywalled. Pairing
-> is optional, and the only part needing hardware we cannot ship you: a Mac on
-> the same Wi-Fi running Perch shows a QR code, the phone scans it (or accepts
-> the perch-pair:… string pasted as text), and both screens then show the same
-> six digits to confirm on each side. Unpairing is one tap and deletes the key.
-> We will gladly arrange a Mac running Perch for you to connect to — just ask
-> here and we will respond the same day.
+> Paste, and the item appears under "On this iPhone" (or iPad) and survives
+> relaunch; or share to Perch from Photos, Safari or Files and find it on the
+> shelf. Each row reads "waiting" while no Mac is paired — nothing is ever
+> labelled sent when it hasn't been. Swipe a row to remove it. Nothing is gated
+> or paywalled. Pairing is optional, and the only part needing hardware we can't
+> ship you: a Mac on the same Wi-Fi running Perch shows a QR code, the phone
+> scans it (or accepts the perch-pair:… string pasted as text), and both screens
+> then display the same six digits, which you compare before approving on the
+> Mac. Unpairing is one tap and deletes the key. We will gladly arrange a Mac
+> running Perch for you to connect to — just ask and we'll respond same day.
 >
 > 5. EXTERNAL SERVICES, TOOLS AND PLATFORMS. None. No third-party SDKs, no
 > analytics, no crash reporter, no ads, no authentication service, no payment
-> processor, no AI service, no data provider, and no backend of ours. The app's
-> only network peer is a Mac the user paired by hand, found over Bonjour
-> (_perch._tcp) on the local network and connected to directly over TCP.
-> Everything else is Apple's frameworks: SwiftUI, Network.framework, AVFoundation
-> for the QR scanner, and CryptoKit for the end-to-end encryption (X25519, HKDF,
-> ChaCha20-Poly1305 — OS-provided standard algorithms, the basis of our
-> export-compliance answer). No data leaves the user's local network.
+> processor, no AI service, no data provider, and no backend of ours. The only
+> network peer is a Mac the user paired by hand, found over Bonjour
+> (_perch._tcp) on the local network and connected directly over TCP. Everything
+> else is Apple's frameworks: SwiftUI, UIKit, PhotosUI, VisionKit for the QR
+> scanner, Network.framework, and CryptoKit for the end-to-end encryption
+> (X25519, HKDF, ChaCha20-Poly1305 — OS-provided standard algorithms, the basis
+> of our export-compliance answer). No data leaves the local network.
 >
-> 6. REGIONAL DIFFERENCES. None — the app behaves identically in every region and
-> on every storefront. No geo-gating, no region-specific content or pricing, and
-> no remote configuration. English only.
+> 6. REGIONAL DIFFERENCES. None — the app behaves identically in every region
+> and storefront. No geo-gating, no region-specific content or pricing, no
+> remote configuration. English only.
 >
-> 7. REGULATED INDUSTRY OR PROTECTED THIRD-PARTY MATERIAL. Neither applies. Perch
-> is a general-purpose productivity utility; all code, text and artwork are our
-> own.
+> 7. REGULATED INDUSTRY OR PROTECTED THIRD-PARTY MATERIAL. Neither applies.
+> Perch is a general-purpose productivity utility; all code, text and artwork
+> are our own.
 >
 > FREE, AND PRIVATE. No in-app purchases, no subscriptions, nothing to restore.
 > The Mac app is paid, sold on our own website, and is never offered for sale or
-> linked to as a purchase inside this app. Nothing a user adds is ever visible to
+> linked as a purchase inside this app. Nothing a user adds is ever visible to
 > anyone else — no feed, no upload, no server, no other user — so there is no
 > reporting or blocking mechanism.
 
@@ -261,15 +271,28 @@ permission prompts is what invites a second round:
 | # | shot | why Apple wants it |
 |---|---|---|
 | 1 | Home Screen, tap the Perch icon | "must begin with launching the app" |
-| 2 | Empty shelf: "Nothing waiting" | proves the app is usable with no Mac |
-| 3 | ＋ → From Photos → pick one; ＋ → Paste | core feature, standalone |
-| 4 | Leave the app → Photos → Share → **Perch** → back to the shelf | the Share extension, the other core feature |
-| 5 | Force-quit and relaunch; the items are still there | it's a shelf, not a send button |
-| 6 | Tap **Pair a Mac** → the **local network** prompt → Allow | "prompts requesting access to … device capabilities" |
-| 7 | Scan QR → the **camera** prompt → Allow → point at the Mac's QR | the second prompt, and the purpose string in context |
-| 8 | Six digits on both screens, confirm on each | shows pairing is deliberate and mutual |
-| 9 | An item flips Waiting → Delivered; the tile appears on the Mac's shelf | the payoff, and the only shot that needs the Mac |
+| 2 | The **local network** prompt → Allow | it fires here, at launch — see the warning below |
+| 3 | Empty shelf: "Nothing waiting" | proves the app is usable with no Mac |
+| 4 | ＋ → From Photos → pick one; ＋ → Paste (iOS asks "Allow Paste?") | core feature, standalone — and a third system alert to expect |
+| 5 | Leave the app → Photos → Share → **Perch** → back to the shelf | the Share extension, the other core feature |
+| 6 | Force-quit and relaunch; the items are still there | it's a shelf, not a send button |
+| 7 | Tap **Pair a Mac** → Scan QR → the **camera** prompt → Allow → point at the Mac's QR | the second purpose string, in context |
+| 8 | The same six digits on both screens; **approve on the Mac** | shows pairing is deliberate and mutually verified |
+| 9 | The row leaves the phone's shelf, a **Delivered** receipt appears, and the tile lands on the Mac's shelf | the payoff, and the only shot that needs the Mac |
 | 10 | **More → Unpair** | the teardown half, which reviewers look for |
+
+⚠️ **The local-network prompt does not wait for "Pair a Mac".** Bonjour
+browsing starts on every activation (`PerchMobileApp.swift:12` →
+`MobileAppModel.becameActive()` → `startBrowsing()`), so on a fresh install the
+alert lands over the launch, before the empty state is even legible. Film it
+there; don't plan a later beat for it that will never come.
+
+⚠️ **The phone has no confirm button.** Possession of the QR secret already
+authenticated both ends, so the six digits exist to be *compared*, not tapped —
+the phone displays them and waits, and the only approval control is on the Mac
+(`MobileAppModel.swift:20`, `PairMacView.swift:51`). Say "compare, then approve
+on the Mac"; a note promising a tap the reviewer can't find is worse than no
+note.
 
 There is no account registration, login, account deletion, purchase,
 subscription, or user-generated-content flow to record — say that in the reply
@@ -286,7 +309,7 @@ the question never gets asked twice).
 | **2.1 Information Needed** — happened, 2026-08-15 | Apple's seven-question form. All seven are answered verbatim in [Review notes](#review-notes--paste-this-into-app-review-information); item 1 is the [screen recording](#the-screen-recording-apple-asks-for). Reply in Resolution Center *and* leave the same text in Notes — this build does not need rebuilding. |
 | 2.1 "we couldn't test the core feature" | The review note above: the app stages and holds items with no Mac at all. |
 | 4.2 "minimum functionality / it's a companion" | It is a functional shelf and a Share extension target on its own, not a remote control. Lead with that framing in the description too. |
-| 5.1.1 local network permission | `NSLocalNetworkUsageDescription` and `NSBonjourServices` are declared, and the prompt only appears when the user taps Pair. |
+| 5.1.1 local network permission | `NSLocalNetworkUsageDescription` and `NSBonjourServices` are declared. The prompt fires at first launch, not at Pair — browsing starts in `becameActive()` — so the purpose string has to make sense to someone who hasn't paired anything yet, and it does. |
 | 5.1.1 camera permission | `NSCameraUsageDescription` is specific: it reads the pairing QR, nothing else. |
 | 3.1.1 "steering to an outside purchase" | Nothing in the family is sold at all: no checkout exists to steer to. The description's one mention of the Mac app is a factual statement about a free companion product. Keep it that way. |
 | Missing privacy manifest | Both bundles carry one; if you add a shared source file that touches a required-reason API, update **both**. |
