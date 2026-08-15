@@ -90,6 +90,11 @@ stdenvNoCC.mkDerivation {
   meta = {
     description = "Native macOS notch file shelf";
     homepage = "https://github.com/hausfold/perch";
+    # Safe to declare again now that perch is MIT (ADR 0009). It was left out
+    # while the repo was FSL-1.1-ALv2: nixpkgs has no FSL license, and anything
+    # that isn't a free license flips the package unfree, which breaks the
+    # rice's install for anyone without allowUnfree.
+    license = lib.licenses.mit;
     platforms = lib.platforms.darwin;
     sourceProvenance = [ lib.sourceTypes.binaryNativeCode ];
   };

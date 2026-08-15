@@ -11,7 +11,7 @@ screen until you know where they're going.
 ![part of hausfold](https://img.shields.io/badge/part_of-hausfold-f2c4e5?labelColor=202020)
 ![themed by nebelung](https://img.shields.io/badge/themed_by-nebelung-c9a8f1?labelColor=202020)
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-b9a8e0?labelColor=202020)
-![license](https://img.shields.io/badge/license-FSL--1.1--ALv2-d7d7d7?labelColor=202020)
+![license](https://img.shields.io/badge/license-MIT-d7d7d7?labelColor=202020)
 
 <sub>**pre-release** · your originals are never moved, renamed or touched, and nothing leaves the shelf on its own — clearing it asks first, and the expiry timer is off unless you turn it on. that's the intent, not a warranty — tell us what breaks.</sub>
 
@@ -66,7 +66,7 @@ standalone installs do it once, by hand. ([why](docs/reference.md#the-one-system
 - **it never touches your originals** — every dropped item is *copied* into a private, collision-proof staging area. drop two files with the same name from different folders and both survive. nothing on disk is moved, renamed, or modified, ever.
 - **it handles the awkward producers** — Photos exports, Safari images, and other apps that hand over files lazily (AppKit "file promises") go down their own import path, so they land correctly instead of arriving empty.
 - **it lives at the top of Finder's right-click menu** — **Add to Perch Shelf** sits in the context menu itself, beside *New Terminal Tab Here*, with no setup at all: right-click any selection and it's on the shelf. Select text or a link anywhere else and the same command is in that app's Services menu. The Quick Actions submenu carries it too, from the Finder extension — macOS turns that one on for you; if it ever goes missing it lives in System Settings ▸ General ▸ Login Items & Extensions ▸ Extensions ▸ ⓘ next to **System Services** — under that row, not under Perch. Perch must be running for the Quick Action so it can reserve shelf space before Finder copies anything; the top-level one launches Perch itself.
-- **it takes files from a script** — `perch add report.pdf` puts something on the shelf from a shell, a Makefile, or an agent; `find . -name '*.png' | perch add -` takes a list on stdin. It's the same road a drag takes — same cap, same staging, originals only ever read — and the exit status says what happened, so a pipeline can tell a full shelf from an unopened one. ([the CLI](docs/cli.md))
+- **it takes files from a script** — `perch add report.pdf` puts something on the shelf from a shell, a Makefile, or an agent; `find . -name '*.png' | perch add -` takes a list on stdin. It's the same road a drag takes — same staging, originals only ever read — and the exit status says what happened, so a pipeline can tell an unopened shelf from a copy that failed. ([the CLI](docs/cli.md))
 - **it stays responsive** — imports run off the main thread with a two-at-a-time limit, and iCloud placeholders are downloaded explicitly. drop a multi-gigabyte file and the shelf keeps animating.
 - **it survives a relaunch** — completed items are written to an atomic manifest. quit and reopen and your pile is still there; startup even recovers files whose manifest write got interrupted.
 - **pin it for repeat drops** — pin a tile and it stays on the shelf after a successful drag, ready to drop into several destinations in quick succession. the pin survives relaunch; unpinning restores the usual one-and-done behavior.
@@ -97,17 +97,11 @@ Each one stands alone. Together they're a house.
 
 ## license
 
-Perch is **fair source**, not open source: [FSL-1.1-ALv2](LICENSE) © hausfold —
-the Functional Source License 1.1 with an Apache-2.0 future license.
+[MIT](LICENSE) © hausfold — free and open source, and free of charge. Read it,
+hack on it, build it yourself, ship your own builds. No paid tier, no license
+key, no cap on what the shelf holds.
 
-In practice:
-
-- the source stays public, right here, and always will.
-- read it, hack on it, build it yourself, run your build on your own machines —
-  all fine, no strings.
-- what you can't do is turn it into a competing product or hand out your own
-  builds of it. that's the one thing MIT couldn't stop.
-- **every release converts to Apache-2.0 two years after that release ships** —
-  the restriction has an expiry date baked in, not a promise.
-- **every tag cut before this change stays MIT, forever.** relicensing is not
-  retroactive; those releases are already out under MIT and stay that way.
+Perch was briefly licensed FSL-1.1-ALv2 (`v2026.08.04` through `v2026.08.14-1`)
+while a paid tier was on the table. That's off the table — those tags are
+relicensed MIT along with everything since, so every release of perch, past and
+future, is MIT.

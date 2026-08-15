@@ -48,15 +48,13 @@ collect several items and then drag the group to one destination.
 9. With a newer release published, the open shelf offers this install's own
    update step; dismissing it silences that version and no other.
 10. Confirm **Add to Perch Shelf** is ticked under Login Items & Extensions ▸
-    Extensions ▸ System Services, invoke it on three files while the free shelf
-    has one open slot, and verify only one source is copied while every original
-    remains unchanged.
+    Extensions ▸ System Services, invoke it on three files, and verify three
+    tiles land while every original remains unchanged.
 11. Invoke the top-level **Add to Perch Shelf** on the same three files and get
-    the same outcome — one copy admitted, three originals untouched — proving
-    the Service shares the drag path's admission rather than its own.
-12. Run `perch add` on those three files with one free slot left: it exits 2,
-    one tile lands, and the two refused sources were never read. Quit Perch and
-    run it again: it launches the shelf and the file still lands.
+    the same outcome — three copies admitted, three originals untouched —
+    proving the Service shares the drag path's admission rather than its own.
+12. Run `perch add` on those three files: it exits 0 and three tiles land. Quit
+    Perch and run it again: it launches the shelf and the file still lands.
 
 ## Deferred without refactor
 

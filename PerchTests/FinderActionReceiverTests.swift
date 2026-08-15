@@ -14,7 +14,7 @@ final class FinderActionReceiverTests: XCTestCase {
         let receiver: FinderActionReceiver
     }
 
-    private func makeFixture(forceFree: Bool = false) throws -> Fixture {
+    private func makeFixture() throws -> Fixture {
         let token = UUID().uuidString
         let shelfRoot = FileManager.default.temporaryDirectory
             .appending(path: "PerchFinderShelf-\(token)", directoryHint: .isDirectory)
@@ -22,19 +22,11 @@ final class FinderActionReceiverTests: XCTestCase {
             .appending(path: "PerchFinderMailbox-\(token)", directoryHint: .isDirectory)
         let defaultsName = "PerchFinderSettings-\(token)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsName))
-        defaults.set(forceFree, forKey: "licenseDebugForceFree")
 
         let repository = try StagingRepository(rootURL: shelfRoot)
-        let license = LicenseStore(
-            defaults: defaults,
-            // A non-empty public key means this test build can sell a license,
-            // which is what makes the free-tier capacity enforceable.
-            verifier: LicenseVerifier(publicKey: Data([0x01]))
-        )
         let store = ShelfStore(
             repository: repository,
-            settings: AppSettings(defaults: defaults),
-            license: license
+            settings: AppSettings(defaults: defaults)
         )
         let mailbox = try FinderActionMailbox(rootURL: mailboxRoot)
         let receiver = FinderActionReceiver(store: store, mailbox: mailbox)
@@ -55,7 +47,7 @@ final class FinderActionReceiverTests: XCTestCase {
     }
 
     func testAdmissionIsPersistedBeforeAnyFinderBytesAreRequested() async throws {
-        let fixture = try makeFixture(forceFree: true)
+        let fixture = try makeFixture()
         let request = FinderActionRequest(
             id: UUID(),
             createdAt: Date(),
@@ -68,7 +60,7 @@ final class FinderActionReceiverTests: XCTestCase {
         await fixture.receiver.scanOnce()
 
         let response = try XCTUnwrap(fixture.mailbox.readResponse(for: request.id))
-        XCTAssertEqual(response.acceptedItemIDs, request.items.prefix(2).map(\.id))
+        XCTAssertEqual(response.acceptedItemIDs, request.items.map(\.id))
         XCTAssertEqual(fixture.store.pendingTransfers.map(\.id), response.acceptedItemIDs)
         XCTAssertFalse(
             FileManager.default.fileExists(

@@ -44,7 +44,7 @@ perch add [options] <path>...
 |---|---|
 | 0 | every path landed on the shelf |
 | 1 | usage error, or a path that isn't there — nothing was submitted |
-| 2 | Perch turned items away: the shelf is full (see the free-tier cap) |
+| 2 | Perch turned items away (nothing refuses an offer today — the code stays because the receipt can say no) |
 | 3 | no Perch answered in time |
 | 4 | Perch admitted the items but a copy failed |
 
@@ -63,8 +63,8 @@ Action already uses ([ADR 0007](architecture-decisions/0007-finder-action-admiss
 1. `perch add` writes a request — **display names only**, no paths — into a
    fresh transaction directory in
    `~/Library/Group Containers/88M28542LQ.com.hausfold.perch/FinderActionRequests`.
-2. The running app reserves shelf slots (this is where the free-tier cap is
-   decided) and answers with the item IDs it admitted.
+2. The running app reserves shelf slots and answers with the item IDs it
+   admitted.
 3. Only then does the tool copy those items' bytes into the transaction
    directory, each through a hidden `.partial` that is moved into place when the
    copy is complete.

@@ -3,8 +3,8 @@ import Foundation
 
 /// The programmatic front door onto the shelf: Shortcuts, Spotlight, and
 /// `shortcuts run` all resolve to this, funnelling into the same
-/// `ShelfStore.importFileURLs` / `importData` a drag uses — same admission
-/// cap, same staging pipeline, same "never touch the source" guarantee.
+/// `ShelfStore.importFileURLs` / `importData` a drag uses — same staging
+/// pipeline, same "never touch the source" guarantee.
 struct AddToShelfIntent: AppIntent {
     static let title: LocalizedStringResource = "Add to Perch Shelf"
     static let description = IntentDescription(

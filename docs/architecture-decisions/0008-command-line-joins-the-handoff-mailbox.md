@@ -27,8 +27,10 @@ container, and publishes relative paths.
 mailbox.** `perch add <path>...` runs the identical four-step transaction the
 Finder Action runs, against the same directory, with the same JSON. The app
 side gains nothing: `FinderActionReceiver` cannot tell the two apart, and must
-not be able to — admission, path validation, adoption, and the free-tier cap
-are decided in one place for every sender there will ever be.
+not be able to — admission, path validation, and adoption are decided in one
+place for every sender there will ever be. (This also said "and the free-tier
+cap"; the cap is gone as of [ADR 0009](0009-perch-stays-free-and-mit.md), the
+single admission point is not.)
 
 The sender half of that protocol therefore moves into
 `PerchFinderBridge/HandoffClient.swift`, shared verbatim by the extension and
@@ -60,7 +62,8 @@ absent one means Perch has never run, and the app makes its own.
 - Every invariant of a drag holds for a script: originals are only read, the
   cap is decided before staging, no original path reaches the container or a
   log, and a tile appears only after a complete copy is adopted.
-- The exit status carries the outcome a script needs — 2 for a full shelf, 3
+- The exit status carries the outcome a script needs — 2 for an item Perch
+  turned away (nothing refuses one today — see ADR 0009), 3
   for no shelf listening, 4 for a copy that failed — so `perch add` is usable
   in a pipeline without parsing output. `--json` reports per item.
 - The App Group directory keeps its `FinderActionRequests` name and JSON shape.
