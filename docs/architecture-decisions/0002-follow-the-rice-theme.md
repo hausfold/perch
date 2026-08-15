@@ -47,7 +47,7 @@ Two knock-on constraints, both load-bearing:
 - **The rice must write real files, not symlinks.** The sandbox resolves a
   symlink before it checks the path, so home-manager's usual `xdg.configFile`
   link into `/nix/store` reads as a store access and is denied — the shelf would
-  silently sit on compiled-in nebelung. `nebelhaus/modules/perch` copies the drop
+  silently sit on compiled-in nebelung. `haus/modules/perch` copies the drop
   in an activation script instead.
 - **The real home has to come from the passwd entry.** Inside the sandbox
   `NSHomeDirectory()` and `homeDirectoryForCurrentUser` both answer with the

@@ -306,7 +306,7 @@ enum RiceFiles {
 ///   "accent": "mauve" }
 /// ```
 ///
-/// The rice writes this (nebelhaus `modules/perch`) so `haus.theme.flavor`,
+/// The desktop writes this (haus `modules/perch`) so `haus.theme.flavor`,
 /// `.contrast` and `.accent` reach perch declaratively. Perch's own settings live
 /// in `UserDefaults`, which Nix has no business writing — this file carries only
 /// what the rice owns. Delete it (or the rice's `theme` option) and the

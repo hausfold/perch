@@ -50,7 +50,8 @@ rice copies the bundle to `/Applications/Perch.app` and a cask's `app` stanza
 moves it to the same path, so rice, cask and drag-install are byte-identical
 locations. Two out-of-band receipts break the tie, with a third signal as
 backstop. Both receipts —
-the rice's `/Library/Application Support/nebelhaus/perch.installed-from` and
+the desktop's `/Library/Application Support/haus/perch.installed-from` (and its
+pre-2026-08-14 spelling `…/nebelhaus/…`, still read) and
 `<brew prefix>/Caskroom/perch` — are outside the container, so a denial would
 read as "not installed that way" rather than as an error. Both turn out to be
 readable under the sandbox today, but the failure is silent if that ever
@@ -64,7 +65,7 @@ when neither receipt was seen, and only able to promote an ambiguous
 A cask or drag-install user gets one more step than a self-applying nudge would
 have given them: run the command, or download and drag. That is the visible cost
 of the sandbox, and it is paid by the cohorts perch's own author is not in — the
-rice cohort was always going to be told to run `haus update`, so on a nebelhaus
+rice cohort was always going to be told to run `haus update`, so on a haus
 machine nothing is lost.
 
 Perch talks to the network, which it never did before. It is one host, one
