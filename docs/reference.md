@@ -61,6 +61,27 @@ Clear button arms and needs a second click, and the menu bar's *Clear Shelf…*
 raises an alert. The expiry timer under Settings ▸ Shelf is **off by default**
 (`Never discard old items`); turn it on and pinned items are still exempt.
 
+## Watched folders
+
+Settings ▸ Watched Folders keeps a list of folders whose **new** files land on
+the shelf by themselves — `~/Downloads`, and the folder macOS saves your
+screenshots to (perch can't ask the system where that is, so you pick it in
+the same panel). Everything about it is copy-only: the arrival is staged like
+a drop, the original never moves, and clearing the tile — or letting the
+retention timer expire it — deletes perch's copy and nothing of yours.
+
+What already sits in a folder when you add it stays off the shelf; only what
+arrives afterwards lands, including things that arrived while perch wasn't
+running. Half-written downloads (`.crdownload`, `.part`, `.download`…) wait
+until they finish and are renamed — that rename is the real completion signal —
+and any other file is imported only after its size has stopped changing for a
+moment, so a normally written file never lands mid-write. (A writer that stalls
+for over a second can still be shelved early; the probe is a net under the
+naming convention, not a proof of doneness.) New folders appearing inside a watched
+folder are not auto-imported; folders still reach the shelf through every
+deliberate door. See
+[ADR 0010](architecture-decisions/0010-watched-folders-stage-copies-on-arrival.md).
+
 ## Colors
 
 The shelf paints from a nebelung palette. Four variants are built in — the
@@ -119,11 +140,15 @@ the UI model. The current design leaves that door open on purpose.
 ## Permissions
 
 Perch requests **no** Accessibility, Input Monitoring, or Screen Recording
-permission, and has no Dock icon. It sees only what you drop on it.
+permission, and has no Dock icon. It sees only what you drop on it and the
+folders you pick for it to watch.
 
 It is sandboxed, with one read-only exception: `~/.config/perch/`, where the
 theme above lives. That is the only path Perch opens that a drag or a file picker
-didn't hand it, and it is never written.
+didn't hand it, and it is never written. A watched folder is picker-granted
+too — perch just keeps that grant across relaunches as an app-scoped security
+bookmark (the `files.bookmarks.app-scope` entitlement), one per folder,
+dropped the moment you stop watching it.
 
 There is no telemetry. Nothing about your files is written to a log.
 

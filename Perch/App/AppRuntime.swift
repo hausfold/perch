@@ -11,6 +11,8 @@ final class AppRuntime: ObservableObject {
     let windowSystem: ShelfWindowSystem
     let mobile: MobileReceiver
     let finderActions: FinderActionReceiver
+    let watchedFolders: WatchedFolderStore
+    let folderWatch: FolderWatchCenter
     /// `NSApp.servicesProvider` is a strong property, so this is not the only
     /// thing keeping the provider alive — it is held here because every other
     /// long-lived collaborator is, and a provider reachable only through
@@ -33,6 +35,8 @@ final class AppRuntime: ObservableObject {
         windowSystem = ShelfWindowSystem(store: store, settings: settings, theme: theme)
         mobile = MobileReceiver(store: store, settings: settings)
         finderActions = FinderActionReceiver(store: store)
+        watchedFolders = WatchedFolderStore()
+        folderWatch = FolderWatchCenter(shelf: store, folders: watchedFolders)
         services = ShelfServicesProvider(store: store)
     }
 
@@ -44,6 +48,7 @@ final class AppRuntime: ObservableObject {
         windowSystem.start()
         UpdateCheck.shared.start()
         mobile.start()
+        folderWatch.start()
     }
 
     func openSettings() {
@@ -52,6 +57,7 @@ final class AppRuntime: ObservableObject {
     }
 
     func stop() {
+        folderWatch.stop()
         finderActions.stop()
         windowSystem.stop()
     }

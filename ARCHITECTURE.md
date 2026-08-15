@@ -121,6 +121,21 @@ bundle-id check while answering perfectly well. See
 [ADR 0008](docs/architecture-decisions/0008-command-line-joins-the-handoff-mailbox.md)
 and [docs/cli.md](docs/cli.md).
 
+A **watched folder** is the seventh door, and the only one that opens without a
+gesture: Settings keeps a list of user-picked folders (each one panel grant,
+persisted as an app-scoped security bookmark), and new files that appear in
+them are copied onto the shelf by `FolderWatchCenter` /
+`Perch/Importing/FolderWatcher.swift`. A kqueue directory source triggers a
+rescan; a candidate must pass name rules (no hidden files, no in-progress
+browser suffixes), be a regular file, and hold its size still across two
+probes before it is handed to the same `ShelfStore.importFileURLs` path a drop
+uses. A per-folder ledger of hashed inode+birth identities — never a name or a
+path — decides what is new, is seeded with the folder's existing contents on
+add, and catches up at launch on arrivals perch missed. Copy only, always: the
+original never leaves the folder, so retention expiry deletes perch's copy and
+nothing of the user's. See
+[ADR 0010](docs/architecture-decisions/0010-watched-folders-stage-copies-on-arrival.md).
+
 The two Finder doors are complementary, not redundant. The extension runs
 without waking Perch, but only inside the submenu and only while the app is up
 to answer its mailbox. The Service is at the top level and macOS launches Perch
@@ -240,6 +255,22 @@ phone go through the shelf's ordinary `remove`. Pulled files land in a
 `MacInbox` container, deliberately *not* the phone's shelf root — anything in
 there is an outbox entry and would be delivered straight back — and are handed
 to the system share sheet, which is what "save this" means on iOS.
+
+### Watching a folder without shelving its half-written files
+
+A watcher sees files before they are whole — Chrome's `.crdownload`, Safari's
+`.download`, a `curl -o` growing in place — and invariant 3 forbids a tile
+over a truncated copy. So a watched arrival is imported only after it passes
+name rules, is a regular file, and holds size and modification date still
+across consecutive probes; a file that never settles is probed cheaply forever
+and imported never. Directory kqueues do not report writes to a file's
+contents, which is fine: entry changes trigger the rescan, and the probe owns
+the question of doneness. What counts as *new* is a per-folder ledger of
+SHA-256(inode + birth date) tokens, so renaming or editing a shelved file in
+place never re-imports it, and nothing about a source's name or path is
+persisted or logged. Marking is at-most-once, when the file is handed to
+import — a failed staging shows its error once rather than retrying on every
+event. See ADR 0010.
 
 ### Name collisions
 

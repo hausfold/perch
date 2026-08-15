@@ -74,7 +74,11 @@ struct PerchApp: App {
         .menuBarExtraStyle(.menu)
 
         Settings {
-            SettingsView(settings: runtime.settings, mobile: runtime.mobile)
+            SettingsView(
+                settings: runtime.settings,
+                mobile: runtime.mobile,
+                folderWatch: runtime.folderWatch
+            )
         }
     }
 
