@@ -44,7 +44,7 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
     case homebrew
     /// Dragged out of the release ZIP — the user replaces the bundle in Finder.
     case direct
-    /// The nebelhaus rice's activation copy — `haus update`.
+    /// The haus desktop's activation copy — `haus update`.
     case rice
     /// A bare Nix store path (`nix run`, someone else's flake) — flake update.
     case nix
@@ -85,7 +85,7 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
         switch self {
         case .homebrew: return "Installed with Homebrew — updates come from brew upgrade --cask perch."
         case .direct: return "Installed from the release ZIP — updates are a download and a drag."
-        case .rice: return "Installed by the nebelhaus rice — updates come from haus update."
+        case .rice: return "Installed by the haus desktop — updates come from haus update."
         case .nix: return "Running from the Nix store — updates come from your flake input."
         case .unknown: return "Updates open the GitHub release page."
         }
@@ -99,7 +99,7 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
     // drag-install are byte-identical locations. Out-of-band receipts break the
     // tie:
     //
-    //   rice   /Library/Application Support/nebelhaus/perch.installed-from —
+    //   rice   /Library/Application Support/haus/perch.installed-from —
     //          written by the activation script with the store path it copied.
     //   cask   <brew prefix>/Caskroom/perch — brew's own staging directory,
     //          which survives the app being moved to /Applications.
@@ -114,8 +114,24 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
     // whose advice (`haus update`) is the one that would otherwise be missed on
     // this machine.
 
-    /// Where the rice records the store path it installed from.
-    static let riceMarkerPath = "/Library/Application Support/nebelhaus/perch.installed-from"
+    /// Where the desktop records the store path it installed from.
+    ///
+    /// 🚨 **Two paths, and the second one is not dead weight.** The directory
+    /// was `…/nebelhaus/` until 2026-08-14, when the desktop was renamed
+    /// (`hausfold/haus`, the rename note's §11). haus moves it and leaves a
+    /// symlink at the old path, so a perch that only knew the old spelling
+    /// keeps working — but the reverse is the case this list is for: a perch
+    /// built from THIS source, running on a Mac whose haus has not been
+    /// rebuilt since the rename, would find nothing at the new path and
+    /// silently demote itself from `.rice` to `.direct` — i.e. start offering
+    /// to update itself on a machine where `haus update` owns the app.
+    ///
+    /// Checked in order, new first. Drop the second entry only once no machine
+    /// can still be running a pre-rename haus.
+    static let riceMarkerPaths = [
+        "/Library/Application Support/haus/perch.installed-from",
+        "/Library/Application Support/nebelhaus/perch.installed-from",
+    ]
 
     /// Homebrew's per-cask staging directory, on both Apple Silicon and Intel.
     static let caskReceiptPaths = [
@@ -151,7 +167,7 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
     }
 
     static func detectLive(fileManager: FileManager = .default) -> InstallKind {
-        let hasRiceMarker = fileManager.fileExists(atPath: riceMarkerPath)
+        let hasRiceMarker = riceMarkerPaths.contains { fileManager.fileExists(atPath: $0) }
         let hasCaskReceipt = caskReceiptPaths.contains { fileManager.fileExists(atPath: $0) }
         return detect(
             bundlePath: Bundle.main.bundleURL.resolvingSymlinksInPath().path,
