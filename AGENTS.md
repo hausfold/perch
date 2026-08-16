@@ -85,10 +85,20 @@ names **the phrases a user says**, not the features perch has. A description
 written as a feature summary is true, well written, and never loads.
 
 `nix/skill.nix` ships it as `pkgs.perch-skill` (`$out/perch/SKILL.md`), which is
-how haus's AI room installs it into every agent client on a machine; the build
-fails if the frontmatter is missing, because a skill without it is installed,
-listed, and never loaded. Standalone users will get the identical bytes from
-`perch skill install` once that verb lands.
+how haus's AI room will install it into every agent client on a machine; the
+build fails if the frontmatter is missing or unterminated, or if the file grows
+past 150 lines, because each of those produces a skill that installs, lists and
+is never loaded — indistinguishable from the agent not knowing perch exists.
+Standalone users will get the identical bytes from `perch skill install` once
+that verb lands.
+
+⚠️ **`perch add` has never shipped, and the skill has to say so until it does.**
+It landed in #63, *after* the `v2026.08.14-1` tag that `nix/release.nix` still
+pins, and `nix/package.nix` deliberately skips creating `bin/perch` when the
+bundle has no `perch-cli`. So every command in that file is `command not found`
+on a real machine today, and it carries a Trap saying exactly that. **`bench
+release perch` is what makes perch's agent surface real** — delete the Trap in
+the same PR that cuts it.
 
 **Every claim in it must be runnable.** When you change a verb, a flag or an
 exit code, change `ai/SKILL.md` in the same PR — a stale line there is a
@@ -116,7 +126,7 @@ from-source build:
   `prebuilt` at it, so a branch feel-tests without waiting on a release.
 
 Released: `nix/release.nix` pins a real notarized release (CI rewrites it on
-every `bench release perch` tag) and the rice enables `haus.perch.enable`
+every `bench release perch` tag) and the rice enables `haus.shelf.enable`
 by default.
 
 ## The companion's own path (App Store)

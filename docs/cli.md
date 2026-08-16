@@ -88,3 +88,11 @@ running as you can be a second `perch add` — that is the whole SDK.
 `PerchFinderBridge/FinderActionProtocol.swift` is the wire format. Two rules are
 not negotiable if you write your own: **wait for the response before you copy
 anything**, and **never put a source path in the JSON**.
+
+## Teaching an agent to use it
+
+[`ai/SKILL.md`](../ai/SKILL.md) is this page's counterpart for a coding agent on
+a machine with no checkout — the routing document that makes *"put this in my
+shelf"* work first try. It quotes the verbs, flags and exit codes above, so
+**change it in the same PR that changes any of them.** It is bound by the
+family standard, the workshop's `notes/agent-surface.md`.

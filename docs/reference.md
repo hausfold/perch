@@ -201,5 +201,5 @@ refuses to ask for (see Permissions above). A system toggle is the honest fix,
 and it is reversible in the same place.
 
 The [haus](https://github.com/hausfold/haus) desktop sets this for you
-whenever `haus.perch.enable` is on. Standalone cask installs should flip it
+whenever `haus.shelf.enable` is on. Standalone cask installs should flip it
 by hand, once.
