@@ -70,6 +70,30 @@ with the app's `Perch.swiftmodule`, so it sets `PRODUCT_MODULE_NAME = PerchCLI`.
 Read `PRD.md`, `ARCHITECTURE.md`, and the ADRs before changing transfer
 semantics. Update them when a product boundary changes.
 
+## The agent surface (`ai/SKILL.md`)
+
+**Don't confuse it with this file.** `AGENTS.md` is for an agent working **on**
+perch, from a checkout. [`ai/SKILL.md`](./ai/SKILL.md) is for an agent **using**
+it — on a stranger's Mac, with no checkout, when their human says *"put this in
+my shelf"*. It is the routing document that makes that sentence work first try:
+what perch is, its verbs, its exit codes, when to reach for something else.
+
+It is bound by the family standard, [the workshop's
+`notes/agent-surface.md`](https://github.com/hausfold/workshop/blob/main/notes/agent-surface.md) —
+≤150 lines, no flag dumps (that's `--help`), and the `description` frontmatter
+names **the phrases a user says**, not the features perch has. A description
+written as a feature summary is true, well written, and never loads.
+
+`nix/skill.nix` ships it as `pkgs.perch-skill` (`$out/perch/SKILL.md`), which is
+how haus's AI room installs it into every agent client on a machine; the build
+fails if the frontmatter is missing, because a skill without it is installed,
+listed, and never loaded. Standalone users will get the identical bytes from
+`perch skill install` once that verb lands.
+
+**Every claim in it must be runnable.** When you change a verb, a flag or an
+exit code, change `ai/SKILL.md` in the same PR — a stale line there is a
+confidently-wrong instruction with a nice format.
+
 ## Release & downstream
 
 Perch is a native Xcode app that macOS 26 won't let Nix build from source (the

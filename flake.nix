@@ -37,6 +37,13 @@
           inherit (release) version sha256;
           prebuilt = prebuilt.outPath;
         };
+
+        # The agent skill (ai/SKILL.md), so a consumer can install it without
+        # installing perch itself — haus's AI room drops it into every agent
+        # client on the machine. Deliberately its own package rather than a
+        # file inside `perch`: it is pure, tiny and platform-agnostic, while
+        # `perch` wraps a macOS-only notarized ZIP. See nix/skill.nix.
+        perch-skill = final.callPackage ./nix/skill.nix { };
       };
 
       packages = forAll (
@@ -47,6 +54,7 @@
         {
           default = pkgs.perch;
           perch = pkgs.perch;
+          perch-skill = pkgs.perch-skill;
         }
       );
     };
