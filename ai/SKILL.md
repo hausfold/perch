@@ -74,11 +74,6 @@ submitted. So a `1` never means "some of them made it".
 
 ## Traps
 
-- **`perch` may not be on PATH at all, and that is expected right now.** The
-  command landed after the current release, so an installed Perch has no CLI in
-  its bundle and nothing creates `bin/perch`. `command -v perch` first; if it's
-  missing, say the shelf is there but its command line ships in the next
-  release — don't tell the user their install is broken.
 - **Adding is one-way.** Nothing here can list or remove. If you told the user
   you'd "clean up the shelf afterwards", you can't.
 - **Perch never touches the original.** It reads and copies. So "shelf this and

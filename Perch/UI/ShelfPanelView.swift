@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 
 struct ShelfPanelView: View {
     @ObservedObject var store: ShelfStore
-    @ObservedObject var settings: AppSettings
     @ObservedObject var theme: ShelfTheme
     @ObservedObject var state: ShelfPanelState
     /// The shelf is perch's only window, so it is also where a pending release
@@ -132,7 +131,7 @@ struct ShelfPanelView: View {
             // cornerRadius 0: the glass is a plain rectangle; compositingGroup()
             // flattens it with the tint so the shelfShape clip actually rounds
             // the bottom (clipShape alone does not reshape an NSGlassEffectView).
-            GlassBackground(cornerRadius: 0)
+            GlassBackground()
             rice.base.opacity(rice.panelTintOpacity)
 
             content

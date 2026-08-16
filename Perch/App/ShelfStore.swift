@@ -21,6 +21,7 @@ final class ShelfStore: ObservableObject {
     // with the slot each came from so a refused one lands back in place. Their
     // staged bytes are still on disk — see `liftForExport`.
     private var lifted: [UUID: (item: ShelfItem, index: Int)] = [:]
+    private var retentionTimer: Timer?
 
     init(
         repository: StagingRepository,
@@ -31,14 +32,26 @@ final class ShelfStore: ObservableObject {
         pipeline = TransferPipeline(repository: repository)
     }
 
-    var exportedURLs: [URL] {
-        items.compactMap { $0.fileURL(inside: repository.rootURL) }
-    }
-
     func restore() {
         items = repository.load()
         pruneExpiredItems()
         logger.info("Restored \(self.items.count, privacy: .public) shelf items")
+        startRetentionTimer()
+    }
+
+    /// Expiry can't only run at launch: perch is an accessory app that stays
+    /// up for weeks, so a launch-only prune would mean retention never fires.
+    /// Hourly is generous — the finest retention setting is a day — and the
+    /// prune is a no-op while retention is off.
+    private func startRetentionTimer() {
+        guard retentionTimer == nil else { return }
+        let timer = Timer(timeInterval: 60 * 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.pruneExpiredItems()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        retentionTimer = timer
     }
 
     func importFileURLs(_ urls: [URL]) {
@@ -393,6 +406,10 @@ final class ShelfStore: ObservableObject {
         do {
             try repository.removeAll()
             items = []
+            // Anything lifted for an in-flight drag had its bytes deleted just
+            // now; letting `returnToShelf` reinsert it would show a tile that
+            // points at nothing.
+            lifted.removeAll()
         } catch {
             report(error)
         }
@@ -452,7 +469,7 @@ final class ShelfStore: ObservableObject {
             panel.allowedContentTypes = [contentType]
         }
 
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         guard panel.runModal() == .OK, let destination = panel.url else { return }
 
         Task { [pipeline] in

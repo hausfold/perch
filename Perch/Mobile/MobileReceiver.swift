@@ -27,7 +27,6 @@ final class MobileReceiver: ObservableObject {
     @Published private(set) var pairingWindow: PairingWindow?
     @Published private(set) var pendingApproval: PairingApproval?
     @Published private(set) var pairedDevices: [PairedPeer] = []
-    @Published private(set) var isListening = false
     @Published var lastEvent: String?
 
     private let store: ShelfStore
@@ -55,7 +54,6 @@ final class MobileReceiver: ObservableObject {
         do {
             try server.start(identity: identity)
             self.server = server
-            isListening = true
         } catch {
             lastEvent = error.localizedDescription
             logger.error("Mobile listener failed to start: \(error.localizedDescription, privacy: .public)")
@@ -78,7 +76,6 @@ final class MobileReceiver: ObservableObject {
     func stop() {
         server?.stop()
         server = nil
-        isListening = false
         closePairingWindow()
     }
 

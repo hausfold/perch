@@ -117,10 +117,17 @@ struct PerchTool {
             return .unavailable
         }
 
+        let request: FinderActionRequest
         do {
-            let request = try client.openRequest(
+            request = try client.openRequest(
                 displayNames: sources.map(\.lastPathComponent)
             )
+        } catch {
+            complain(error.localizedDescription)
+            return .failed
+        }
+
+        do {
             // The mailbox is the liveness test, not a process list: a shelf may
             // be running under a dev bundle identifier, and either way only the
             // app that answers can admit anything. Give a live one a moment
@@ -187,6 +194,10 @@ struct PerchTool {
             report(outcomes, options: options)
             return exitCode(for: outcomes)
         } catch {
+            // Same contract as the timeout path: an empty completion is what
+            // releases any slots Perch reserved — without it a throw here
+            // leaves stuck `.copying` tiles for the full abandonment window.
+            client.abandon(request.id)
             complain(error.localizedDescription)
             return .failed
         }
@@ -375,6 +386,10 @@ struct PerchTool {
           --quiet, -q       don't print a line per added file
           -                 read newline-separated paths from stdin
           --                treat every remaining argument as a path
+
+        other commands:
+          perch --version   print the installed release
+          perch help        this text
 
         exit status:
           0 added   1 usage   2 refused   3 no Perch   4 copy failed

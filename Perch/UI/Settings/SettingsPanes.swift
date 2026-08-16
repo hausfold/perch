@@ -160,7 +160,7 @@ struct ShelfPane: View {
                 SettingsRow(
                     symbol: "clock.arrow.circlepath",
                     title: "Discard items after",
-                    subtitle: "Anything untouched for this long leaves the shelf on its own."
+                    subtitle: "Anything added longer ago than this leaves the shelf on its own. Pinned items stay."
                 ) {
                     Picker("Discard items after", selection: $settings.retentionDays) {
                         ForEach(offeredChoices, id: \.self) { days in
@@ -279,7 +279,7 @@ struct WatchedFoldersPane: View {
         panel.allowsMultipleSelection = true
         panel.prompt = "Watch"
         panel.message = "Perch will copy new files from this folder onto the shelf."
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         guard panel.runModal() == .OK else { return }
         for url in panel.urls {
             folderWatch.addFolder(at: url)
@@ -362,7 +362,7 @@ struct DevicesPane: View {
 struct UpdatesPane: View {
     @ObservedObject var update: UpdateCheck
     /// Read by `UpdateCheck.automaticChecksEnabled`; defaults to on.
-    @AppStorage("automaticUpdateChecks") private var automaticUpdateChecks = true
+    @AppStorage(UpdateCheck.Key.automatic) private var automaticUpdateChecks = true
 
     var body: some View {
         SettingsPaneLayout(title: SettingsPane.updates.title, subtitle: SettingsPane.updates.summary) {

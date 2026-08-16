@@ -33,6 +33,34 @@ final class StagingRepositoryTests: XCTestCase {
         XCTAssertNotEqual(first.id, second.id)
     }
 
+    // A peer-chosen name must never impersonate a staging sentinel
+    // (`.detached`, `.receiving`, `.<uuid>.partial`) or stage a hidden file
+    // recovery can't see — leading dots are stripped, not honored.
+    func testSafeFilenameNeverProducesDotNamesOrTraversal() {
+        XCTAssertEqual(StagingRepository.safeFilename(".detached"), "detached")
+        XCTAssertEqual(StagingRepository.safeFilename(".zshrc"), "zshrc")
+        XCTAssertEqual(StagingRepository.safeFilename("."), "Untitled")
+        XCTAssertEqual(StagingRepository.safeFilename(".."), "Untitled")
+        XCTAssertEqual(StagingRepository.safeFilename("..."), "Untitled")
+        XCTAssertEqual(StagingRepository.safeFilename("a/b:c"), "a∕b꞉c")
+        // A visible name that merely *ends* in .partial is content, not an
+        // interrupted import — it survives sanitizing and cleanup.
+        XCTAssertEqual(StagingRepository.safeFilename("report.partial"), "report.partial")
+    }
+
+    func testCleanupKeepsContainerWhoseContentEndsInPartial() throws {
+        let directory = try repository.allocateImportDirectory()
+        let url = directory.appending(path: "report.partial")
+        try Data("bytes".utf8).write(to: url)
+        let item = try repository.item(forStagedURL: url)
+        try repository.persist([item])
+
+        // load() runs cleanupUnusableContainers; the visible .partial name
+        // must not read as an interrupted import and take the container out.
+        XCTAssertEqual(repository.load().map(\.id), [item.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+    }
+
     func testManifestRoundTripFiltersMissingFiles() throws {
         let directory = try repository.allocateImportDirectory()
         let url = directory.appending(path: "notes.txt")

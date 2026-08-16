@@ -34,10 +34,6 @@ enum MobileConfig {
         groupContainer.appending(path: "MacInbox", directoryHint: .isDirectory)
     }
 
-    static var groupDefaults: UserDefaults {
-        UserDefaults(suiteName: appGroupID) ?? .standard
-    }
-
     /// This phone's stable wire identity, minted on first use.
     ///
     /// It lives in the keychain — the same store as the pairing record — on
@@ -69,7 +65,17 @@ enum MobileConfig {
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
         add[kSecAttrAccessGroup as String] = appGroupID
-        SecItemAdd(add as CFDictionary, nil)
+        let status = SecItemAdd(add as CFDictionary, nil)
+        // The app and the Share extension can both mint on first use; the
+        // loser of that race must return the winner's identity, not its own
+        // unpersisted UUID — a device that presents a different deviceID on
+        // each call is "paired" on screen and refused by the Mac.
+        if status == errSecDuplicateItem,
+           SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+           let data = result as? Data,
+           let stored = UUID(uuidString: String(decoding: data, as: UTF8.self)) {
+            return (stored, UIDevice.current.name)
+        }
         return (id, UIDevice.current.name)
     }
 }

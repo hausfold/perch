@@ -161,7 +161,10 @@ final class StagingRepository: @unchecked Sendable {
         }
 
         var candidate = url.deletingLastPathComponent()
-        while candidate != rootURL {
+        // Compare paths, not URLs: one side of this walk carries a trailing
+        // slash the other may not, and a comparison that never turns true here
+        // would keep climbing past the staging root.
+        while candidate.path != rootURL.path {
             let contents = try fileManager.contentsOfDirectory(atPath: candidate.path)
             guard contents.isEmpty else { break }
             try fileManager.removeItem(at: candidate)
@@ -299,12 +302,22 @@ final class StagingRepository: @unchecked Sendable {
     /// import path — drags on the Mac, shares on the phone, wire arrivals
     /// (where the name comes from another device and gets no benefit of the
     /// doubt: "." and ".." are names only a path traversal wants).
+    ///
+    /// A leading dot is stripped, not honored: a hidden staged file is
+    /// invisible to recovery, and dot-names are how the staging sentinels
+    /// (`.detached`, `.receiving`, `.<uuid>.partial`) stay out of a container's
+    /// content — a peer-chosen name must not be able to impersonate one and
+    /// get its own container swept.
+    ///
+    /// `FinderActionProtocol.safeFilename` is a byte-identical twin (the
+    /// Finder targets don't compile PerchWire) — change both together.
     static func safeFilename(_ candidate: String) -> String {
-        let cleaned = candidate
+        var cleaned = candidate
             .replacingOccurrences(of: "/", with: "∕")
             .replacingOccurrences(of: ":", with: "꞉")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return cleaned.isEmpty || cleaned == "." || cleaned == ".." ? "Untitled" : cleaned
+        while cleaned.hasPrefix(".") { cleaned.removeFirst() }
+        return cleaned.isEmpty ? "Untitled" : cleaned
     }
 
     private func isDetached(_ container: URL) -> Bool {
@@ -319,7 +332,10 @@ final class StagingRepository: @unchecked Sendable {
         guard let marked = try? marker.resourceValues(
             forKeys: [.contentModificationDateKey]
         ).contentModificationDate else {
-            return isDetached(container)
+            // An unreadable marker date must not mean "expired now" — that
+            // would delete bytes the grace period exists to protect. Wait for
+            // a pass that can read it.
+            return false
         }
         return Date().timeIntervalSince(marked) >= Self.detachedGrace
     }
@@ -344,9 +360,14 @@ final class StagingRepository: @unchecked Sendable {
                 includingPropertiesForKeys: nil,
                 options: []
             )) ?? []
+            // Sentinels are always dot-named (`.receiving`, `.<uuid>.partial`)
+            // and `safeFilename` strips leading dots, so a staged item can
+            // never look like one — a visible file merely *ending* in
+            // ".partial" is content, not an interrupted import.
             let isInterrupted = children.contains {
                 $0.lastPathComponent == ".receiving"
-                    || $0.lastPathComponent.hasSuffix(".partial")
+                    || ($0.lastPathComponent.hasPrefix(".")
+                        && $0.lastPathComponent.hasSuffix(".partial"))
             }
             if isInterrupted || isExpiredDetachment(container) {
                 try? fileManager.removeItem(at: container)

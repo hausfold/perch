@@ -159,12 +159,10 @@ final class FolderWatchCenter: ObservableObject {
     }
 
     /// `~`-abbreviate against the real home — inside the sandbox,
-    /// `NSHomeDirectory()` is the container, not the user's home.
+    /// `NSHomeDirectory()` is the container, not the user's home, which is why
+    /// this goes through `RiceFiles.home` (the passwd lookup).
     private static func abbreviate(_ path: String) -> String {
-        guard let entry = getpwuid(getuid()), let dir = entry.pointee.pw_dir else {
-            return path
-        }
-        let home = String(cString: dir)
+        let home = RiceFiles.home.path
         guard path.hasPrefix(home) else { return path }
         return "~" + path.dropFirst(home.count)
     }

@@ -34,7 +34,7 @@ final class MobilePairingWindowController: NSWindowController, NSWindowDelegate 
         showWindow(nil)
         // Perch is an accessory app; without this the window opens behind
         // whatever has focus.
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }
 

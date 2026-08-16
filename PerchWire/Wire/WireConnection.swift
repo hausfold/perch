@@ -78,10 +78,6 @@ public actor WireConnection {
         receiveCryptor = receive
     }
 
-    public var isSecured: Bool {
-        sendCryptor != nil
-    }
-
     public func send(_ payload: WirePayload) async throws {
         var bytes = try payload.encoded()
         if sendCryptor != nil {

@@ -73,16 +73,22 @@ struct FilePreview: View {
 }
 
 /// Memoizes generated QuickLook thumbnails by staged path so re-expanding the
-/// shelf doesn't re-render every preview.
+/// shelf doesn't re-render every preview. An `NSCache`, not a dictionary:
+/// perch runs for weeks, and an unbounded map of every path ever previewed
+/// would only ever grow.
 @MainActor
 final class ThumbnailCache {
     static let shared = ThumbnailCache()
 
-    private var cache: [String: NSImage] = [:]
+    private let cache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 256
+        return cache
+    }()
     private let generator = QLThumbnailGenerator.shared
 
     func thumbnail(for url: URL, size: CGSize, scale: CGFloat) async -> NSImage? {
-        if let hit = cache[url.path] { return hit }
+        if let hit = cache.object(forKey: url.path as NSString) { return hit }
         let request = QLThumbnailGenerator.Request(
             fileAt: url,
             size: size,
@@ -102,7 +108,7 @@ final class ThumbnailCache {
                 }
             }
         }
-        if let image { cache[url.path] = image }
+        if let image { cache.setObject(image, forKey: url.path as NSString) }
         return image
     }
 }

@@ -90,12 +90,16 @@ struct HandoffClient: Sendable {
         deadline: Date,
         poll: TimeInterval = 0.1
     ) throws -> FinderActionResponse? {
-        while Date() < deadline {
+        // `repeat`, not `while`: a caller whose budget was consumed upstream
+        // (the CLI can spend its whole --wait launching the app) still gets
+        // one look at the mailbox before giving up.
+        repeat {
             if let response = try mailbox.readResponse(for: requestID) {
                 return response
             }
+            guard Date() < deadline else { break }
             Thread.sleep(forTimeInterval: poll)
-        }
+        } while true
         return nil
     }
 

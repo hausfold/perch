@@ -5,7 +5,6 @@ import UniformTypeIdentifiers
 enum TransferPipelineError: LocalizedError {
     case cloudDownloadTimedOut
     case imageEncodingFailed
-    case noReadableRepresentation
 
     var errorDescription: String? {
         switch self {
@@ -13,15 +12,8 @@ enum TransferPipelineError: LocalizedError {
             "The iCloud item did not finish downloading in time. Try the drop again after it is available locally."
         case .imageEncodingFailed:
             "The dropped image could not be encoded."
-        case .noReadableRepresentation:
-            "That item does not expose a file, image, link, or text representation."
         }
     }
-}
-
-struct StagedTransfer: Sendable {
-    let item: ShelfItem
-    let phase: PendingTransfer.Phase
 }
 
 final class TransferPipeline: @unchecked Sendable {
@@ -63,7 +55,7 @@ final class TransferPipeline: @unchecked Sendable {
                     let allocatedContainer = try repository.allocateImportDirectory(id: itemID)
                     container = allocatedContainer
                     let destination = allocatedContainer.appending(
-                        path: Self.safeFilename(sourceURL.lastPathComponent)
+                        path: StagingRepository.safeFilename(sourceURL.lastPathComponent)
                     )
                     let partial = allocatedContainer.appending(
                         path: ".\(itemID.uuidString).partial"
@@ -101,7 +93,7 @@ final class TransferPipeline: @unchecked Sendable {
             let fileManager = FileManager()
             let container = try self.repository.allocateImportDirectory(id: itemID)
             let destination = container.appending(
-                path: Self.safeFilename(receivedURL.lastPathComponent)
+                path: StagingRepository.safeFilename(receivedURL.lastPathComponent)
             )
             do {
                 try fileManager.moveItem(at: receivedURL, to: destination)
@@ -125,7 +117,7 @@ final class TransferPipeline: @unchecked Sendable {
             let fileManager = FileManager()
             let container = try self.repository.allocateImportDirectory(id: itemID)
             let destination = container.appending(
-                path: Self.safeFilename(suggestedName)
+                path: StagingRepository.safeFilename(suggestedName)
             )
             do {
                 do {
@@ -148,7 +140,7 @@ final class TransferPipeline: @unchecked Sendable {
     func stageData(_ data: Data, suggestedName: String, itemID: UUID) async throws -> ShelfItem {
         try await enqueue {
             let container = try self.repository.allocateImportDirectory(id: itemID)
-            let destination = container.appending(path: Self.safeFilename(suggestedName))
+            let destination = container.appending(path: StagingRepository.safeFilename(suggestedName))
             try data.write(to: destination, options: [.atomic])
             return try self.repository.item(forStagedURL: destination, id: itemID)
         }
@@ -157,7 +149,7 @@ final class TransferPipeline: @unchecked Sendable {
     func stageText(_ text: String, suggestedName: String, itemID: UUID) async throws -> ShelfItem {
         try await enqueue {
             let container = try self.repository.allocateImportDirectory(id: itemID)
-            let destination = container.appending(path: Self.safeFilename(suggestedName))
+            let destination = container.appending(path: StagingRepository.safeFilename(suggestedName))
             try text.write(to: destination, atomically: true, encoding: .utf8)
             return try self.repository.item(forStagedURL: destination, id: itemID)
         }
@@ -228,10 +220,6 @@ final class TransferPipeline: @unchecked Sendable {
                 continuation.resume(with: Result(catching: operation))
             }
         }
-    }
-
-    private static func safeFilename(_ candidate: String) -> String {
-        StagingRepository.safeFilename(candidate)
     }
 
     private static func isUndownloadedCloudItem(_ url: URL) throws -> Bool {
