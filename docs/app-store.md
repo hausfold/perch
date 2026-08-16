@@ -154,8 +154,8 @@ cannot be pasted from here.
 
 Four things to know before pasting it, three of them learned the annoying way:
 
-- **The Notes field caps at 4,000 characters.** The block below is 3,974 — it
-  fits with 26 to spare, so anything you add has to buy its space from
+- **The Notes field caps at 4,000 characters.** The block below is 3,950 — it
+  fits with 50 to spare, so anything you add has to buy its space from
   something else. Check with
   `awk '/^## Review notes/{f=1} f&&/^>/{sub(/^> ?/,"");print} f&&/^Also fill in:/{exit}' docs/app-store.md | wc -m`.
 - **It is a plain-text field**, which is why the block below carries no
@@ -175,11 +175,12 @@ answer says. Apple asks *what you tested on*, not that you own every device
 they'll run it on; the "test on physical devices" line in the rejection is
 about the platform you ship to, and the iPhone half covers that. The iPad half
 is the same binary, the same universal SwiftUI layout, and the iPad screenshots
-Apple requires come out of the Simulator anyway. What is *not* fine is claiming
-a device you never booted — so boot the two the answer names, walk the shelf
-once, and the sentence is true. (Done 2026-08-16 on iPad Pro 13-inch (M5),
-iPadOS 26.5: empty state, `On this iPad` section header, `22 bytes · waiting`
-row, presence row — all correct.)
+Apple requires come out of the Simulator anyway. What is *not* fine is naming a
+device you never booted, which is why item 2 lists **one** iPad and not a
+plausible-looking spread — every device in that answer is one that actually ran
+the shelf. (Done 2026-08-16 on iPad Pro 13-inch (M5), iPadOS 26.5: empty state,
+`On this iPad` section header, `22 bytes · waiting` row, presence row — all
+correct.) If you add a device to the list, boot it first.
 
 > Perch Companion is the iPhone/iPad half of Perch, a Mac shelf that lives at
 > the notch. The Mac app is separate, distributed outside the App Store at
@@ -195,9 +196,9 @@ row, presence row — all correct.)
 > paragraph.
 >
 > 2. TESTED ON. iPhone 15 Pro, iOS 27.0 (physical device) — every flow,
-> including pairing and delivery over Wi-Fi. iPad Pro 13-inch (M5) and iPad mini
-> (A17 Pro), iPadOS 26.5 (Simulator) — layout and shelf behaviour. Mac side:
-> macOS 26 running the Perch desktop app.
+> including pairing and delivery over Wi-Fi. iPad Pro 13-inch (M5), iPadOS 26.5
+> (Simulator) — layout and shelf behaviour. Mac side: macOS 26 running the
+> Perch desktop app.
 >
 > 3. WHAT IT DOES, AND FOR WHOM. A shelf in your pocket. Share a file, photo,
 > link or scrap of text to Perch from any app: it lands on the phone's shelf at
