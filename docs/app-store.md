@@ -252,7 +252,7 @@ Also fill in: no demo account needed, contact = `hi@hausfold.co`. (Not
 you cannot afford to get wrong, and `hi@hausfold.co` is live, routes today, and
 is what every page of the site already says. **This is no longer a stopgap** —
 `hi@` was settled as *the* address 2026-08-09, so there is nothing to switch
-to later; see `notes/hausfold-rename.md` §5.4 in the workshop. If `support@`
+to later. If `support@`
 ever gets added it will be an alias onto `hi@`, which doesn't change this
 field.)
 
