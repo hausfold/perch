@@ -47,6 +47,11 @@ years. Perch's angle is **dependability and restraint**:
 brew install --cask hausfold/tap/perch
 ```
 
+Or through Nix: the flake exposes `overlays.default` (which puts `perch` in
+your pkgs) and `packages.aarch64-darwin.perch`, both wrapping the same
+notarized release ZIP — add `perch.url = "github:hausfold/perch"` as an input
+and install `pkgs.perch`.
+
 Signed with our Apple Developer ID and notarized, so it opens straight away — no
 Gatekeeper prompt, no quarantine hack.
 
@@ -67,6 +72,8 @@ standalone installs do it once, by hand. ([why](docs/reference.md#the-one-system
 - **it handles the awkward producers** — Photos exports, Safari images, and other apps that hand over files lazily (AppKit "file promises") go down their own import path, so they land correctly instead of arriving empty.
 - **it lives at the top of Finder's right-click menu** — **Add to Perch Shelf** sits in the context menu itself, beside *New Terminal Tab Here*, with no setup at all: right-click any selection and it's on the shelf. Select text or a link anywhere else and the same command is in that app's Services menu. The Quick Actions submenu carries it too, from the Finder extension — macOS turns that one on for you; if it ever goes missing it lives in System Settings ▸ General ▸ Login Items & Extensions ▸ Extensions ▸ ⓘ next to **System Services** — under that row, not under Perch. Perch must be running for the Quick Action so it can reserve shelf space before Finder copies anything; the top-level one launches Perch itself.
 - **it takes files from a script** — `perch add report.pdf` puts something on the shelf from a shell, a Makefile, or an agent; `find . -name '*.png' | perch add -` takes a list on stdin. It's the same road a drag takes — same staging, originals only ever read — and the exit status says what happened, so a pipeline can tell an unopened shelf from a copy that failed. ([the CLI](docs/cli.md))
+- **it watches folders you point it at** — add a folder in Settings (Screenshots, Downloads) and anything new that lands there is copied onto the shelf on its own, originals untouched as always. ([watched folders](docs/reference.md#watched-folders))
+- **it pairs with your iPhone** — the free companion app and its Share sheet send photos, links, and files to the Mac's shelf over your own network, encrypted end to end, and can pull shelf items back down ([ADR 0006](docs/architecture-decisions/0006-companion-ships-free-on-the-mac-release-tag.md)).
 - **it stays responsive** — imports run off the main thread with a two-at-a-time limit, and iCloud placeholders are downloaded explicitly. drop a multi-gigabyte file and the shelf keeps animating.
 - **it survives a relaunch** — completed items are written to an atomic manifest. quit and reopen and your pile is still there; startup even recovers files whose manifest write got interrupted.
 - **pin it for repeat drops** — pin a tile and it stays on the shelf after a successful drag, ready to drop into several destinations in quick succession. the pin survives relaunch; unpinning restores the usual one-and-done behavior.

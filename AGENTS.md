@@ -92,14 +92,6 @@ is never loaded — indistinguishable from the agent not knowing perch exists.
 Standalone users will get the identical bytes from `perch skill install` once
 that verb lands.
 
-⚠️ **`perch add` has never shipped, and the skill has to say so until it does.**
-It landed in #63, *after* the `v2026.08.14-1` tag that `nix/release.nix` still
-pins, and `nix/package.nix` deliberately skips creating `bin/perch` when the
-bundle has no `perch-cli`. So every command in that file is `command not found`
-on a real machine today, and it carries a Trap saying exactly that. **`bench
-release perch` is what makes perch's agent surface real** — delete the Trap in
-the same PR that cuts it.
-
 **Every claim in it must be runnable.** When you change a verb, a flag or an
 exit code, change `ai/SKILL.md` in the same PR — a stale line there is a
 confidently-wrong instruction with a nice format.
@@ -143,7 +135,7 @@ Two things bite if you forget them: `PerchIOS/` and `PerchShare/` each carry a
 `PrivacyInfo.xcprivacy`, and they compile the *same* shared sources — a new
 required-reason API is a two-file change. And `VERSION`'s CalVer reaches App
 Store Connect with leading zeros stripped (`2026.08.06` → `2026.8.6`), build
-number = the workflow's run number.
+number = `run_number × 10 + (attempt − 1)` (see `docs/app-store.md`).
 
 ## Before you open a PR
 

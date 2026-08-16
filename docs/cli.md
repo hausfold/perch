@@ -1,8 +1,9 @@
 # `perch` — the command line
 
 `perch add` puts files on the shelf from a script, a Makefile, a shell pipe, or
-an agent. It is the same road a drag takes: the same admission cap, the same
-staging pipeline, the same "never touch the original" guarantee.
+an agent. It is the same road a drag takes: the same admission handshake (so
+nothing is copied that no shelf is there to adopt), the same staging pipeline,
+the same "never touch the original" guarantee.
 
 ```sh
 perch add report.pdf shot.png
@@ -38,6 +39,9 @@ perch add [options] <path>...
   --quiet, -q       don't print a line per added file
   -                 read newline-separated paths from stdin
   --                treat every remaining argument as a path
+
+perch --version     print the installed release
+perch help          usage
 ```
 
 | Exit | Meaning |

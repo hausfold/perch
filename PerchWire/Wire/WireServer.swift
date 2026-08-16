@@ -76,6 +76,10 @@ public final class WireServer: @unchecked Sendable {
     private let delegate: WireServerDelegate
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "WireServer")
     private var listener: NWListener?
+    /// Live session connections, so `stop()` actually stops: cancelling only
+    /// the listener would leave accepted sessions free to keep committing to
+    /// the shelf after "receive from iPhone" was turned off.
+    private var sessions: [UUID: WireConnection] = [:]
     private let lock = NSLock()
 
     public init(delegate: WireServerDelegate) {
@@ -102,17 +106,38 @@ public final class WireServer: @unchecked Sendable {
                 type: WireProtocol.bonjourType,
                 txtRecord: txt
             )
-            listener.newConnectionHandler = { [weak self] connection in
+            listener.newConnectionHandler = { [weak self, weak listener] connection in
                 guard let self else {
+                    connection.cancel()
+                    return
+                }
+                let wireConnection = WireConnection(connection: connection)
+                let sessionID = UUID()
+                // Register under the same lock `stop()` drains under, and only
+                // while this listener is still the live one — an accept
+                // dispatched in the same instant as `stop()` must be refused,
+                // not left to run to completion untracked.
+                let accepted = lock.withLock { () -> Bool in
+                    guard let listener, listener === self.listener else { return false }
+                    sessions[sessionID] = wireConnection
+                    return true
+                }
+                guard accepted else {
                     connection.cancel()
                     return
                 }
                 logger.info("Accepted a connection")
                 let session = WireServerSession(
-                    connection: WireConnection(connection: connection),
+                    connection: wireConnection,
                     delegate: delegate
                 )
-                Task.detached { await session.run() }
+                Task.detached { [weak self] in
+                    await session.run()
+                    guard let self else { return }
+                    self.lock.withLock {
+                        self.sessions[sessionID] = nil
+                    }
+                }
             }
             listener.stateUpdateHandler = { [logger] state in
                 switch state {
@@ -130,9 +155,17 @@ public final class WireServer: @unchecked Sendable {
     }
 
     public func stop() {
-        lock.withLock {
+        let live: [WireConnection] = lock.withLock {
             listener?.cancel()
             listener = nil
+            let connections = Array(sessions.values)
+            sessions.removeAll()
+            return connections
+        }
+        // Cancelling the socket makes each session's pending receive throw,
+        // which unwinds `run()` through its normal teardown.
+        for connection in live {
+            Task { await connection.cancel() }
         }
     }
 

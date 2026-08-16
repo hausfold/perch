@@ -18,7 +18,6 @@ final class ShelfPanelController: NSObject {
     init(
         screen: NSScreen,
         store: ShelfStore,
-        settings: AppSettings,
         theme: ShelfTheme,
         dropHandler: ShelfDropHandler
     ) {
@@ -48,7 +47,6 @@ final class ShelfPanelController: NSObject {
 
         let rootView = ShelfPanelView(
             store: store,
-            settings: settings,
             theme: theme,
             state: viewState,
             onExpand: { [weak self] in self?.expand() },
@@ -227,7 +225,6 @@ final class ShelfPanelState: ObservableObject {
     /// The timer lives here rather than on the drag source because the panel
     /// hides as the drag leaves the notch, tearing that view (and any timer it
     /// held) down mid-flight; this state object outlives it.
-    @MainActor
     func startExportGrace(after grace: Duration = .seconds(1)) {
         exportGraceTask?.cancel()
         exportGraceTask = Task { [weak self] in
@@ -241,7 +238,6 @@ final class ShelfPanelState: ObservableObject {
     }
 
     /// A new drag started — its tiles stay collapsed until this drag resolves.
-    @MainActor
     func beginExport(of ids: Set<UUID>) {
         exportGraceTask?.cancel()
         exportGraceTask = nil
@@ -249,14 +245,12 @@ final class ShelfPanelState: ObservableObject {
         draggingOutIDs.formUnion(ids)
     }
 
-    @MainActor
     func markPromiseEngaged(_ id: UUID) {
         promiseEngagedIDs.insert(id)
     }
 
     /// A drag-out resolved for one item, either way — it is no longer collapsed
     /// and no longer waiting on a promise.
-    @MainActor
     func finishExport(of id: UUID) {
         promiseEngagedIDs.remove(id)
         draggingOutIDs.remove(id)

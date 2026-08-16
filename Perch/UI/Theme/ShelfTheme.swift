@@ -14,6 +14,8 @@ final class ShelfTheme: ObservableObject {
     @Published private(set) var palette: RicePalette
 
     private var appearanceObserver: NSKeyValueObservation?
+    // nonisolated(unsafe) so deinit may unregister it; written once in init.
+    private nonisolated(unsafe) var distributedObserver: NSObjectProtocol?
 
     init(observingSystemAppearance: Bool = true) {
         palette = RiceTheme.palette(
@@ -30,7 +32,7 @@ final class ShelfTheme: ObservableObject {
         appearanceObserver = NSApp?.observe(\.effectiveAppearance) { [weak self] _, _ in
             Task { @MainActor in self?.refresh() }
         }
-        DistributedNotificationCenter.default().addObserver(
+        distributedObserver = DistributedNotificationCenter.default().addObserver(
             forName: RiceTheme.systemAppearanceChanged,
             object: nil,
             queue: .main
@@ -41,6 +43,9 @@ final class ShelfTheme: ObservableObject {
 
     deinit {
         appearanceObserver?.invalidate()
+        if let distributedObserver {
+            DistributedNotificationCenter.default().removeObserver(distributedObserver)
+        }
     }
 
     /// Re-read the appearance and the rice's config, and publish only if the

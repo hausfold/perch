@@ -58,7 +58,6 @@ final class ShareViewController: UIViewController {
                     continue
                 }
                 staged += 1
-                state.stagedCount = staged
             } catch {
                 // One unreadable attachment shouldn't sink the rest.
                 continue
@@ -186,7 +185,6 @@ final class ShareState: ObservableObject {
     }
 
     @Published var phase: Phase = .staging
-    @Published var stagedCount = 0
 }
 
 struct ShareStatusView: View {

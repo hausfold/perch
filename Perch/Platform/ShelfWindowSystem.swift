@@ -70,15 +70,11 @@ final class ShelfWindowSystem {
         panels.removeAll()
     }
 
-    func toggleShelfOnPointerScreen() {
+    func openShelfOnPointerScreen() {
         let point = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main
         guard let screen, let panel = panels[screen.perchIdentifier] else { return }
         panel.expand()
-    }
-
-    func collapseAll() {
-        panels.values.forEach { $0.collapse() }
     }
 
     private func rebuildPanels() {
@@ -98,7 +94,6 @@ final class ShelfWindowSystem {
             let controller = ShelfPanelController(
                 screen: screen,
                 store: store,
-                settings: settings,
                 theme: theme,
                 dropHandler: dropHandler
             )

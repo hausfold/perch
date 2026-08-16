@@ -6,8 +6,9 @@ import Foundation
 /// answers with the IDs it admitted before the extension asks Finder for bytes.
 enum FinderActionProtocol {
     static let appGroupIdentifier = "88M28542LQ.com.hausfold.perch"
-    /// Only senders that live outside the app bundle's extension points need
-    /// this — the `perch` tool, to tell whether a shelf is listening at all.
+    /// Only the `perch` tool needs this — to ask Launch Services where the
+    /// installed app lives so it can launch one. Liveness is never judged by
+    /// it: the mailbox answering is the only test that a shelf is listening.
     static let appBundleIdentifier = "com.hausfold.perch"
     static let requestsDirectoryName = "FinderActionRequests"
     static let requestFilename = "request.json"
@@ -16,12 +17,17 @@ enum FinderActionProtocol {
     static let stagedDirectoryName = "Staged"
     static let abandonedAfter: TimeInterval = 10 * 60
 
+    /// Byte-identical twin of `StagingRepository.safeFilename` (the Finder
+    /// targets don't compile PerchWire) — change both together. Leading dots
+    /// are stripped so a name can never impersonate a staging sentinel or
+    /// stage a file recovery can't see.
     static func safeFilename(_ candidate: String) -> String {
-        let cleaned = candidate
+        var cleaned = candidate
             .replacingOccurrences(of: "/", with: "∕")
             .replacingOccurrences(of: ":", with: "꞉")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return cleaned.isEmpty || cleaned == "." || cleaned == ".." ? "Untitled" : cleaned
+        while cleaned.hasPrefix(".") { cleaned.removeFirst() }
+        return cleaned.isEmpty ? "Untitled" : cleaned
     }
 }
 

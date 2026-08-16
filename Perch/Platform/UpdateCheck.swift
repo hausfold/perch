@@ -435,7 +435,7 @@ final class UpdateCheck: ObservableObject {
     // signs under `com.hausfold.perch.dev` — keeps its own, exactly like its
     // own staging directory.
 
-    private enum Key {
+    enum Key {
         static let checkedAt = "update.checkedAt"
         static let latest = "update.latest"
         static let dismissed = "update.dismissed"

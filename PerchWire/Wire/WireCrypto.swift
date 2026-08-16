@@ -2,13 +2,11 @@ import CryptoKit
 import Foundation
 
 public enum WireCryptoError: LocalizedError {
-    case badAuth
     case counterExhausted
     case sealFailed
 
     public var errorDescription: String? {
         switch self {
-        case .badAuth: "The peer failed authentication."
         case .counterExhausted: "The session sent too many frames."
         case .sealFailed: "A frame could not be sealed or opened."
         }

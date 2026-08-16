@@ -21,7 +21,7 @@ struct PerchApp: App {
     var body: some Scene {
         MenuBarExtra {
             Button("Open Shelf") {
-                runtime.windowSystem.toggleShelfOnPointerScreen()
+                runtime.windowSystem.openShelfOnPointerScreen()
             }
             .keyboardShortcut("o")
 
@@ -51,12 +51,12 @@ struct PerchApp: App {
             if let pending = update.pendingVersion {
                 Button("Perch \(pending) is available…") {
                     update.performUpdate()
-                    runtime.windowSystem.toggleShelfOnPointerScreen()
+                    runtime.windowSystem.openShelfOnPointerScreen()
                 }
             }
             Button("Check for Updates…") {
                 update.checkForUpdates(userInitiated: true)
-                runtime.windowSystem.toggleShelfOnPointerScreen()
+                runtime.windowSystem.openShelfOnPointerScreen()
             }
 
             Divider()
@@ -115,13 +115,14 @@ struct PerchApp: App {
         alert.addButton(withTitle: "Clear")
         alert.addButton(withTitle: "Cancel")
         // NSAlert makes the first button the default, which would put Return on
-        // the destructive one. Move the default to Cancel and give it Escape as
-        // well, so both reflexes — hit Return, hit Escape — are the safe answer
-        // and clearing takes a deliberate click.
+        // the destructive one. Move the default to Cancel — AppKit already
+        // gives a button titled "Cancel" the Escape key — so both reflexes,
+        // Return and Escape, are the safe answer and clearing takes a
+        // deliberate click.
         alert.buttons.first?.keyEquivalent = ""
         alert.buttons.last?.keyEquivalent = "\r"
 
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         runtime.store.clear()
     }
@@ -140,7 +141,7 @@ private struct SettingsMenuItem: View {
 
     var body: some View {
         Button("Settings…") {
-            NSApp.activate(ignoringOtherApps: true)
+            NSApp.activate()
             openSettings()
             DispatchQueue.main.async {
                 raiseSettingsWindow()

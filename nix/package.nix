@@ -73,9 +73,9 @@ stdenvNoCC.mkDerivation {
     runHook preInstall
     mkdir -p $out/Applications
     /usr/bin/ditto Perch.app $out/Applications/Perch.app
-    # Guarded because the pin lags the source: releases cut before the tool
-    # existed have no such binary, and a dangling bin/perch would be worse than
-    # no bin/perch at all.
+    # Defensive: every release since v2026.08.16 embeds perch-cli, but a
+    # hand-bootstrapped pin (or a dev bundle built without the CLI target)
+    # may not, and a dangling bin/perch would be worse than no bin/perch.
     if [ -x "$out/Applications/Perch.app/Contents/MacOS/perch-cli" ]; then
       mkdir -p $out/bin
       ln -s $out/Applications/Perch.app/Contents/MacOS/perch-cli $out/bin/perch

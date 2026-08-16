@@ -51,11 +51,6 @@ final class AppRuntime: ObservableObject {
         folderWatch.start()
     }
 
-    func openSettings() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
     func stop() {
         folderWatch.stop()
         finderActions.stop()

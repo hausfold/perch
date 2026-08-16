@@ -4,32 +4,24 @@ import SwiftUI
 /// Perch has no transparency setting of its own — it only ever mirrors the
 /// system's "Reduce Transparency" accessibility setting. When that's on, this
 /// swaps the glass/vibrancy material for a solid, non-blurring plate instead.
+///
+/// Square-cornered on purpose: the shelf hangs off the top screen edge, and
+/// any rounding is applied by the clip shape around it.
 struct GlassBackground: NSViewRepresentable {
-    let cornerRadius: CGFloat
-
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func makeNSView(context: Context) -> GlassBackingView {
         let view = GlassBackingView()
-        view.cornerRadius = cornerRadius
         view.reduceTransparency = reduceTransparency
         return view
     }
 
     func updateNSView(_ nsView: GlassBackingView, context: Context) {
-        nsView.cornerRadius = cornerRadius
         nsView.reduceTransparency = reduceTransparency
     }
 }
 
 final class GlassBackingView: NSView {
-    var cornerRadius: CGFloat = 0 {
-        didSet {
-            guard cornerRadius != oldValue else { return }
-            applyCornerRadius()
-        }
-    }
-
     var reduceTransparency = false {
         didSet {
             guard reduceTransparency != oldValue else { return }
@@ -62,9 +54,7 @@ final class GlassBackingView: NSView {
             solid.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
             content = solid
         } else if #available(macOS 26.0, *) {
-            let glass = NSGlassEffectView()
-            glass.cornerRadius = cornerRadius
-            content = glass
+            content = NSGlassEffectView()
         } else {
             let visualEffect = NSVisualEffectView()
             visualEffect.blendingMode = .behindWindow
@@ -82,17 +72,5 @@ final class GlassBackingView: NSView {
             content.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
         contentView = content
-        applyCornerRadius()
-    }
-
-    private func applyCornerRadius() {
-        if #available(macOS 26.0, *), let glass = contentView as? NSGlassEffectView {
-            glass.cornerRadius = cornerRadius
-            return
-        }
-        // The solid plate and the pre-26 NSVisualEffectView have no
-        // dedicated corner-radius property; only NSGlassEffectView does.
-        contentView?.wantsLayer = true
-        contentView?.layer?.cornerRadius = cornerRadius
     }
 }

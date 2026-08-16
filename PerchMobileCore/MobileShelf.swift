@@ -6,9 +6,12 @@ import UniformTypeIdentifiers
 /// outbox recording which items still owe a delivery.
 ///
 /// Both the app and the Share extension construct one of these over the same
-/// App Group directory. Writes are atomic and `load()` reconciles from disk,
-/// so the two processes converge even when a share lands while the app is
-/// open.
+/// App Group directory. Within one process, `lock` serializes every
+/// read-modify-write of the manifest and the outbox. Across the two
+/// processes only the writes' atomicity and `load()`'s reconcile-from-disk
+/// protect us: a simultaneous app/extension write can lose the other's
+/// bookkeeping entry, but the staged files themselves are never at risk and
+/// the next `load()` re-adopts anything the manifest missed.
 final class MobileShelf: @unchecked Sendable {
     let repository: StagingRepository
 
@@ -107,36 +110,46 @@ final class MobileShelf: @unchecked Sendable {
     // MARK: - Outcomes
 
     func remove(_ item: ShelfItem) throws {
-        try repository.remove(item)
-        var current = items()
-        current.removeAll { $0.id == item.id }
-        try repository.persist(current)
-        mutateOutbox { $0[item.id] = nil }
+        try lock.withLock {
+            try repository.remove(item)
+            var current = repository.load()
+            current.removeAll { $0.id == item.id }
+            try repository.persist(current)
+            mutateOutboxUnlocked { $0[item.id] = nil }
+        }
     }
 
     /// The Mac confirmed durable storage: the phone's copy has done its job.
     /// The bytes go; a dated receipt stays so the UI can say so.
+    ///
+    /// Called from the wire client's event callback, so like every other
+    /// manifest read-modify-write it runs under `lock` — two `.stored` events
+    /// racing an unlocked rewrite here could resurrect a delivered item.
     func markDelivered(_ itemID: UUID) {
-        let current = items()
-        if let item = current.first(where: { $0.id == itemID }) {
-            try? repository.remove(item)
-            try? repository.persist(current.filter { $0.id != itemID })
+        lock.withLock {
+            let current = repository.load()
+            if let item = current.first(where: { $0.id == itemID }) {
+                try? repository.remove(item)
+                try? repository.persist(current.filter { $0.id != itemID })
+            }
+            mutateOutboxUnlocked { $0[itemID] = .delivered(Date()) }
         }
-        mutateOutbox { $0[itemID] = .delivered(Date()) }
     }
 
     /// Receipts older than a day stop being news; a waiting entry whose item
     /// no longer exists is a leftover and goes too.
     func pruneReceipts() {
-        let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
-        let known = Set(items().map(\.id))
-        mutateOutbox { outbox in
-            outbox = outbox.filter { entry in
-                switch entry.value {
-                case let .delivered(date):
-                    date >= cutoff
-                case .waiting:
-                    known.contains(entry.key)
+        lock.withLock {
+            let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
+            let known = Set(repository.load().map(\.id))
+            mutateOutboxUnlocked { outbox in
+                outbox = outbox.filter { entry in
+                    switch entry.value {
+                    case let .delivered(date):
+                        date >= cutoff
+                    case .waiting:
+                        known.contains(entry.key)
+                    }
                 }
             }
         }
@@ -171,19 +184,20 @@ final class MobileShelf: @unchecked Sendable {
     /// itself may have just adopted this very file under such a fresh ID, so
     /// matching by path (not ID) is what keeps this from double-listing it.
     private func commit(_ item: ShelfItem) {
-        var current = items().filter { $0.relativePath != item.relativePath }
-        current.append(item)
-        try? repository.persist(current)
-        mutateOutbox { $0[item.id] = .waiting }
+        lock.withLock {
+            var current = repository.load().filter { $0.relativePath != item.relativePath }
+            current.append(item)
+            try? repository.persist(current)
+            mutateOutboxUnlocked { $0[item.id] = .waiting }
+        }
     }
 
-    private func mutateOutbox(_ change: (inout [UUID: Delivery]) -> Void) {
-        lock.withLock {
-            var outbox = deliveries()
-            change(&outbox)
-            if let data = try? JSONEncoder().encode(outbox) {
-                try? data.write(to: outboxURL, options: [.atomic])
-            }
+    /// Callers hold `lock` (it is not recursive).
+    private func mutateOutboxUnlocked(_ change: (inout [UUID: Delivery]) -> Void) {
+        var outbox = deliveries()
+        change(&outbox)
+        if let data = try? JSONEncoder().encode(outbox) {
+            try? data.write(to: outboxURL, options: [.atomic])
         }
     }
 }

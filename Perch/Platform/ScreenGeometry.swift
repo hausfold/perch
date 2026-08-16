@@ -112,7 +112,7 @@ struct ShelfGeometry: Equatable, Sendable {
         // glass, not the window: the window matches the catch-zone width (below)
         // and the glass is centered within it.
         let usable = screen.frame.width - 48
-        let contentWidth = min(usable, max(360, min(540, usable)))
+        let contentWidth = min(usable, 540)
         // Never wider than the catch band — the glass is trimmed *within* the
         // window, so on a narrow display where the catch band is the smaller of
         // the two, the content follows it down.
