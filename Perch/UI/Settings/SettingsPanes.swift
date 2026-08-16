@@ -383,15 +383,20 @@ struct UpdatesPane: View {
                     title: versionTitle,
                     subtitle: versionSubtitle
                 ) {
-                    if pendingVersion == nil {
+                    // Check Now stays whatever the answer was: an update taken
+                    // outside the app (a `brew upgrade` in another window) is
+                    // only cleared by another check, and waiting out the hourly
+                    // timer is not an answer.
+                    HStack(spacing: 8) {
                         Button("Check Now") {
                             update.checkForUpdates(userInitiated: true)
                         }
-                    } else {
-                        Button(update.installKind.buttonLabel) {
-                            update.performUpdate()
+                        if pendingVersion != nil {
+                            Button(update.installKind.buttonLabel) {
+                                update.performUpdate()
+                            }
+                            .buttonStyle(.borderedProminent)
                         }
-                        .buttonStyle(.borderedProminent)
                     }
                 }
             }

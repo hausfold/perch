@@ -114,7 +114,13 @@ private struct SettingsWindowConfigurator: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    // Again on every update pass, not only at make: on a cold open the view can
+    // reach `makeNSView` before SwiftUI has put it in a window, and a single
+    // missed turn would leave this window unresizable for the whole session —
+    // the exact bug this exists to fix. `configure` is idempotent.
+    func updateNSView(_ nsView: NSView, context: Context) {
+        configure(nsView.window)
+    }
 
     private func configure(_ window: NSWindow?) {
         // The style mask doubles as the "already done" marker: a settings
