@@ -154,8 +154,8 @@ cannot be pasted from here.
 
 Four things to know before pasting it, three of them learned the annoying way:
 
-- **The Notes field caps at 4,000 characters.** The block below is 3,968 — it
-  fits with 32 to spare, so anything you add has to buy its space from
+- **The Notes field caps at 4,000 characters.** The block below is 3,950 — it
+  fits with 50 to spare, so anything you add has to buy its space from
   something else. Check with
   `awk '/^## Review notes/{f=1} f&&/^>/{sub(/^> ?/,"");print} f&&/^Also fill in:/{exit}' docs/app-store.md | wc -m`.
 - **It is a plain-text field**, which is why the block below carries no
@@ -170,22 +170,35 @@ Four things to know before pasting it, three of them learned the annoying way:
   claim, the crypto primitives. If you change what the app does, this text is
   part of the change.
 
+**On saying "Simulator" out loud in item 2.** It is fine, and it is what the
+answer says. Apple asks *what you tested on*, not that you own every device
+they'll run it on; the "test on physical devices" line in the rejection is
+about the platform you ship to, and the iPhone half covers that. The iPad half
+is the same binary, the same universal SwiftUI layout, and the iPad screenshots
+Apple requires come out of the Simulator anyway. What is *not* fine is naming a
+device you never booted, which is why item 2 lists **one** iPad and not a
+plausible-looking spread — every device in that answer is one that actually ran
+the shelf. (Done 2026-08-16 on iPad Pro 13-inch (M5), iPadOS 26.5: empty state,
+`On this iPad` section header, `22 bytes · waiting` row, presence row — all
+correct.) If you add a device to the list, boot it first.
+
 > Perch Companion is the iPhone/iPad half of Perch, a Mac shelf that lives at
 > the notch. The Mac app is separate, distributed outside the App Store at
 > https://hausfold.co/perch. This app does NOT need a Mac to be reviewed — see
 > 4.
 >
-> 1. SCREEN RECORDING. Attached. Captured from a physical iPhone 16 running iOS
-> 27.0 mirrored to a Mac so both halves of the product are visible in one file.
-> It begins at the Home Screen, launches the app, and shows the whole flow: the
-> local-network and camera prompts, adding items with no Mac present, the Share
-> extension, pairing, and delivery. It shows no registration, login, purchase or
-> user-generated-content flow because the app has none; see the last paragraph.
+> 1. SCREEN RECORDING. Attached. Captured from a physical iPhone 15 Pro running
+> iOS 27.0 mirrored to a Mac so both halves of the product are visible in one
+> file. It begins at the Home Screen, launches the app, and shows the whole
+> flow: the local-network and camera prompts, adding items with no Mac present,
+> the Share extension, pairing, and delivery. It shows no registration, login,
+> purchase or user-generated-content flow because the app has none; see the last
+> paragraph.
 >
-> 2. TESTED ON. iPhone 16, iOS 27.0 (physical device) — every flow, including
-> pairing and delivery over Wi-Fi. iPad Pro 13-inch (M5) and iPad Air 11-inch
-> (M4), iPadOS 26.5 (Simulator) — layout and shelf behaviour. Mac side: macOS 26
-> running the Perch desktop app.
+> 2. TESTED ON. iPhone 15 Pro, iOS 27.0 (physical device) — every flow,
+> including pairing and delivery over Wi-Fi. iPad Pro 13-inch (M5), iPadOS 26.5
+> (Simulator) — layout and shelf behaviour. Mac side: macOS 26 running the
+> Perch desktop app.
 >
 > 3. WHAT IT DOES, AND FOR WHOM. A shelf in your pocket. Share a file, photo,
 > link or scrap of text to Perch from any app: it lands on the phone's shelf at
@@ -356,6 +369,17 @@ xcrun simctl io booted screenshot shot.png
 `PERCH_AUTOSEND_TEXT` and `PERCH_PAIR_OFFER` (`PerchIOS/App/MobileAppModel.swift`)
 populate a shelf without a real Mac, which is how you get a screenshot with
 content in it. Don't ship a screenshot of an empty state.
+
+⚠️ **`simctl launch` does not inherit your shell's environment.** Setting them
+the obvious way silently does nothing and you get the empty state anyway —
+they need the `SIMCTL_CHILD_` prefix, which is what passes a variable through
+to the launched app:
+
+```sh
+SIMCTL_CHILD_PERCH_AUTOSEND_TEXT="Quarterly review notes" \
+SIMCTL_CHILD_PERCH_PAIR_OFFER="Julien's MacBook Pro" \
+  xcrun simctl launch booted com.hausfold.perch.ios
+```
 
 ## Privacy label
 
