@@ -4,7 +4,7 @@ Status: accepted
 
 ## Context
 
-The shelf was white-on-black with one sage literal, so `nebelhaus.theme.flavor`
+The shelf was white-on-black with one sage literal, so `haus.theme.flavor`
 and `.contrast` were a lie for perch: a latte rice still got a black glass panel,
 and a nebelung palette bump could only reach perch through a rebuild. Pounce
 already solves this — a rice-written JSON names a palette per polarity, and the

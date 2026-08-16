@@ -115,22 +115,8 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
     // this machine.
 
     /// Where the desktop records the store path it installed from.
-    ///
-    /// 🚨 **Two paths, and the second one is not dead weight.** The directory
-    /// was `…/nebelhaus/` until 2026-08-14, when the desktop was renamed
-    /// (`hausfold/haus`, the rename note's §11). haus moves it and leaves a
-    /// symlink at the old path, so a perch that only knew the old spelling
-    /// keeps working — but the reverse is the case this list is for: a perch
-    /// built from THIS source, running on a Mac whose haus has not been
-    /// rebuilt since the rename, would find nothing at the new path and
-    /// silently demote itself from `.rice` to `.direct` — i.e. start offering
-    /// to update itself on a machine where `haus update` owns the app.
-    ///
-    /// Checked in order, new first. Drop the second entry only once no machine
-    /// can still be running a pre-rename haus.
     static let riceMarkerPaths = [
-        "/Library/Application Support/haus/perch.installed-from",
-        "/Library/Application Support/nebelhaus/perch.installed-from",
+        "/Library/Application Support/haus/perch.installed-from"
     ]
 
     /// Homebrew's per-cask staging directory, on both Apple Silicon and Intel.

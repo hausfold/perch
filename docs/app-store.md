@@ -84,7 +84,6 @@ a companion, not a standalone.
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
 - **Support URL**: `https://hausfold.co/perch`
 - **Marketing URL**: `https://hausfold.co/perch`
-  Both were `https://nebelhaus.com/perch` in the first submitted listing.
   hausfold is the seller, and perch's privacy policy — the one thing App Store
   Connect *requires* a URL for — lives at `https://hausfold.co/perch/privacy`;
   the support and marketing URLs belong beside it.
@@ -253,7 +252,7 @@ Also fill in: no demo account needed, contact = `hi@hausfold.co`. (Not
 you cannot afford to get wrong, and `hi@hausfold.co` is live, routes today, and
 is what every page of the site already says. **This is no longer a stopgap** —
 `hi@` was settled as *the* address 2026-08-09, so there is nothing to switch
-to later; see `notes/hausfold-rename.md` §5.4 in the workshop. If `support@`
+to later. If `support@`
 ever gets added it will be an alias onto `hi@`, which doesn't change this
 field.)
 
@@ -410,9 +409,9 @@ Apple a compliance code.
 
 ## Re-identifying an already-submitted app
 
-Written 2026-08-08, for the hausfold rename — `com.nebelhaus.perch.ios` →
-`com.hausfold.perch.ios`. Keep it: the ordering generalizes to any bundle-id
-change after a record exists, and the trap it avoids is not obvious.
+Written 2026-08-08, when the iOS half moved to `com.hausfold.perch.ios`. Keep
+it: the ordering generalizes to any bundle-id change after a record exists, and
+the trap it avoids is not obvious.
 
 **Why it can't be an edit.** App Store Connect only offers the bundle-id
 dropdown while *no build is associated with the record*. Perch's 1.0 has an
@@ -480,23 +479,19 @@ holding an old key ("paired on screen, refused by the Mac"). No migration code
 is warranted: the app has never been released, so the only data at risk is on
 your own test devices.
 
-**The Mac app followed, separately.** This section once said the Mac half kept
-`com.nebelhaus.perch` "for now" — it was under no App Store deadline, and renaming
-it moves `~/Library/Containers/com.nebelhaus.perch/`, where the real shelf lives.
-It was renamed to `com.hausfold.perch` on 2026-08-08 anyway — the bundle id *is*
-the sandbox container, so the sooner it settles the less there is to strand.
-(The urgency at the time was a licence file keyed to that `defaults` domain;
-that licence no longer exists, see ADR 0009.) Same reasoning as above, same
-accepted cost — empty shelf, Settings back to defaults, pairings broken, the
-local-network prompt re-appears. What breaks pairing is the Keychain *service*
-strings moving on both sides at once (`Perch/Mobile/PairedDeviceStore.swift` on
-the Mac, `PerchMobileCore/MacPairingStore.swift` and `MobileConfig.swift` on the
-phone) — not the container move; they die together, which is the safe half.
+**The Mac app followed, separately.** It settled on `com.hausfold.perch` on
+2026-08-08 — the bundle id *is* the sandbox container, so the sooner it settles
+the less there is to strand. Same reasoning as above, same accepted cost —
+empty shelf, Settings back to defaults, pairings broken, the local-network
+prompt re-appears. What breaks pairing is the Keychain *service* strings moving
+on both sides at once (`Perch/Mobile/PairedDeviceStore.swift` on the Mac,
+`PerchMobileCore/MacPairingStore.swift` and `MobileConfig.swift` on the phone)
+— not the container move; they die together, which is the safe half.
 
-No migration shim, by decision. The Mac app *is* released (cask + `nix/release.nix`,
-and the rice enables it by default), so a live install's shelf under
-`~/Library/Containers/com.nebelhaus.perch/` is orphaned, not migrated — the
-upgrade comes up empty, and the old container is yours to delete. It was
+No migration shim, by decision. The Mac app *is* released (cask +
+`nix/release.nix`, and the desktop enables it by default), so a live install's
+shelf under the previous container was orphaned rather than migrated — the
+upgrade came up empty, and the old container was the owner's to delete. It was
 affordable because perch was days old and barely installed anywhere; the same
 move today would want a migration, whatever the licensing story.
 
@@ -507,9 +502,9 @@ because they come back: the Apple Distribution certificate expires annually, API
 keys get rotated, and a new machine or a new app starts here again.
 
 > ✅ **Steps 1–3 were re-run on 2026-08-08, under `com.hausfold.*`.** They had
-> been completed once for `com.nebelhaus.perch.ios` (first green upload
-> `v2026.08.07`, submitted as *Perch for Mac* 1.0); the hausfold rename re-did
-> them against new identifiers, and the listing is now **`Perch Companion`** —
+> been completed once under the previous identifiers (first green upload
+> `v2026.08.07`, submitted as *Perch for Mac* 1.0); the bundle-id move re-did
+> them against new ones, and the listing is now **`Perch Companion`** —
 > see [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app)
 > for why the name changed with them. Steps 4–7 carried over untouched: **Team ID
 > `88M28542LQ` and every certificate and API key are unchanged.**
