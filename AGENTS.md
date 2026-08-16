@@ -70,6 +70,40 @@ with the app's `Perch.swiftmodule`, so it sets `PRODUCT_MODULE_NAME = PerchCLI`.
 Read `PRD.md`, `ARCHITECTURE.md`, and the ADRs before changing transfer
 semantics. Update them when a product boundary changes.
 
+## The agent surface (`ai/SKILL.md`)
+
+**Don't confuse it with this file.** `AGENTS.md` is for an agent working **on**
+perch, from a checkout. [`ai/SKILL.md`](./ai/SKILL.md) is for an agent **using**
+it — on a stranger's Mac, with no checkout, when their human says *"put this in
+my shelf"*. It is the routing document that makes that sentence work first try:
+what perch is, its verbs, its exit codes, when to reach for something else.
+
+It is bound by the family standard, [the workshop's
+`notes/agent-surface.md`](https://github.com/hausfold/workshop/blob/main/notes/agent-surface.md) —
+≤150 lines, no flag dumps (that's `--help`), and the `description` frontmatter
+names **the phrases a user says**, not the features perch has. A description
+written as a feature summary is true, well written, and never loads.
+
+`nix/skill.nix` ships it as `pkgs.perch-skill` (`$out/perch/SKILL.md`), which is
+how haus's AI room will install it into every agent client on a machine; the
+build fails if the frontmatter is missing or unterminated, or if the file grows
+past 150 lines, because each of those produces a skill that installs, lists and
+is never loaded — indistinguishable from the agent not knowing perch exists.
+Standalone users will get the identical bytes from `perch skill install` once
+that verb lands.
+
+⚠️ **`perch add` has never shipped, and the skill has to say so until it does.**
+It landed in #63, *after* the `v2026.08.14-1` tag that `nix/release.nix` still
+pins, and `nix/package.nix` deliberately skips creating `bin/perch` when the
+bundle has no `perch-cli`. So every command in that file is `command not found`
+on a real machine today, and it carries a Trap saying exactly that. **`bench
+release perch` is what makes perch's agent surface real** — delete the Trap in
+the same PR that cuts it.
+
+**Every claim in it must be runnable.** When you change a verb, a flag or an
+exit code, change `ai/SKILL.md` in the same PR — a stale line there is a
+confidently-wrong instruction with a nice format.
+
 ## Release & downstream
 
 Perch is a native Xcode app that macOS 26 won't let Nix build from source (the
@@ -92,7 +126,7 @@ from-source build:
   `prebuilt` at it, so a branch feel-tests without waiting on a release.
 
 Released: `nix/release.nix` pins a real notarized release (CI rewrites it on
-every `bench release perch` tag) and the rice enables `haus.perch.enable`
+every `bench release perch` tag) and the rice enables `haus.shelf.enable`
 by default.
 
 ## The companion's own path (App Store)
