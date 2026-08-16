@@ -80,6 +80,13 @@ struct PerchApp: App {
                 folderWatch: runtime.folderWatch
             )
         }
+        // A Settings scene defaults to `.contentSize`, which pins the window to
+        // exactly what the content asks for. This lets it grow instead, taking
+        // the *minimum* from the content and leaving the maximum open. It does
+        // not, on its own, put a resize control on the window — a Settings
+        // window is built without `.resizable` and this modifier doesn't add it
+        // back. `SettingsWindowConfigurator` does; verified on 26.6.
+        .windowResizability(.contentMinSize)
     }
 
     /// Clearing from the menu asks first, and says what it costs.

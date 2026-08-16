@@ -59,7 +59,7 @@ Clearing an item deletes its whole import directory — the staged copy is delet
 outright rather than moved to the Trash, so **Clear asks first**: the shelf's
 Clear button arms and needs a second click, and the menu bar's *Clear Shelf…*
 raises an alert. The expiry timer under Settings ▸ Shelf is **off by default**
-(`Never discard old items`); turn it on and pinned items are still exempt.
+(*Discard items after: Never*); turn it on and pinned items are still exempt.
 
 ## Watched folders
 
