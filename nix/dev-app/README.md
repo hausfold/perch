@@ -12,7 +12,7 @@ session** (where `xcodebuild` works), signs it with a stable identity under the
 `com.hausfold.perch.dev` bundle id, and points this input at that build:
 
 ```
---override-input nebelhaus/perch/prebuilt path:/path/to/built-app-dir
+--override-input haus/perch/prebuilt path:/path/to/built-app-dir
 ```
 
 The package then packages *that* app instead of the release. Nothing here needs

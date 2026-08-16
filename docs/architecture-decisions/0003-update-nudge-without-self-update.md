@@ -50,8 +50,7 @@ rice copies the bundle to `/Applications/Perch.app` and a cask's `app` stanza
 moves it to the same path, so rice, cask and drag-install are byte-identical
 locations. Two out-of-band receipts break the tie, with a third signal as
 backstop. Both receipts —
-the desktop's `/Library/Application Support/haus/perch.installed-from` (and its
-pre-2026-08-14 spelling `…/nebelhaus/…`, still read) and
+the desktop's `/Library/Application Support/haus/perch.installed-from` and
 `<brew prefix>/Caskroom/perch` — are outside the container, so a denial would
 read as "not installed that way" rather than as an error. Both turn out to be
 readable under the sandbox today, but the failure is silent if that ever

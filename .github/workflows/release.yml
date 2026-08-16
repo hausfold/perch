@@ -164,7 +164,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
   bump-tap:
-    name: bump nebelhaus/homebrew-tap
+    name: bump hausfold/homebrew-tap
     needs: release
     runs-on: ubuntu-latest
     steps:

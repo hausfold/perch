@@ -35,11 +35,6 @@ no input taps, and no screen reading. A licensing phone-home would spend it.
 
 **An Ed25519-signed license file, verified offline, and a capacity cap.**
 
-> Amended 2026-08-09, before the production key or first sale:
-> `.perchlicense` replaces the original `.nebelhauslicense` spelling. No
-> migration alias is needed because no valid customer license existed under the
-> old extension.
-
 - **The license is a file, not an account.** `.perchlicense` is a small JSON
   blob — `product`, `email`, `purchased`, `seats`, `sig` — signed with Ed25519
   over a canonical fixed-order `key=value` payload (not the JSON: canonicalizing
