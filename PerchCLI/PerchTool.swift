@@ -215,8 +215,32 @@ struct PerchTool {
         ) {
             return installed
         }
-        let enclosing = Bundle.main.bundleURL
-        return enclosing.pathExtension == "app" ? enclosing : nil
+        return enclosingAppBundle?.bundleURL
+    }
+
+    /// The `.app` this tool ships inside, found by walking up from its own
+    /// *resolved* executable path rather than by trusting `Bundle.main`.
+    ///
+    /// Every installer puts the tool on `PATH` as a **symlink** into the
+    /// bundle — `nix/package.nix` here, the cask's `binary` stanza, haus's
+    /// shelf room — because it is signed and notarized as part of the app and
+    /// a copy outside it would be nested code torn out of that seal. Invoked
+    /// through such a link, `Bundle.main` is the *link's* directory: no
+    /// Info.plist, no `.app` extension. That made `perch --version` print
+    /// `unknown` on every install that isn't the raw in-bundle path, and left
+    /// this launch fallback with nothing to open.
+    private var enclosingAppBundle: Bundle? {
+        guard let executable = Bundle.main.executableURL?.resolvingSymlinksInPath() else {
+            return nil
+        }
+        // …/Perch.app/Contents/MacOS/perch-cli → …/Perch.app
+        let app =
+            executable
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        guard app.pathExtension == "app" else { return nil }
+        return Bundle(url: app)
     }
 
     private func launchPerch() {
@@ -361,7 +385,7 @@ struct PerchTool {
     }
 
     private var version: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        enclosingAppBundle?.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
     }
 
     private func complain(_ message: String) {
