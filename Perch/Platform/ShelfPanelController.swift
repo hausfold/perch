@@ -54,6 +54,7 @@ final class ShelfPanelController: NSObject {
         )
         let host = ShelfHostingView(rootView: rootView, dropHandler: dropHandler)
         host.hoverTriggerWidth = geometry.hoverTriggerWidth
+        host.hoverTriggerHeight = geometry.hoverTriggerHeight
         host.onDragEntered = { [weak self] in
             self?.viewState.isDropActive = true
             self?.expand()
@@ -271,6 +272,12 @@ final class ShelfHostingView<Content: View>: NSHostingView<Content> {
         didSet { updateTrackingAreas() }
     }
 
+    // Height of the hover band, measured down from the view's top edge; nil
+    // (or ≥ bounds.height) means the full height triggers.
+    var hoverTriggerHeight: CGFloat? {
+        didSet { updateTrackingAreas() }
+    }
+
     private let dropHandler: ShelfDropHandler
     private var trackingAreaReference: NSTrackingArea?
 
@@ -312,8 +319,21 @@ final class ShelfHostingView<Content: View>: NSHostingView<Content> {
     /// Centered sub-rect of `bounds` used for hover-to-expand. See
     /// `hoverTriggerWidth`.
     private var hoverRect: NSRect {
-        guard let hoverTriggerWidth, hoverTriggerWidth < bounds.width else { return bounds }
-        return bounds.insetBy(dx: (bounds.width - hoverTriggerWidth) / 2, dy: 0)
+        var rect = bounds
+        if let hoverTriggerWidth, hoverTriggerWidth < rect.width {
+            rect = rect.insetBy(dx: (rect.width - hoverTriggerWidth) / 2, dy: 0)
+        }
+        if let hoverTriggerHeight, hoverTriggerHeight < rect.height {
+            // Anchored to the top edge of the panel (the notch), not centered:
+            // the slack in the collapsed frame is all below the housing.
+            rect = NSRect(
+                x: rect.minX,
+                y: isFlipped ? rect.minY : rect.maxY - hoverTriggerHeight,
+                width: rect.width,
+                height: hoverTriggerHeight
+            )
+        }
+        return rect
     }
 
     override func mouseEntered(with event: NSEvent) {

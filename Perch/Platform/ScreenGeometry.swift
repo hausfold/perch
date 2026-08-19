@@ -63,6 +63,11 @@ struct ShelfGeometry: Equatable, Sendable {
     // above — a hover merely passing through the side of that wide band
     // should not pop the shelf open once it has items to reveal.
     let hoverTriggerWidth: CGFloat
+    // Height of the hover-to-expand band, anchored to the top of
+    // collapsedFrame. The collapsed window hangs a good way below the notch so
+    // a *drag* is caught early; a passive hover should not be — it stops
+    // roughly at the bottom edge of the housing itself.
+    let hoverTriggerHeight: CGFloat
     // Depth of whatever occupies the top edge: the camera housing where there is
     // one, otherwise the menu bar. The collapsed ember hangs just under it on
     // either kind of display — never over the housing, and never out in the band
@@ -97,12 +102,20 @@ struct ShelfGeometry: Equatable, Sendable {
         }
 
         if let housingWidth = screen.cameraHousingWidth {
-            // A little grace either side of the true housing edge so the
-            // trigger isn't pixel-perfect, without approaching the catch band.
-            hoverTriggerWidth = min(collapsedWidth, housingWidth + 48)
+            // Barely wider than the true housing edge so the trigger isn't
+            // pixel-perfect, and nowhere near the wide catch band: an
+            // accidental pass along the menu bar beside the notch must not
+            // pop a loaded shelf open.
+            hoverTriggerWidth = min(collapsedWidth, housingWidth + 12)
         } else {
-            hoverTriggerWidth = min(collapsedWidth, 160)
+            hoverTriggerWidth = min(collapsedWidth, 120)
         }
+        // Same reasoning vertically: stop at the housing's own depth (plus a
+        // few points of grace) instead of the full, deliberately generous
+        // catch height. Notchless displays get the menu-bar band.
+        hoverTriggerHeight = screen.hasCameraHousing
+            ? min(collapsedHeight, screen.safeAreaTop + 6)
+            : collapsedHeight
 
         // A comfortable reading width for the tile strip — deliberately a touch
         // narrower than the catch band (roughly one tile unit trimmed off the

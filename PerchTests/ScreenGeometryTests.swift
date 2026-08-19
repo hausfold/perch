@@ -32,6 +32,13 @@ final class ScreenGeometryTests: XCTestCase {
         // centered within it (1512 → min(540, 1512−48) = 540).
         XCTAssertEqual(geometry.expandedContentWidth, 540)
         XCTAssertLessThan(geometry.expandedContentWidth, geometry.expandedFrame.width)
+        // The passive-hover band stays near the notch itself: barely wider than
+        // the 168pt housing, and no deeper than the housing plus a little grace
+        // — far inside the wide, deliberately generous drag-catch frame.
+        XCTAssertEqual(geometry.hoverTriggerWidth, 180)
+        XCTAssertEqual(geometry.hoverTriggerHeight, 38)
+        XCTAssertLessThan(geometry.hoverTriggerWidth, geometry.collapsedFrame.width)
+        XCTAssertLessThan(geometry.hoverTriggerHeight, geometry.collapsedFrame.height)
     }
 
     func testNotchlessScreenGetsCompactCenteredFallback() {
