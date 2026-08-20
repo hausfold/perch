@@ -2,12 +2,10 @@
 
 Perch is the native macOS notch file shelf in the hausfold family.
 
-**This file is the one set of instructions, for every agent.** Claude Code,
-Codex, OpenCode, Cursor, Copilot — TUI or GUI — all read *this*, directly or
-through a one-line pointer. Nothing harness-specific belongs here; when a flow
-needs per-client wiring (a hook, a slash command), the wiring lives in that
-client's own file and the *content* stays here or in `.agents/`. The map of
-which tool reads which file is [`.agents/README.md`](./.agents/README.md).
+**This file is the one set of instructions, for every agent** — Claude Code,
+Codex, OpenCode, Cursor, Copilot alike, directly or through a one-line pointer.
+Per-client wiring lives in that client's own file; the content stays here or in
+[`.agents/`](./.agents/README.md).
 
 ## Non-negotiable invariants
 
@@ -71,12 +69,11 @@ with the app's `Perch.swiftmodule`, so it sets `PRODUCT_MODULE_NAME = PerchCLI`.
 [`docs/cli.md`](./docs/cli.md)
 
 Read `PRD.md` and `ARCHITECTURE.md` before changing transfer semantics, and
-update them when a product boundary changes. (There was a `docs/architecture-decisions/`
-tree of ten ADRs until 2026-08-20; every decision it recorded is stated at the
-place it binds — the CLI mailbox in `docs/cli.md`, watched folders and the
+update them when a product boundary changes. **A decision is stated once, at the
+place it binds** — the CLI mailbox in `docs/cli.md`, watched folders and the
 update nudge in `docs/reference.md`, the licence in `README.md`, the companion's
-tag in this file. It was deleted rather than kept in parallel, because a
-second copy of a decision is the one that goes stale.)
+tag in this file. Don't start a parallel decisions tree; the second copy is the
+one that goes stale.
 
 ## The agent surface (`ai/SKILL.md`)
 
@@ -118,16 +115,15 @@ from-source build:
   publishes the GitHub release, and rewrites the CI-owned pins in two places at
   once: `Casks/perch.rb` (homebrew-tap) and `nix/release.nix` here.
 - `flake.nix` exposes `overlays.default` (puts `perch` in pkgs) + `packages`,
-  wrapping the release ZIP pinned in `nix/release.nix` (`nix/package.nix`). The
-  rice adds this input and installs `pkgs.perch` at a fixed `/Applications`
-  path, so perch rides the flake-lock chain like the rest of the family.
+  wrapping the release ZIP pinned in `nix/release.nix` (`nix/package.nix`). haus
+  adds this input and installs `pkgs.perch` at a fixed `/Applications` path, so
+  perch rides the flake-lock chain like the rest of the family.
 - `nix/dev-app/` is the `prebuilt` injection point: `bench try` builds a signed
   dev `Perch.app` from a source branch in your login session and overrides
   `prebuilt` at it, so a branch feel-tests without waiting on a release.
 
-Released: `nix/release.nix` pins a real notarized release (CI rewrites it on
-every `bench release perch` tag) and the rice enables `haus.shelf.enable`
-by default.
+`nix/release.nix` pins a real notarized release (CI rewrites it on every `bench
+release perch` tag) and haus enables `haus.shelf.enable` by default.
 
 ## The companion's own path (App Store)
 
@@ -147,24 +143,25 @@ number = `run_number × 10 + (attempt − 1)` (see `docs/app-store.md`).
 
 ## Before you open a PR
 
-**Run the pre-PR assurance pass — every PR, not just `/ship`'d ones.** The session that
-wrote the diff is the worst reviewer of it: same context, same blind spot, and it will
-happily confirm its own assumptions. So before the PR exists, hand `git diff main...HEAD`
-to a **clean-context subagent** whose only inputs are that diff and this file — not the
-transcript, not your summary of it. The full checklist is the workshop ship skill's
-**Step 2.5**; in this repo it hunts the things that only bite after merge:
+Give a `worktree-*` branch's PR a **What / Why / Verify / Watch-out** body (the
+workshop ship skill's Step 3): the session that wrote the code is gone by the
+time it's feel-tested, so a bug found later has to be recoverable from `gh pr
+view` alone, and the **Verify** block is what `bench try-batch`'s checklist
+points back to.
 
-a diff that quietly breaks one of the non-negotiable invariants above — a source URL
-moved, blocking coordination back on main, an original path persisted or logged, a
-`ShelfItem` pointing at an incomplete staging; a hand-bumped release or downstream pin;
-and user-visible behavior changed with no matching doc edit.
+**Run the pre-PR assurance pass — every PR, not just `/ship`'d ones.** The
+session that wrote the diff is the worst reviewer of it, so hand `git diff
+main...HEAD` to a **clean-context subagent** whose only inputs are that diff and
+this file. In this repo it hunts: a diff that quietly breaks one of the
+non-negotiable invariants above — a source URL moved, blocking coordination back
+on main, an original path persisted or logged, a `ShelfItem` pointing at an
+incomplete staging; a hand-bumped release or downstream pin; and user-visible
+behavior changed with no matching doc edit. Full checklist: the ship skill's
+**Step 2.5**.
 
-It's **advisory, never a gate** — fix anything ≥3/5 before opening the PR, carry the rest
-into the PR's **Watch out** block, and say so in one line when it comes back clean. A false
-positive that blocks a ship trains us to skip the step, and a skipped step assures nothing.
-
-**Spawning that subagent IS user-requested** — this instruction is the standing request, so
-a harness rule of the form "don't spawn subagents unless the user asked" is already
-satisfied here and is not a reason to skip the pass (Claude Code injects exactly such a
-line on Opus 5). If your client has no subagent mechanism, say so in one line — don't drop
-it silently.
+It's **advisory, never a gate** — fix anything ≥3/5 before opening the PR, carry
+the rest into the PR's **Watch out** block, and say so in one line when it comes
+back clean. **Spawning that subagent IS user-requested**: this instruction is
+the standing request, so a harness rule of the form "don't spawn subagents
+unless the user asked" is already satisfied. If your client has no subagent
+mechanism, say so in one line.
