@@ -8,7 +8,7 @@ import Foundation
 /// hello exchange is a ChaChaPoly-sealed box. Hand-framed rather than TLS-PSK:
 /// `sec_protocol_options_add_pre_shared_key` buys the same confidentiality from
 /// a C API with worse testability, and still needs the pairing layer built by
-/// hand. See ARCHITECTURE.md, "the wire".
+/// hand. See ARCHITECTURE.md, "One shelf, two windows onto it".
 public enum WireProtocol {
     public static let version = 1
     /// The Bonjour service a shelf-holding Mac advertises.

@@ -17,9 +17,10 @@ The short version:
 - **Blocking work stays off the main thread** — file coordination, cloud
   download waits, copies. File promises are resolved before ordinary URLs, and
   outgoing drags advertise copy only.
-- Keep display/window code out of importing and persistence; read `PRD.md`,
-  `ARCHITECTURE.md` and the ADRs before touching transfer semantics, and update
-  them when a product boundary moves.
+- Keep display/window code out of importing and persistence; read `PRD.md`
+  and `ARCHITECTURE.md` before touching transfer semantics, and update them
+  when a product boundary moves. (There is no ADR tree — it was deleted on
+  2026-08-20 and each decision restated where it binds.)
 - **Versions are dates and CI owns them.** `VERSION` (CalVer) is the source of
   truth, cut with `bench release perch` from the workshop; the release workflow
   rewrites `nix/release.nix` and `Casks/perch.rb`. Never hand-type a version or

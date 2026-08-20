@@ -61,7 +61,10 @@ directions:
 
 Finder's right-click Quick Actions menu is a fourth door, implemented as a
 non-UI Action Extension (`PerchFinderAction`). macOS registers it as a Finder
-Quick Action and turns it on by default; its checkbox lives under Login Items &
+Quick Action and turns it on by default — measured on macOS 26.6 (2026-08-14):
+`defaults read pbs` shows `FinderActive` ▸
+`APPEXTENSION-com.hausfold.perch.finder-action = 1` with no user step. Its
+checkbox lives under Login Items &
 Extensions ▸ Extensions ▸ **System Services** (the OS files every app's Quick
 Action under that row, not under the app's own name). Perch exposes a Settings
 shortcut to that pane — the top of it, since macOS publishes no anchor for the
@@ -117,8 +120,7 @@ group container by its documented path, since
 `containerURL(forSecurityApplicationGroupIdentifier:)` answers nil without the
 entitlement. It treats the mailbox, not a process list, as the liveness test: a
 dev build owns the notch under its own bundle identifier and would fail a
-bundle-id check while answering perfectly well. The command line is a second
-client of that mailbox rather than a door of its own — see
+bundle-id check while answering perfectly well. See
 [docs/cli.md](docs/cli.md).
 
 A **watched folder** is the seventh door, and the only one that opens without a
@@ -206,7 +208,7 @@ brew's Caskroom directory — with the rice's theme drop as a third signal if th
 receipts ever stop being readable from inside the container. The poll is the
 app's only *outbound internet* call and the only reason it holds
 `com.apple.security.network.client`; a Settings toggle stops it, and DEBUG builds
-never run it — perch nudges about a release and never installs one. (The
+never run it. (The
 mobile listener below is the app's other network surface — local-network only,
 paired devices only, its own toggle, and the sole reason for
 `network.server`.)
@@ -218,7 +220,10 @@ on what the shelf holds. It was briefly the other thing — an Ed25519-signed
 offline licence and a two-tile cap, decided 2026-08-03 and reversed 2026-08-15.
 Nothing shipped: the production key was never minted, so `canSell` was false in
 every build and the cap never switched on. The `README.md` licence section has
-the tag range.
+the tag range. The runbook for the day that switch would be flipped — minting
+the keypair, the signing contract a Worker would have to honour — was
+`docs/going-paid.md`, deleted with the decision;
+`git show v2026.08.14-1:docs/going-paid.md` still has it.
 
 The **admission step** it left behind is not a leftover: a sender that is not
 the app — the Finder Action, the `perch` tool, a paired iPhone — asks for a slot
@@ -249,7 +254,9 @@ buys the same confidentiality from a C API with worse testability and still
 needs the pairing layer built by hand; the hand-rolled frame layer is ~150 lines
 and fully loopback-tested. A relay for "arrives while both are away" stays open
 as a later, opt-in layer — the wire's `queued → stored` states were shaped so
-one slots in without a model rewrite.
+one slots in without a model rewrite. AirDrop, iCloud Drive and a CloudKit
+queue were each considered and rejected: no public receiver API, a folder perch
+would have to police, and an Apple-account dependency, respectively.
 
 The same session runs the other way. The Mac never dials a phone — a phone is
 asleep, off-network, or behind a lock screen most of the time — so "shared and
