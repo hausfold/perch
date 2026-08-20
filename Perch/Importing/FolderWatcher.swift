@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 
 /// Which files a watched folder is willing to shelve. Pure, so the rules are
-/// testable without a filesystem. See ADR 0010.
+/// testable without a filesystem.
 enum FolderWatchRules {
     /// The names browsers give a download that is not finished. Completion is
     /// announced by renaming past these, and the rename is a directory event.
@@ -43,7 +43,7 @@ enum FolderWatchRules {
 /// changes (create, rename, delete), a rescan is needed anyway for launch
 /// catch-up and ledger pruning, and content writes to a growing file — which
 /// a directory kqueue does not report — are the probe's job, not the event
-/// stream's. See ADR 0010.
+/// stream's.
 final class FolderWatcher: @unchecked Sendable {
     let folderID: UUID
 

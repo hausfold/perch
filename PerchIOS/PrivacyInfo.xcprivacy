@@ -4,7 +4,7 @@
 <dict>
 	<!-- Perch collects nothing and tracks no one: there is no account, no
 	     analytics, no relay, and the only network the app speaks on is the
-	     local one, to a Mac the user paired by hand (ADR 0005). The two
+	     local one, to a Mac the user paired by hand. The two
 	     entries below are Apple's "required reason" APIs we do touch — both
 	     inside our own App Group container. Keep this file in step with
 	     PerchShare/PrivacyInfo.xcprivacy; the extension touches the same

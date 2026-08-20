@@ -104,7 +104,7 @@ jobs:
             --sign "$IDENTITY" \
             "$FINDER_ACTION"
           # The `perch` tool, deliberately with NO entitlements: it is the
-          # unsandboxed half of the handoff (ADR 0008) and reads your files as
+          # unsandboxed half of the handoff and reads your files as
           # you. Sandboxing it would defeat the point; the App Group it writes
           # into is addressed by path, not by entitlement.
           codesign --force --options runtime --timestamp \
