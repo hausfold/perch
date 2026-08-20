@@ -20,7 +20,7 @@ NSDraggingDestination                 paired iPhone / iPad
         ▼                                     ▼
 ShelfDropHandler                      MobileReceiver ── pairing, Keychain,
         │  distinguishes promises /           │         spool + digest verify
-        │  file URLs / images / links /       │         (PerchWire/, ADR 0005)
+        │  file URLs / images / links /       │         (PerchWire/)
         │  text                               │
         ▼                                     ▼
 ShelfStore ─────── main-actor state, pending/completed/error transitions
@@ -117,9 +117,9 @@ group container by its documented path, since
 `containerURL(forSecurityApplicationGroupIdentifier:)` answers nil without the
 entitlement. It treats the mailbox, not a process list, as the liveness test: a
 dev build owns the notch under its own bundle identifier and would fail a
-bundle-id check while answering perfectly well. See
-[ADR 0008](docs/architecture-decisions/0008-command-line-joins-the-handoff-mailbox.md)
-and [docs/cli.md](docs/cli.md).
+bundle-id check while answering perfectly well. The command line is a second
+client of that mailbox rather than a door of its own — see
+[docs/cli.md](docs/cli.md).
 
 A **watched folder** is the seventh door, and the only one that opens without a
 gesture: Settings keeps a list of user-picked folders (each one panel grant,
@@ -133,8 +133,7 @@ uses. A per-folder ledger of hashed inode+birth identities — never a name or a
 path — decides what is new, is seeded with the folder's existing contents on
 add, and catches up at launch on arrivals perch missed. Copy only, always: the
 original never leaves the folder, so retention expiry deletes perch's copy and
-nothing of the user's. See
-[ADR 0010](docs/architecture-decisions/0010-watched-folders-stage-copies-on-arrival.md).
+nothing of the user's.
 
 The two Finder doors are complementary, not redundant. The extension runs
 without waking Perch, but only inside the submenu and only while the app is up
@@ -188,7 +187,7 @@ Both paths sit outside the app container, which costs one read-only
 home-relative sandbox exception and forces two details: the real home comes from
 `getpwuid` (inside the sandbox `NSHomeDirectory()` is the container), and the
 rice must drop **real files**, since the sandbox resolves a symlink into
-`/nix/store` before it checks the path and denies it. See ADR 0002.
+`/nix/store` before it checks the path and denies it.
 
 ### Knowing there is a new release
 
@@ -207,16 +206,19 @@ brew's Caskroom directory — with the rice's theme drop as a third signal if th
 receipts ever stop being readable from inside the container. The poll is the
 app's only *outbound internet* call and the only reason it holds
 `com.apple.security.network.client`; a Settings toggle stops it, and DEBUG builds
-never run it. See ADR 0003. (The mobile listener below is the app's other
-network surface — local-network only, paired devices only, its own toggle, and
-the sole reason for `network.server`. See ADR 0005.)
+never run it — perch nudges about a release and never installs one. (The
+mobile listener below is the app's other network surface — local-network only,
+paired devices only, its own toggle, and the sole reason for
+`network.server`.)
 
 ### Admission, and why it survived the free tier
 
 Perch is free software (MIT) with no paid tier, no license file, and no ceiling
-on what the shelf holds — see
-[ADR 0009](docs/architecture-decisions/0009-perch-stays-free-and-mit.md), which
-reverses [ADR 0004](docs/architecture-decisions/0004-offline-license-and-a-capacity-cap.md).
+on what the shelf holds. It was briefly the other thing — an Ed25519-signed
+offline licence and a two-tile cap, decided 2026-08-03 and reversed 2026-08-15.
+Nothing shipped: the production key was never minted, so `canSell` was false in
+every build and the cap never switched on. The `README.md` licence section has
+the tag range.
 
 The **admission step** it left behind is not a leftover: a sender that is not
 the app — the Finder Action, the `perch` tool, a paired iPhone — asks for a slot
@@ -238,8 +240,16 @@ X25519 + a human-confirmed six-digit code; every frame after the hello is
 ChaChaPoly-sealed under per-session keys. Arriving bytes spool into a hidden
 dot-directory on the shelf's volume, are digest-verified, and enter the shelf
 through the same admission-first, atomic-commit path as a drag. Pairing lives
-in the Keychain; revoking a device deletes its row. The wire protocol, the
-pairing ceremony, and the no-relay stance are ADR 0005.
+in the Keychain; revoking a device deletes its row.
+
+**No account, no relay, and TLS-PSK was considered and declined.** A hausfold
+sync server would spend, for a v1 nobody asked to be cloudy, exactly the trust
+that "your files never leave your network" buys. `sec_protocol_options_add_pre_shared_key`
+buys the same confidentiality from a C API with worse testability and still
+needs the pairing layer built by hand; the hand-rolled frame layer is ~150 lines
+and fully loopback-tested. A relay for "arrives while both are away" stays open
+as a later, opt-in layer — the wire's `queued → stored` states were shaped so
+one slots in without a model rewrite.
 
 The same session runs the other way. The Mac never dials a phone — a phone is
 asleep, off-network, or behind a lock screen most of the time — so "shared and
@@ -270,7 +280,7 @@ SHA-256(inode + birth date) tokens, so renaming or editing a shelved file in
 place never re-imports it, and nothing about a source's name or path is
 persisted or logged. Marking is at-most-once, when the file is handed to
 import — a failed staging shows its error once rather than retrying on every
-event. See ADR 0010.
+event.
 
 ### Name collisions
 

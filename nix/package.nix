@@ -65,7 +65,7 @@ stdenvNoCC.mkDerivation {
   dontBuild = true;
 
   # `bin/perch` is a symlink, never a copy: the tool is signed and notarized as
-  # part of the bundle (ADR 0008), and a copy outside it would be nested code
+  # part of the bundle, and a copy outside it would be nested code
   # torn out of the seal it was signed under. It is `perch-cli` in the bundle
   # because a `Contents/MacOS/perch` would overwrite `Contents/MacOS/Perch` on a
   # case-insensitive volume — which is every stock Mac.
@@ -90,7 +90,7 @@ stdenvNoCC.mkDerivation {
   meta = {
     description = "Native macOS notch file shelf";
     homepage = "https://github.com/hausfold/perch";
-    # Safe to declare again now that perch is MIT (ADR 0009). It was left out
+    # Safe to declare again now that perch is MIT. It was left out
     # while the repo was FSL-1.1-ALv2: nixpkgs has no FSL license, and anything
     # that isn't a free license flips the package unfree, which breaks the
     # rice's install for anyone without allowUnfree.

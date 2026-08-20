@@ -270,7 +270,7 @@ struct WatchedFoldersPane: View {
     }
 
     /// The panel is the whole permission model: the grant it returns is what
-    /// the watcher keeps (as an app-scoped bookmark — ADR 0010), so there is
+    /// the watcher keeps (as an app-scoped bookmark), so there is
     /// nothing to pre-authorize and nothing typed in by hand.
     private func addWatchedFolder() {
         let panel = NSOpenPanel()

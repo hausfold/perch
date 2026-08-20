@@ -67,8 +67,9 @@ Perch is sandboxed. It holds `files.user-selected.read-write` and nothing more,
 so it cannot read a path you merely *name* — `perch://add?path=…` would hand it
 a path it isn't allowed to open. The tool is unsandboxed and runs as you, so it
 does the reading, and the two halves meet in the App Group container the Finder
-Action already uses ([ADR 0007](architecture-decisions/0007-finder-action-admission-before-copy.md),
-[ADR 0008](architecture-decisions/0008-command-line-joins-the-handoff-mailbox.md)):
+Action already uses — admission is granted before anything reads source bytes,
+and the command line is a second client of that same mailbox rather than a new
+door:
 
 1. `perch add` writes a request — **display names only**, no paths — into a
    fresh transaction directory in

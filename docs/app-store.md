@@ -11,7 +11,8 @@ by how often you'll need it — the release loop first, the standing facts in th
 middle, and the once-per-decade Apple setup as an appendix at the bottom.
 
 The companion is **free**, and stays free — so is the Mac app it belongs to
-([ADR 0009](architecture-decisions/0009-perch-stays-free-and-mit.md)). The phone
+(free of charge and MIT since 2026-08-15; the `README.md` licence section has
+what happened to the ten-day fair-source experiment before it). The phone
 is the second half of perch, so it carries no purchase, no IAP, and no account.
 That keeps the review simple: nothing to restore, no subscription screens, no
 receipts.

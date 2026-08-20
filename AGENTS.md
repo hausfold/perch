@@ -68,10 +68,15 @@ one that doesn't**: `Casks/perch.rb` has no `binary` stanza, so a
 `brew install --cask` user has the app and no `perch`. Same class of
 trap: a Swift target named `perch` emits a `perch.swiftmodule` that collides
 with the app's `Perch.swiftmodule`, so it sets `PRODUCT_MODULE_NAME = PerchCLI`.
-[`docs/cli.md`](./docs/cli.md) · [ADR 0008](docs/architecture-decisions/0008-command-line-joins-the-handoff-mailbox.md)
+[`docs/cli.md`](./docs/cli.md)
 
-Read `PRD.md`, `ARCHITECTURE.md`, and the ADRs before changing transfer
-semantics. Update them when a product boundary changes.
+Read `PRD.md` and `ARCHITECTURE.md` before changing transfer semantics, and
+update them when a product boundary changes. (There was a `docs/architecture-decisions/`
+tree of ten ADRs until 2026-08-20; every decision it recorded is stated at the
+place it binds — the CLI mailbox in `docs/cli.md`, watched folders and the
+update nudge in `docs/reference.md`, the licence in `README.md`, the companion's
+tag in this file. It was deleted rather than kept in parallel, because a
+second copy of a decision is the one that goes stale.)
 
 ## The agent surface (`ai/SKILL.md`)
 
@@ -127,7 +132,7 @@ by default.
 ## The companion's own path (App Store)
 
 The iPhone/iPad half can't ride the cask or the flake — it ships through the App
-Store, free, on the *same* `v*` tag ([ADR 0006](docs/architecture-decisions/0006-companion-ships-free-on-the-mac-release-tag.md)):
+Store, free, on the *same* `v*` tag:
 `.github/workflows/testflight.yml` archives `PerchIOS`, exports the `.ipa`, and
 uploads it. It stops at TestFlight — attaching a build to a store version and
 submitting for review is a human act, and its runbook (listing copy, privacy

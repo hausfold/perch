@@ -5,8 +5,10 @@ import Foundation
 /// Everything that crosses the network between a phone and a Mac is a
 /// length-prefixed frame. Pairing and the session hello are plaintext JSON
 /// control messages authenticated by the pairing secret; every frame after the
-/// hello exchange is a ChaChaPoly-sealed box. See `docs/architecture-decisions/`
-/// ADR 0005 for why this is hand-framed rather than TLS-PSK.
+/// hello exchange is a ChaChaPoly-sealed box. Hand-framed rather than TLS-PSK:
+/// `sec_protocol_options_add_pre_shared_key` buys the same confidentiality from
+/// a C API with worse testability, and still needs the pairing layer built by
+/// hand. See ARCHITECTURE.md, "the wire".
 public enum WireProtocol {
     public static let version = 1
     /// The Bonjour service a shelf-holding Mac advertises.

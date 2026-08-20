@@ -71,8 +71,8 @@ moment, so a normally written file never lands mid-write. (A writer that stalls
 for over a second can still be shelved early; the probe is a net under the
 naming convention, not a proof of doneness.) New folders appearing inside a watched
 folder are not auto-imported; folders still reach the shelf through every
-deliberate door. See
-[ADR 0010](architecture-decisions/0010-watched-folders-stage-copies-on-arrival.md).
+deliberate door. A watched folder copies what arrives and never touches the
+original — same invariant as every other door.
 
 ## Colors
 
@@ -168,7 +168,8 @@ you have:
 | a Nix store path | copies `nix flake update perch` |
 | dragging the release ZIP | opens the release page |
 
-See [ADR 0003](architecture-decisions/0003-update-nudge-without-self-update.md).
+Perch nudges and never installs: it has no self-updater, so the copied command
+is always the one your install method understands.
 
 ## The one system setting perch needs
 
