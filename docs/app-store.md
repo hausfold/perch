@@ -79,7 +79,16 @@ they disagree, fix it here first and paste. Keep it honest about what the app is
 a companion, not a standalone.
 
 - **Name**: `Perch Companion` (plain `Perch` is taken by another developer; in-app branding stays `Perch`). Was `Perch for Mac` until 2026-08-08 — bundle ID, SKU and name all changed together in the hausfold re-identification, see [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app). Bundle ID `com.hausfold.perch.ios`, SKU `perch-ios-hausfold`
-- **Subtitle** (30 max): `Send it to your Mac's shelf`
+- **Subtitle** (30 max): `Send it to your desktop shelf`
+  Was `Send it to your Mac's shelf` until 2026-08-19, when App Review rejected
+  1.0 (240) under **5.2.5** for an Apple trademark in the subtitle. Name,
+  subtitle and icon carry **no Apple product names** — "desktop" instead of
+  "Mac". The description and the review notes keep theirs — there it is a
+  referential compatibility statement, which the trademark guidelines allow.
+  **Keywords deliberately keep `mac`** (not displayed on the product page, and
+  it is how people search for this); **promotional text dropped it** on the same
+  day, because it renders on the page and carried the exact rejected phrase. If
+  5.2.5 comes back anyway, the keyword is the next thing to strip.
 - **Category**: Productivity (secondary: Utilities)
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
 - **Support URL**: `https://hausfold.co/perch`
@@ -98,7 +107,7 @@ a companion, not a standalone.
 
 **Promotional text** (170, changeable without review):
 
-> Share anything to Perch and it's waiting on your Mac's shelf — over your own
+> Share anything to Perch and it's waiting on your desktop shelf — over your own
 > network, with no account and no cloud in the middle.
 
 **Description**:
@@ -335,6 +344,7 @@ the question never gets asked twice).
 | risk | answer |
 |---|---|
 | **2.1 Information Needed** — happened, 2026-08-15 | Apple's seven-question form. All seven are answered verbatim in [Review notes](#review-notes--paste-this-into-app-review-information); item 1 is the [screen recording](#the-screen-recording-apple-asks-for). Reply in Resolution Center *and* leave the same text in Notes — this build does not need rebuilding. |
+| **5.2.5 Apple trademark in metadata** — happened, 2026-08-19 | "Mac" in the **subtitle**. Metadata-only fix: a subtitle with no Apple product name, same build, resubmit. Name, subtitle, icon **and promotional text** stay trademark-free; the description's referential compatibility line ("the Mac half is a separate app") and the `mac` keyword are a recorded decision to keep — see [The listing](#the-listing). |
 | 2.1 "we couldn't test the core feature" | The review note above: the app stages and holds items with no Mac at all. |
 | 4.2 "minimum functionality / it's a companion" | It is a functional shelf and a Share extension target on its own, not a remote control. Lead with that framing in the description too. |
 | 5.1.1 local network permission | `NSLocalNetworkUsageDescription` and `NSBonjourServices` are declared. The prompt fires at first launch, not at Pair — browsing starts in `becameActive()` — so the purpose string has to make sense to someone who hasn't paired anything yet, and it does. |
