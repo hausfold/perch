@@ -13,26 +13,42 @@ final class PairedDeviceStore: @unchecked Sendable {
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "PairedDevices")
     private let lock = NSLock()
 
+    /// Listing is two steps on purpose: the file-based Keychain the Mac app
+    /// gets rejects `kSecMatchLimitAll` together with `kSecReturnData` outright
+    /// (`errSecParam`), so ask it for the accounts and read each one singly.
+    /// Only the file-based Keychain has that limit — moving these queries to
+    /// the data-protection one would lift it, and strand every device paired
+    /// before the move.
     func all() -> [PairedPeer] {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Self.service,
             kSecMatchLimit as String: kSecMatchLimitAll,
-            kSecReturnData as String: true,
+            kSecReturnAttributes as String: true,
         ]
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let blobs = result as? [Data] else {
+        guard status == errSecSuccess, let items = result as? [[String: Any]] else {
             if status != errSecItemNotFound {
                 logger.error("Keychain list failed: \(status, privacy: .public)")
             }
             return []
         }
-        return blobs
-            .compactMap { try? JSONDecoder().decode(PairedPeer.self, from: $0) }
-            .sorted { $0.pairedAt < $1.pairedAt }
+        let peers = items
+            .compactMap { $0[kSecAttrAccount as String] as? String }
+            .compactMap(UUID.init(uuidString:))
+            .compactMap(peer(for:))
+        // A device the second read can't resolve would drop out of the list
+        // silently — the same "no devices paired" lie this method just stopped
+        // telling. Count is safe to log; the identity behind it is not.
+        if peers.count != items.count {
+            logger.error("Keychain list skipped \(items.count - peers.count, privacy: .public) unreadable device(s)")
+        }
+        return peers.sorted { $0.pairedAt < $1.pairedAt }
     }
 
+    /// Must stay lock-free: `all()` calls this per item, and `lock` is a
+    /// non-recursive `NSLock`, so taking it here would deadlock that walk.
     func peer(for deviceID: UUID) -> PairedPeer? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
