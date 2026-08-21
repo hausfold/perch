@@ -13,23 +13,28 @@ final class PairedDeviceStore: @unchecked Sendable {
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "PairedDevices")
     private let lock = NSLock()
 
+    /// Listing is two steps on purpose: the file-based Keychain the Mac app
+    /// gets rejects `kSecMatchLimitAll` together with `kSecReturnData` outright
+    /// (`errSecParam`), so ask it for the accounts and read each one singly.
     func all() -> [PairedPeer] {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Self.service,
             kSecMatchLimit as String: kSecMatchLimitAll,
-            kSecReturnData as String: true,
+            kSecReturnAttributes as String: true,
         ]
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess, let blobs = result as? [Data] else {
+        guard status == errSecSuccess, let items = result as? [[String: Any]] else {
             if status != errSecItemNotFound {
                 logger.error("Keychain list failed: \(status, privacy: .public)")
             }
             return []
         }
-        return blobs
-            .compactMap { try? JSONDecoder().decode(PairedPeer.self, from: $0) }
+        return items
+            .compactMap { $0[kSecAttrAccount as String] as? String }
+            .compactMap(UUID.init(uuidString:))
+            .compactMap(peer(for:))
             .sorted { $0.pairedAt < $1.pairedAt }
     }
 
