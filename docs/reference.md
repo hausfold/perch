@@ -64,13 +64,20 @@ timer expire it — deletes perch's copy and nothing of yours.
 **Shelf my screenshots** is the same thing with the finding-out done for you.
 Flipping it opens the same folder panel, already pointed at wherever this Mac
 saves captures: what `screenshotsFolder` in `~/.config/perch/config.json` says
-(haus writes that key from `haus.screenshots.location`), else the Desktop,
+(haus writes that key from `haus.screenshots.location`, when
+`haus.shelf.watchScreenshots` is on), else the Desktop,
 which is macOS's own default. Perch cannot simply read the setting — a
 sandboxed app is not shown another app's preferences — and it cannot grant
 itself the folder either, so the panel stays: the click is the permission.
 Pick a different folder in it and that one becomes your screenshots folder,
-because you know where they go and perch was guessing. Switching it off stops
-watching and keeps every capture already on the shelf.
+because you know where they go and perch was guessing — and a folder already
+in the list is adopted rather than added twice.
+
+Switching it off takes that folder out of the watched list altogether:
+everything already on the shelf stays, nothing new arrives on its own, and
+turning it back on means the panel again (the grant went with the folder).
+That is the same folder the list below shows, so if you added it for other
+reasons too, this is the switch that removes it.
 
 One macOS setting is worth turning off alongside it: the floating screenshot
 thumbnail. It doesn't preview a saved file, it *holds* the capture and writes

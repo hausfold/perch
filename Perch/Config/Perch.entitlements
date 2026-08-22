@@ -37,10 +37,13 @@
 	     Perch/Mobile/). Nothing else ever listens. -->
 	<key>com.apple.security.network.server</key>
 	<true/>
-	<!-- The rice's theme drop: ~/.config/perch/{config.json,themes/*.json},
-	     which lives outside the container. Read-only, one directory, and the
-	     only path perch reaches for that a drag or a file picker did not hand
-	     it — see Perch/UI/Theme/RicePalette.swift. -->
+	<!-- The rice's drop: ~/.config/perch/{config.json,themes/*.json}, which
+	     lives outside the container. Read-only, one directory, and the only
+	     path perch reaches for that a drag or a file picker did not hand it.
+	     Two readers, both of that one directory: Perch/UI/Theme/RicePalette.swift
+	     (the palette) and Perch/UI/Settings/ScreenshotsFolder.swift (where this
+	     Mac saves screenshots, which is only ever used to aim a file picker —
+	     reading it grants nothing). -->
 	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
 	<array>
 		<string>/.config/perch/</string>

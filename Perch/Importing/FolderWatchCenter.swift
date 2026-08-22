@@ -20,6 +20,14 @@ final class FolderWatchCenter: ObservableObject {
     private let folderStore: WatchedFolderStore
     private var watchers: [UUID: FolderWatcher] = [:]
     private var resolvedPaths: [UUID: String] = [:]
+    /// Where each configured folder was last seen, INCLUDING the ones whose
+    /// watcher has since fallen over. `resolvedPaths` answers "what is being
+    /// watched right now" and is cleared the moment a folder goes unavailable;
+    /// this answers "what is configured", which is the question the dedupe
+    /// below has to ask. Both are in-memory only — the bookmark stays the sole
+    /// persisted trace of a folder. Dropped on `removeFolder`, so a folder the
+    /// person took out is genuinely gone.
+    private var lastKnownPaths: [UUID: String] = [:]
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "WatchedFolders")
 
     init(shelf: ShelfStore, folders: WatchedFolderStore) {
@@ -41,35 +49,65 @@ final class FolderWatchCenter: ObservableObject {
         watchers.removeAll()
     }
 
-    func addFolder(at url: URL) {
+    /// The id of the folder now being watched — the existing one when this is
+    /// a folder perch already has, so a caller that wants to REMEMBER which
+    /// folder it asked for can hold an opaque id rather than a path.
+    @discardableResult
+    func addFolder(at url: URL) -> UUID? {
         // Compare through symlinks, or the same directory picked via an alias
         // would get a second watcher — and every arrival two tiles.
         let canonical = url.standardizedFileURL.resolvingSymlinksInPath().path
-        guard !resolvedPaths.values.contains(canonical) else { return }
+        if let existing = resolvedPaths.first(where: { $0.value == canonical })?.key {
+            return existing
+        }
+        // Configured but not currently watched — a bookmark that stopped
+        // resolving (`markUnavailable`), or one still resolving at launch.
+        // Adding "again" is a repair, not a second folder: without this the
+        // store, which does not dedupe, would grow a twin entry and every
+        // arrival would land twice. The panel just handed us access, so a
+        // fresh bookmark is exactly what the stale entry needs.
+        if let stale = lastKnownPaths.first(where: { $0.value == canonical })?.key,
+           folderStore.folders.contains(where: { $0.id == stale }) {
+            if let refreshed = try? folderStore.bookmarking.make(url) {
+                folderStore.updateBookmark(stale, to: refreshed)
+            }
+            if let folder = folderStore.folders.first(where: { $0.id == stale }) {
+                startWatching(folder, seedExisting: true)
+            }
+            return stale
+        }
         do {
             let folder = try folderStore.add(folderAt: url)
             resolvedPaths[folder.id] = canonical
+            lastKnownPaths[folder.id] = canonical
             startWatching(folder, seedExisting: true)
             refreshRows()
+            return folder.id
         } catch {
             shelf.latestError = "Perch could not keep access to that folder: \(error.localizedDescription)"
+            return nil
         }
     }
 
-    /// The watcher on this exact folder, if there is one. Canonical
+    /// The configured folder sitting on this path, if there is one. Canonical
     /// comparison, the same one `addFolder` dedupes with — so an alias, a
-    /// symlinked path and the folder itself all answer as one folder. Nil
-    /// while a bookmark is still resolving, which is the honest answer: no
-    /// watcher is running on it yet.
+    /// symlinked path and the folder itself all answer as one folder.
+    ///
+    /// Configured, not "currently being watched": a folder whose bookmark has
+    /// stopped resolving is still one of yours (it is the orange row in
+    /// Settings), and a caller asking "is this folder already in the list"
+    /// must not be told no and go add it twice. Nil during the first moments
+    /// after launch, before any bookmark has resolved.
     func watchedFolderID(for url: URL) -> UUID? {
         let canonical = url.standardizedFileURL.resolvingSymlinksInPath().path
-        return resolvedPaths.first { $0.value == canonical }?.key
+        return lastKnownPaths.first { $0.value == canonical }?.key
     }
 
     func removeFolder(_ id: UUID) {
         watchers[id]?.stop()
         watchers[id] = nil
         resolvedPaths[id] = nil
+        lastKnownPaths[id] = nil
         folderStore.remove(id)
         refreshRows()
     }
@@ -150,7 +188,9 @@ final class FolderWatchCenter: ObservableObject {
             }
         )
         watchers[folderID] = watcher
-        resolvedPaths[folderID] = url.standardizedFileURL.resolvingSymlinksInPath().path
+        let canonical = url.standardizedFileURL.resolvingSymlinksInPath().path
+        resolvedPaths[folderID] = canonical
+        lastKnownPaths[folderID] = canonical
         refreshRows()
         watcher.start(seedExisting: seedExisting)
     }

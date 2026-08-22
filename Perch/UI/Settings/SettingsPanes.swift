@@ -221,11 +221,18 @@ struct ShelfPane: View {
 struct WatchedFoldersPane: View {
     @ObservedObject var folderWatch: FolderWatchCenter
 
-    /// Which folder the person meant by "my screenshots". Not a preference —
-    /// a memory of the panel they clicked, so the switch below still reads as
-    /// on when their captures land somewhere `screenshotsTarget` would never
-    /// have guessed. Empty until they use the switch at all.
-    @AppStorage("screenshotsFolderPath") private var screenshotsPick: String = ""
+    /// Which watched folder the person meant by "my screenshots". Not a
+    /// preference — a memory of the panel they clicked, so the switch below
+    /// still reads as on when their captures land somewhere
+    /// `screenshotsTarget` would never have guessed.
+    ///
+    /// The folder's ID and deliberately not its path: a watched folder lives
+    /// in this app as a security bookmark precisely so no plain source path is
+    /// persisted anywhere, and a convenience switch is no reason to be the one
+    /// place that writes one down. Empty until the switch is used at all, and
+    /// stale the moment that folder is removed — which is why it is only ever
+    /// consulted against the rows that exist.
+    @AppStorage("screenshotsFolderID") private var screenshotsFolderID: String = ""
 
     /// The rice's answer, read once when the pane appears rather than from a
     /// body accessor — same spirit as ShelfTheme re-reading the drop when the
@@ -239,13 +246,14 @@ struct WatchedFoldersPane: View {
             SettingsCard {
                 SettingsRow(
                     symbol: "camera.viewfinder",
+                    tint: .blue,
                     title: "Shelf my screenshots",
                     subtitle: screenshotsSubtitle
                 ) {
                     Toggle(
                         "Shelf my screenshots",
                         isOn: Binding(
-                            get: { watchedScreenshotsID != nil },
+                            get: { screenshotsRow != nil },
                             set: { wanted in setScreenshotsWatched(wanted) }
                         )
                     )
@@ -300,25 +308,34 @@ struct WatchedFoldersPane: View {
 
     // MARK: Shelf my screenshots
 
-    /// The folder the switch offers: the one this Mac's desktop config named,
-    /// else the Desktop — unless the person has already told us otherwise by
-    /// picking one.
+    /// The folder the switch OFFERS when nothing is watched yet: what the
+    /// desktop config named, else the Desktop.
     private var screenshotsTarget: URL {
-        if !screenshotsPick.isEmpty {
-            return URL(fileURLWithPath: screenshotsPick, isDirectory: true)
-        }
-        return riceFolder ?? RiceFiles.home.appendingPathComponent("Desktop", isDirectory: true)
+        riceFolder ?? RiceFiles.home.appendingPathComponent("Desktop", isDirectory: true)
     }
 
-    private var watchedScreenshotsID: UUID? {
-        folderWatch.watchedFolderID(for: screenshotsTarget)
+    /// The watched folder this switch is about, if there is one: the one the
+    /// person picked through it, else whichever row happens to sit on the
+    /// folder we would have offered — so a folder added through "Watch a
+    /// Folder…" reads as on too, rather than as a second thing to turn on.
+    private var screenshotsRow: FolderWatchCenter.Row? {
+        if let id = UUID(uuidString: screenshotsFolderID),
+           let row = folderWatch.rows.first(where: { $0.id == id }) {
+            return row
+        }
+        guard let id = folderWatch.watchedFolderID(for: screenshotsTarget) else { return nil }
+        return folderWatch.rows.first { $0.id == id }
     }
 
     private var screenshotsSubtitle: String {
-        let folder = Self.abbreviate(screenshotsTarget.path)
-        return watchedScreenshotsID == nil
-            ? "Perch will ask for \(folder) once, then new captures land on the shelf."
-            : "New captures in \(folder) land on the shelf."
+        guard let row = screenshotsRow else {
+            return "Perch will ask for \(Self.abbreviate(screenshotsTarget.path)) once, "
+                + "then new captures land on the shelf."
+        }
+        guard let path = row.displayPath else {
+            return "Perch can no longer reach that folder."
+        }
+        return "New captures in \(path) land on the shelf."
     }
 
     /// On: the same panel as “Watch a Folder…”, already at the right folder —
@@ -331,7 +348,8 @@ struct WatchedFoldersPane: View {
     /// were guessing.
     private func setScreenshotsWatched(_ wanted: Bool) {
         guard wanted else {
-            if let id = watchedScreenshotsID { folderWatch.removeFolder(id) }
+            if let row = screenshotsRow { folderWatch.removeFolder(row.id) }
+            screenshotsFolderID = ""
             return
         }
         let panel = NSOpenPanel()
@@ -343,8 +361,11 @@ struct WatchedFoldersPane: View {
         panel.message = "Perch will copy new screenshots from this folder onto the shelf."
         NSApp.activate()
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        screenshotsPick = url.path
-        folderWatch.addFolder(at: url)
+        // The id comes back even when perch was already watching that folder,
+        // so picking one that is in the list simply adopts it.
+        if let id = folderWatch.addFolder(at: url) {
+            screenshotsFolderID = id.uuidString
+        }
     }
 
     /// `~`-abbreviated for display only, against the real home — inside the

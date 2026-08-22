@@ -13,10 +13,11 @@ import Foundation
 ///
 /// 1. `screenshotsFolder` in the rice config drop (`~/.config/perch/config.json`,
 ///    the same file the theme keys arrive in). haus writes it from
-///    `haus.screenshots.location`, which is where a haus machine's screenshots
-///    go BECAUSE haus put them there — no guessing on either side. It is
-///    absent when haus does not own that setting, precisely so nobody has to
-///    guess in the first place.
+///    `haus.screenshots.location` when `haus.shelf.watchScreenshots` is on,
+///    and that path is where the machine's screenshots go BECAUSE haus put
+///    them there — no guessing on either side. It is absent whenever haus does
+///    not own the setting, precisely so nobody has to guess in the first
+///    place.
 /// 2. `~/Desktop`, which is macOS's own default.
 ///
 /// Neither is a permission. Everything this answers is "which folder should
@@ -39,10 +40,18 @@ enum ScreenshotsFolder {
         return decoded.screenshotsFolder
     }
 
-    /// The folder to open the picker at. `home` is injectable so the tests
-    /// never depend on the machine they run on.
-    static func resolve(riceValue: String? = nil, home: URL = RiceFiles.home) -> URL {
-        let value = riceValue ?? Self.riceValue()
+    /// The folder to open the picker at, reading the drop. Both inputs are
+    /// injectable, and there is no defaulted `riceValue` overload on purpose:
+    /// one that silently fell back to the real `~/.config/perch/config.json`
+    /// would make every test's answer depend on the machine running it.
+    static func resolve(configURL: URL = RiceFiles.configFile, home: URL = RiceFiles.home) -> URL {
+        resolve(riceValue: riceValue(from: configURL), home: home)
+    }
+
+    /// The same decision with the reading already done — pure, and the one
+    /// the tests pin.
+    static func resolve(riceValue: String?, home: URL) -> URL {
+        let value = riceValue
         guard let value, !value.isEmpty else {
             return home.appendingPathComponent("Desktop", isDirectory: true)
         }

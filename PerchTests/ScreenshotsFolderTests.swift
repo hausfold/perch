@@ -31,6 +31,23 @@ final class ScreenshotsFolderTests: XCTestCase {
         )
     }
 
+    /// The reading overload, pinned against a drop that does not exist — the
+    /// machine running this must never be able to change the answer.
+    func testNoDropFallsBackToTheDesktop() {
+        XCTAssertEqual(
+            ScreenshotsFolder.resolve(configURL: home.appending(path: "absent.json"), home: home).path,
+            home.appending(path: "Desktop").path
+        )
+    }
+
+    func testTheDropIsReadThroughTheResolvingOverload() throws {
+        let url = try writeConfig(["screenshotsFolder": "~/Pictures/Screenshots"])
+        XCTAssertEqual(
+            ScreenshotsFolder.resolve(configURL: url, home: home).path,
+            home.appending(path: "Pictures/Screenshots").path
+        )
+    }
+
     func testEmptyRiceValueFallsBackToTheDesktop() {
         XCTAssertEqual(
             ScreenshotsFolder.resolve(riceValue: "", home: home).path,
