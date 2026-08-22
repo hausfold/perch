@@ -5,9 +5,14 @@ watched folders and the phone. This file is the **work queue**: each *Run* below
 is sized for one agent session on its own `worktree-*` branch and its own PR.
 Runs are independent — take any of them in any order, in parallel.
 
+**Delete this file when the board is empty.** It is a dated snapshot by
+construction; a second `docs/field-test-*.md` living beside a finished one is
+the stale-doc failure AGENTS.md warns about.
+
 **Not a decisions document.** Where a fix changes a product boundary, the
 decision moves into `PRD.md` / `ARCHITECTURE.md` / the relevant `docs/` page in
-the same PR, and the row here is struck out.
+the same PR, and the row here is struck out — including the two open calls at
+the bottom, whose answers land there and are **not** copied back here.
 
 Every root cause below was read out of the source, not observed under a
 debugger. Confidence is stated per item. **Reproduce before you fix** — a
@@ -21,16 +26,16 @@ is provably the only thing going wrong.
 | # | Symptom | Area | Verdict | Run |
 |---|---|---|---|---|
 | 1 | Shelf hover-opens ~1 notch-width either side of the notch | Platform | Confirmed cause | **A** |
-| 13 | "Show a drop target on every display" only ever draws on the main display | Platform | Confirmed cause | **A** |
+| 13 | Secondary display never shows a drop target | Platform | Strong hypothesis | **A** |
 | 10 | Open/close animation janks at ~250 items (scrolling is fine) | UI | Confirmed cause | **B** |
-| 9 | 50 folders dropped into Finder land in a 3pt diagonal cascade | UI | Confirmed cause | **B** |
-| 7 | Rename a staged file in Finder → tile can never be dragged out, and vanishes | Store | Confirmed cause | **C** |
+| 9 | 50 folders dropped into Finder land in a diagonal line | UI | **Open** — first theory disproved | **B** |
+| 7 | Rename a staged file in Finder → tile can never be dragged out, and vanishes | Store | Confirmed + a second race | **C** |
 | 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | Leading hypothesis + 1 confirmed adjacent bug | **D** |
 | 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | Unresolved by reading | **D** |
 | 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | Two candidates | **E** |
 | 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | Needs a clean-machine check first | **F** |
 | 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | Probably an obsolete claim | **F** |
-| 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | Confirmed cause | **G** |
+| 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | Fault localised, cause open | **G** |
 | 3 | 3 GB file "lands immediately" instead of showing progress | — | **Not a bug** — bad expectation | — |
 | 11 | Phone Wi-Fi off, Mac still receives | — | **Not a bug** — bad expectation | — |
 
@@ -59,10 +64,20 @@ geometry is *already* correct; the trigger is not reading it.
 `NSTrackingArea` — `Perch/Platform/ShelfPanelController.swift:300` and the
 `hoverRect` at `:321`. But `mouseEntered(with:)` / `mouseExited(with:)` at
 `:339`/`:343` fire for **every** tracking area whose owner is this view, and
-`NSHostingView` installs its own full-bounds tracking area (that is how SwiftUI
-`.onHover` works) with itself as owner. So the wide hosting-view area calls our
-override and expands the shelf; the narrow area we installed is irrelevant.
-That is exactly why narrowing the rect twice changed nothing.
+`NSHostingView` installs its own full-bounds tracking area with itself as owner.
+So the wide hosting-view area calls our override and expands the shelf; the
+narrow area we installed is irrelevant. That is exactly why narrowing the rect
+twice changed nothing.
+
+**Confirmed empirically.** A subclass of `NSHostingView` whose root view
+contains `.onHover` ends up with **two** tracking areas, both owned by the
+subclass: ours, and SwiftUI's at full bounds with options
+`mouseEnteredAndExited | mouseMoved | activeAlways | inVisibleRect`. Remove the
+`.onHover` and the second one is not installed at all. Ours is
+`ShelfPanelView.swift:534`. Note the irony: the comment at
+`ShelfPanelController.swift:302-306` warns against `.inVisibleRect` for exactly
+this reason, and `super.updateTrackingAreas()` at `:315` then re-adds an area
+that uses it.
 
 **Fix sketch.** Stop trusting *which* area fired. Either:
 - gate on identity — `guard event.trackingArea === trackingAreaReference`
@@ -85,10 +100,12 @@ housing. Then drag a file along the same path — still caught in the wide band.
 
 ### A2 · Secondary displays get a panel at the wrong coordinates (#13)
 
-**Symptom.** With "Show a drop target on every display" both on and off, only
-the main display ever shows a shelf.
+**Symptom.** With "Show a drop target on every display" **on**, only the main
+display shows a shelf. (With it **off**, one panel on the main display is the
+intended behaviour — see the second note below for why even that can misplace.)
 
-**Root cause (high confidence).**
+**Root cause (strong hypothesis — the API contract is verbatim, the macOS 26
+runtime behaviour is not yet observed. Land the test case first).**
 `ShelfWindowSystem.rebuildPanels()` does build one controller per
 `NSScreen.screens`, so the panels exist — they are just placed off-screen.
 `ShelfPanelController` computes `geometry.collapsedFrame` in **global** screen
@@ -111,9 +128,13 @@ one, on the main display. Drag a file to the notch/top edge of the secondary
 display and confirm it catches. Then `⌘`-drag the menu bar between displays
 (fires `didChangeScreenParametersNotification` → `rebuildPanels`) and re-check.
 
-**Watch out.** `panels` is keyed by `perchIdentifier`; two mirrored displays can
-report the same `NSScreenNumber`. Don't let a duplicate key silently drop a
-panel — that is a second, separate failure mode with the same symptom.
+**Watch out — two more failure modes with the same symptom.**
+- `panels` is keyed by `perchIdentifier`; two mirrored displays can report the
+  same `NSScreenNumber`, and a duplicate key silently drops a panel.
+- With the setting **off**, `rebuildPanels` uses `NSScreen.main`
+  (`ShelfWindowSystem.swift:85-91`) — which is the **key-window** screen, not
+  the zero-origin one. So the single-panel case is misplaced by the same
+  double-offset whenever focus is on a secondary display.
 
 ---
 
@@ -128,15 +149,20 @@ expand/collapse animation stutters.
 `ScrollView(.horizontal) { HStack { ForEach(store.items) … } }` — an **eager**
 `HStack`. Every expand builds all 250 `FileTile`s, and each one:
 - starts a `.task` in `FilePreview` (`Perch/UI/FilePreview.swift`), and
-- for anything without a QuickLook content preview calls
-  `NSWorkspace.shared.icon(forFile:)` **synchronously in `body`**
-  (`FilePreview.swift`, `fileIcon`) — a LaunchServices round trip per tile, on
-  the main thread, during the animation.
+- calls `NSWorkspace.shared.icon(forFile:)` **synchronously in `body`**
+  (`FilePreview.swift:30-32`, `fileIcon`) — a LaunchServices round trip per
+  tile, on the main thread, during the animation.
+
+That second cost is worse than "only files without a content preview": `@State
+thumbnail` starts `nil` on every rebuild, so `fileIcon` renders — and hits
+LaunchServices — for **all 250 tiles on every expand**, thumbnailed ones
+included, until each `.task` resolves.
 
 **Fix sketch.** `LazyHStack` for both `ForEach`es, and hoist the workspace icon
-behind the same async/cached path the thumbnail uses (extend `ThumbnailCache`,
-or a sibling icon cache keyed by content type rather than by path — icons are
-per-type, so a 250-item shelf needs a handful of distinct icons, not 250).
+behind the same async/cached path the thumbnail uses. Key that cache **by path**
+in an `NSCache`, exactly as `ThumbnailCache` already does — *not* by content
+type: `icon(forFile:)` is per-file for `.app` bundles, Finder custom icons and
+alias badges.
 
 **Verify.** Stage ~250 items (`for i in $(seq 1 250); do …; done` into a watched
 folder, or `perch add`). Open/close ten times. Then confirm the *reflow*
@@ -153,18 +179,29 @@ pin/remove badges aren't clipped. Lazy stacks re-clip; re-check the badges.
 along a top-left→bottom-right diagonal, and Finder's Clean Up keeps the
 diagonal.
 
-**Root cause (high confidence).**
-`Perch/UI/FileDragSourceView.swift:141-142`: each `NSDraggingItem` gets
-`setDraggingFrame` at `offset = min(index, 4) * 3` points, cascading down-right.
-Finder honours the per-item drag frames when it places dropped icons, so a
-3pt-per-item cascade becomes a literal diagonal of 50 icons. (Clean Up snaps to
-grid without re-ordering, so the diagonal survives it — that part is Finder
-behaving correctly.)
+**First theory, and why it is dead.** `FileDragSourceView.swift:141-142` does
+cascade the drag frames — `offset = min(index, 4) * 3` — but the `min(index, 4)`
+clamp stops it after five items. For a 50-folder drag the offsets are
+`0, 3, 6, 9, 12, 12, 12, …`: **46 of the 50 items already share an identical
+frame**, so a 3pt cascade cannot be producing a 50-icon diagonal, and "make the
+frames identical" would change nothing for 46 of them. (Confirmed this is the
+live path: the drag-all handle at `ShelfPanelView.swift:240` hands `store.items`
+to a single `FileDragSourceView`.)
 
-**Fix sketch.** Give every dragging item the **same** frame (a true stack) so
-Finder falls back to its own grid placement, and keep the visual cascade purely
-in the drag image (only the top ~4 contents need to differ). Confirm the drag
-image still reads as a stack rather than a single icon.
+**So this one is open.** The likely answer is that Finder cascades a
+multi-item drop *itself* when the drag gives it no distinct positions to work
+from — i.e. the diagonal is Finder's own default and the fix is to stop letting
+it decide. Investigate in this order:
+1. Drop 6 items vs 50 into an empty icon-view window. If both cascade
+   identically, it is Finder's placement, not our frames.
+2. Try dropping onto a **list-view** or **column-view** window, and onto the
+   Desktop. If those are fine, it is purely icon-view placement.
+3. Compare against a 50-file drag out of another shelf app (Dropover, Yoink) —
+   if theirs land in a grid, diff what they put on the pasteboard.
+
+**Only then** decide the fix. Candidates: set no dragging frames at all and let
+Finder place; or set frames on a real grid so Finder's honouring of them
+produces the layout you want.
 
 **Verify.** 5 folders and 50 folders, dropped into (a) an empty Finder window in
 icon view, (b) a list-view window, (c) the Desktop. Icons arrive in Finder's
@@ -191,13 +228,29 @@ that path inside `…/Application Support/Perch/ActiveShelf/<uuid>/`. Nothing
 re-resolves it, so a rename orphans the item:
 
 - `item.fileURL(inside:)` still returns a URL, it just no longer exists.
-- The drag still starts (`ExportItem.url` is stale), Finder still reports
+- The drag still starts (`ExportItem.url` is stale) and Finder still reports
   `.copy`, so `draggingSession(_:endedAt:operation:)` reports `.accepted` →
   `ShelfStore.liftForExport` removes the tile and rewrites the manifest.
-- The promise fulfilment then fails on `copyItem`, or is never engaged at all,
-  so the item sits in `lifted` forever. It is off the shelf, off the manifest,
-  and its bytes are still on disk — which is exactly why step 5 brings it back
-  (`StagingRepository.recoverUntrackedFiles`).
+
+**A second, independent bug decides whether the tile comes back — and it is an
+ordering race.** `report(_:_:)` hops to the main actor through a `Task`
+(`Perch/UI/FileDragSourceView.swift:229-233`), while `draggingSession(_:endedAt:)`
+reports `.accepted` **inline**. A promise that fails fast therefore delivers
+`.failed` *before* `.accepted`:
+
+1. `.failed` → `returnToShelf(id)` finds nothing in `lifted` and no-ops
+   (`ShelfStore.swift:370`), and `state.finishExport(of:)` clears
+   `draggingOutIDs`.
+2. `.accepted` → `liftForExport` then removes the tile **after** the only thing
+   that could have put it back has already run.
+3. `draggingOutIDs` is empty, so the 1 s grace timer hands nothing off — no
+   `.detached` marker is written, the bytes survive, and the next launch
+   re-adopts them via `StagingRepository.recoverUntrackedFiles`.
+
+That is step 5 of the repro, exactly. (The other path — grace timer fires and
+`handOff` → `detach` writes `.detached` — would *not* reproduce step 5:
+`load()` and `recoverUntrackedFiles` both skip detached containers,
+`StagingRepository.swift:74-76` and `:281`.)
 
 **Fix sketch — pick one, they are different products.**
 - **(a) Re-resolve.** Every import allocates its own `<uuid>` container holding
@@ -209,9 +262,12 @@ re-resolves it, so a rename orphans the item:
   file is gone, surface it (`latestError`) and don't begin the session. Safe,
   but the tile is still dead.
 
-(a) is the better product and is roughly the same amount of code. Either way,
-`liftForExport` must not remove an item whose bytes it cannot find — that is the
-data-loss half, and it is worth fixing on its own even before choosing.
+(a) is the better product and is roughly the same amount of code. Two things are
+worth fixing on their own, before either is chosen:
+- `liftForExport` must not remove an item whose bytes it cannot find.
+- The `.accepted` / `.failed` verdicts must be **ordered**. Either report
+  `.accepted` through the same `Task` hop the promise verdicts use, or make
+  `returnToShelf` tolerate arriving before the lift.
 
 **Verify.** Run the 5-step repro. Then: rename → drag out → lands correctly and
 leaves the shelf. Rename → drag out → press Escape → tile springs back. Rename →
@@ -220,7 +276,9 @@ Add regression tests in `ShelfStoreExportTests`.
 
 **Watch out.** Do not break the invariant that a visible `ShelfItem` points at a
 *completed* staged representation, and do not start persisting or logging
-original paths while touching this.
+original paths while touching this. And fix (a)'s "read the container's single
+non-dot child" must **not** resurrect a container carrying `.detached` — those
+bytes belong to whatever took an earlier drop.
 
 ---
 
@@ -390,8 +448,8 @@ Quick Actions shows it once, Services shows it once, and both land 3 tiles with
 **Symptom.** Phone and Mac are paired and delivering. Settings ▸ Devices shows
 "No devices paired yet." Revoke is therefore unreachable, so the revoke test could not be run at all.
 
-**Root cause (high confidence).** Two different Keychain reads back the two
-behaviours:
+**Fault localised; the cause itself is still open.** Two different Keychain
+reads back the two behaviours:
 - Delivery uses `PairedDeviceStore.peer(for:)` — a single-account lookup with
   `kSecReturnData`. It works, which proves the item is in the Keychain.
 - The list uses `PairedDeviceStore.all()`
@@ -433,6 +491,11 @@ eventually") is only reachable across volumes. **Rewrite it**: drag a 3 GB file
 from an external/USB or network volume, or from a disk image, and assert
 progress there; on the internal volume assert that it lands instantly.
 
+Measured, to save the next person the doubt: a 2 GB `FileManager.copyItem` on
+one APFS volume finishes in **0.001 s** and consumes **zero** extra disk. `cp`
+of the same file takes 1.34 s and the full 2 GB — so `cp` is **not** a valid
+stand-in when writing the replacement test.
+
 **#11 · "Wi-Fi off on the phone, Mac still received it."** Also correct.
 Every wire path sets `includePeerToPeer = true` (`PerchWire/Wire/WireServer.swift:94`,
 `WireBrowser.swift:62`, `WireConnection.swift:37`), so delivery can run over
@@ -452,7 +515,7 @@ feature, and the test was asserting the opposite.
 Moving `PairedDeviceStore` to the data-protection Keychain fixes the enumeration
 properly, but every phone paired against the current file-based Keychain
 **stops being recognised** unless the change ships with a read-old/write-new
-migration. The comment at `PairedDeviceStore.swift:17` already calls this out.
+migration. The comment at `PairedDeviceStore.swift:16-21` already calls this out.
 
 - **Option A — migrate.** Read from the file-based Keychain, write to the
   data-protection one, keep the fallback read for one release, then drop it.
