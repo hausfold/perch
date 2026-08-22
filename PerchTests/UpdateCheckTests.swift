@@ -5,7 +5,7 @@ final class UpdateCheckTests: XCTestCase {
 
     // MARK: - Cohort detection
     //
-    // The trap these pin: the rice (modules/perch, postActivation) and a
+    // The trap these pin: the rice (modules/shelf, postActivation) and a
     // Homebrew cask BOTH end up at /Applications/Perch.app, so the path alone
     // can't tell them apart from a drag-install. The receipts do — when the
     // sandbox lets them be read.

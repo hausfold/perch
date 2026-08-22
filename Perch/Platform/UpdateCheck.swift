@@ -25,7 +25,7 @@ import os
 //            release page. Nothing in this file writes outside the container.
 //   surface  the obvious surface is a UNUserNotificationCenter banner. Perch
 //            asks the system for no permissions it can avoid (see the Mission
-//            Control note in the rice's modules/perch) and notifications are one
+//            Control note in the rice's modules/shelf) and notifications are one
 //            of them, so the only surfaces are passive: a strip at the bottom of
 //            the expanded shelf, and a row in the menu bar menu. Neither
 //            interrupts anything; both wait until you look.
@@ -94,7 +94,7 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
     // MARK: Detection
     //
     // Path prefixes alone can't tell the cohorts apart: the rice copies the
-    // bundle to `/Applications/Perch.app` (modules/perch, postActivation) and a
+    // bundle to `/Applications/Perch.app` (modules/shelf, postActivation) and a
     // cask's `app` stanza MOVES it to the same path — so rice, cask, and
     // drag-install are byte-identical locations. Out-of-band receipts break the
     // tie:
