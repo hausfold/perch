@@ -35,7 +35,7 @@ is provably the only thing going wrong.
 | 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | Two candidates | **E** |
 | 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | Needs a clean-machine check first | **F** |
 | 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | Probably an obsolete claim | **F** |
-| 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | Fault localised, cause open | **G** |
+| 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Regression** — #82's fix didn't hold | **G** |
 | 3 | 3 GB file "lands immediately" instead of showing progress | — | **Not a bug** — bad expectation | — |
 | 11 | Phone Wi-Fi off, Mac still receives | — | **Not a bug** — bad expectation | — |
 
@@ -448,6 +448,16 @@ Quick Actions shows it once, Services shows it once, and both land 3 tiles with
 **Symptom.** Phone and Mac are paired and delivering. Settings ▸ Devices shows
 "No devices paired yet." Revoke is therefore unreachable, so the revoke test could not be run at all.
 
+**History — this was "fixed" one day ago and the fix did not work.**
+`3b40264` (#82) diagnosed `all()` as `errSecParam` (-50) from asking the
+file-based Keychain for `kSecMatchLimitAll` **together with** `kSecReturnData`,
+and split it into the two-step read that is in the tree now. That PR shipped
+**unbuilt and unrun** by its own admission, and its verify step 1 was "pair a
+phone, it should appear in Settings". This field test *is* that step, and it
+failed. So the two-step workaround either did not address the real cause or
+introduced a second one — treat the `errSecParam` explanation as **disproved
+until the log says otherwise**, exactly like #1's #55/#78.
+
 **Fault localised; the cause itself is still open.** Two different Keychain
 reads back the two behaviours:
 - Delivery uses `PairedDeviceStore.peer(for:)` — a single-account lookup with
@@ -463,11 +473,20 @@ reads back the two behaviours:
 log stream --predicate 'subsystem == "com.hausfold.perch" && category == "PairedDevices"'
 ```
 
-A logged `Keychain list failed: <status>` says the enumeration itself is
-refused; silence with an empty list says the enumeration returned zero rows and
-the account→`peer(for:)` resolution is where it dies.
+Three outcomes, three different bugs:
+- `Keychain list failed: <status>` → the enumeration is still refused, and the
+  status is not what #82 assumed. If it is `-50` again, the two-step read did
+  not change anything that mattered.
+- `Keychain list skipped N unreadable device(s)` → step one works and the
+  per-account `peer(for:)` read is what dies. #82 added that line for exactly
+  this case; it is the most informative outcome.
+- **Silence with an empty list** → the enumeration succeeds and genuinely
+  returns zero rows, meaning the item `peer(for:)` finds is not visible to a
+  `kSecMatchLimitAll` query at all — an access-group or
+  `kSecAttrSynchronizable` mismatch, not a limit-all problem.
 
-**Fix sketch.** The durable fix is to move every query in this file — add, read,
+**Fix sketch.** With the in-place workaround already tried and failed, the
+durable fix is to move every query in this file — add, read,
 list, delete — onto the data-protection Keychain
 (`kSecUseDataProtectionKeychain: true`), which supports `kSecMatchLimitAll`
 together with `kSecReturnData` and collapses the two-step hack in `all()` into
@@ -520,14 +539,14 @@ migration. The comment at `PairedDeviceStore.swift:16-21` already calls this out
 - **Option A — migrate.** Read from the file-based Keychain, write to the
   data-protection one, keep the fallback read for one release, then drop it.
   ~40 extra lines and one migration test.
-- **Option B — patch `all()` in place.** Keep the file-based Keychain and fix
-  whatever the logged status turns out to be. Smaller diff, but the two-step
-  enumeration hack stays, and so does the class of bug.
+- **Option B — patch `all()` in place, again.** Keep the file-based Keychain and
+  fix whatever the logged status turns out to be. Smaller diff, but the two-step
+  enumeration hack stays, and so does the class of bug. **This is what #82 was,
+  one day ago, and it did not hold.**
 
 **Recommendation: A**, with the fallback read — the current listing is already
 lying to the user about a security-relevant fact ("no devices can reach this
-Mac" when one can), and the file-based Keychain's `kSecMatchLimitAll` limits are
-the reason. **Reversal cost:** if A ships without the fallback read, every
+Mac" when one can), and one in-place attempt has already failed. **Reversal cost:** if A ships without the fallback read, every
 existing pairing must be redone by hand on both devices; with the fallback read,
 reverting is a straight revert.
 
