@@ -306,11 +306,14 @@ enum RiceFiles {
 ///   "accent": "mauve" }
 /// ```
 ///
-/// The desktop writes this (haus `modules/perch`) so `haus.theme.flavor`,
+/// The desktop writes this (haus `modules/shelf`) so `haus.theme.flavor`,
 /// `.contrast` and `.accent` reach perch declaratively. Perch's own settings live
 /// in `UserDefaults`, which Nix has no business writing — this file carries only
-/// what the rice owns. Delete it (or the rice's `theme` option) and the
-/// compiled-in nebelung pair applies, accented with its own green.
+/// what the rice owns, and not only colour: `screenshotsFolder` rides in the
+/// same file and is decoded separately by `ScreenshotsFolder`, each side
+/// ignoring the keys that are not its own. Delete it (or the rice's `theme`
+/// option) and the compiled-in nebelung pair applies, accented with its own
+/// green.
 ///
 /// There is no accent picker in Settings and there won't be: the shelf is a
 /// five-second surface, and "follow the rice" is the feature. This file is the

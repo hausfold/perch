@@ -56,11 +56,28 @@ raises an alert. The expiry timer under Settings ▸ Shelf is **off by default**
 ## Watched folders
 
 Settings ▸ Watched Folders keeps a list of folders whose **new** files land on
-the shelf by themselves — `~/Downloads`, and the folder macOS saves your
-screenshots to (perch can't ask the system where that is, so you pick it in
-the same panel). Everything about it is copy-only: the arrival is staged like
-a drop, the original never moves, and clearing the tile — or letting the
-retention timer expire it — deletes perch's copy and nothing of yours.
+the shelf by themselves — `~/Downloads`, a scans folder, wherever things
+arrive. Everything about it is copy-only: the arrival is staged like a drop,
+the original never moves, and clearing the tile — or letting the retention
+timer expire it — deletes perch's copy and nothing of yours.
+
+**Shelf my screenshots** is the same thing with the finding-out done for you.
+Flipping it opens the same folder panel, already pointed at wherever this Mac
+saves captures: what `screenshotsFolder` in `~/.config/perch/config.json` says
+(haus writes that key from `haus.screenshots.location`), else the Desktop,
+which is macOS's own default. Perch cannot simply read the setting — a
+sandboxed app is not shown another app's preferences — and it cannot grant
+itself the folder either, so the panel stays: the click is the permission.
+Pick a different folder in it and that one becomes your screenshots folder,
+because you know where they go and perch was guessing. Switching it off stops
+watching and keeps every capture already on the shelf.
+
+One macOS setting is worth turning off alongside it: the floating screenshot
+thumbnail. It doesn't preview a saved file, it *holds* the capture and writes
+it out about five seconds later, so the shelf catches every screenshot five
+seconds after you took it. System Settings has no switch for it; the
+screenshot toolbar's Options ▸ Show Floating Thumbnail does, and on a haus
+machine `haus.shelf.watchScreenshots` turns it off for you.
 
 What already sits in a folder when you add it stays off the shelf; only what
 arrives afterwards lands, including things that arrived while perch wasn't
@@ -86,6 +103,10 @@ follows macOS Light/Dark:
                          "accent": "mauve" }
   themes/<name>.json   flat "role": "#hex" map — a nebelung *.hex.json verbatim
 ```
+
+That file carries one non-colour key as well — `screenshotsFolder`, which
+tells the screenshots switch where this Mac saves captures (see [Watched
+folders](#watched-folders)). Anything perch doesn't recognise is ignored.
 
 A file in `themes/` **shadows** a built-in of the same name, so a palette bump
 lands without a new release, and any Catppuccin-shaped palette drops in under its

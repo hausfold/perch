@@ -56,6 +56,16 @@ final class FolderWatchCenter: ObservableObject {
         }
     }
 
+    /// The watcher on this exact folder, if there is one. Canonical
+    /// comparison, the same one `addFolder` dedupes with — so an alias, a
+    /// symlinked path and the folder itself all answer as one folder. Nil
+    /// while a bookmark is still resolving, which is the honest answer: no
+    /// watcher is running on it yet.
+    func watchedFolderID(for url: URL) -> UUID? {
+        let canonical = url.standardizedFileURL.resolvingSymlinksInPath().path
+        return resolvedPaths.first { $0.value == canonical }?.key
+    }
+
     func removeFolder(_ id: UUID) {
         watchers[id]?.stop()
         watchers[id] = nil

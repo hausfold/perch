@@ -221,8 +221,39 @@ struct ShelfPane: View {
 struct WatchedFoldersPane: View {
     @ObservedObject var folderWatch: FolderWatchCenter
 
+    /// Which folder the person meant by "my screenshots". Not a preference —
+    /// a memory of the panel they clicked, so the switch below still reads as
+    /// on when their captures land somewhere `screenshotsTarget` would never
+    /// have guessed. Empty until they use the switch at all.
+    @AppStorage("screenshotsFolderPath") private var screenshotsPick: String = ""
+
+    /// The rice's answer, read once when the pane appears rather than from a
+    /// body accessor — same spirit as ShelfTheme re-reading the drop when the
+    /// shelf opens, and no file watcher anywhere. nil until the read lands,
+    /// which reads as the Desktop: macOS's own default, and right far more
+    /// often than not.
+    @State private var riceFolder: URL?
+
     var body: some View {
         SettingsPaneLayout(title: SettingsPane.folders.title, subtitle: SettingsPane.folders.summary) {
+            SettingsCard {
+                SettingsRow(
+                    symbol: "camera.viewfinder",
+                    title: "Shelf my screenshots",
+                    subtitle: screenshotsSubtitle
+                ) {
+                    Toggle(
+                        "Shelf my screenshots",
+                        isOn: Binding(
+                            get: { watchedScreenshotsID != nil },
+                            set: { wanted in setScreenshotsWatched(wanted) }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                }
+            }
+
             SettingsCard {
                 if folderWatch.rows.isEmpty {
                     SettingsPlaceholderRow(text: "No folders watched yet.")
@@ -256,11 +287,73 @@ struct WatchedFoldersPane: View {
                 """
                 New files that land in a watched folder are copied onto the shelf. The \
                 originals never move, and taking a tile off the shelf never touches them. \
-                macOS won’t tell Perch where screenshots are saved — to catch them, pick \
-                that folder here.
+                Every folder here is one you picked in a panel — the screenshots switch \
+                above opens that same panel, already pointed at the folder your captures \
+                go to.
                 """
             )
         }
+        // Off main: a read is small, but the pane is not the place to make an
+        // exception to "blocking file work stays off the main actor".
+        .task { riceFolder = await Task.detached(priority: .utility) { ScreenshotsFolder.resolve() }.value }
+    }
+
+    // MARK: Shelf my screenshots
+
+    /// The folder the switch offers: the one this Mac's desktop config named,
+    /// else the Desktop — unless the person has already told us otherwise by
+    /// picking one.
+    private var screenshotsTarget: URL {
+        if !screenshotsPick.isEmpty {
+            return URL(fileURLWithPath: screenshotsPick, isDirectory: true)
+        }
+        return riceFolder ?? RiceFiles.home.appendingPathComponent("Desktop", isDirectory: true)
+    }
+
+    private var watchedScreenshotsID: UUID? {
+        folderWatch.watchedFolderID(for: screenshotsTarget)
+    }
+
+    private var screenshotsSubtitle: String {
+        let folder = Self.abbreviate(screenshotsTarget.path)
+        return watchedScreenshotsID == nil
+            ? "Perch will ask for \(folder) once, then new captures land on the shelf."
+            : "New captures in \(folder) land on the shelf."
+    }
+
+    /// On: the same panel as “Watch a Folder…”, already at the right folder —
+    /// the grant has to come from a panel, so the most this can save is the
+    /// navigating and the knowing-where. Cancelling grants nothing and the
+    /// switch falls back, which is the truth: nothing is being watched.
+    ///
+    /// Whatever they actually pick becomes the screenshots folder, even when
+    /// it isn’t the one we offered. They know where their captures go and we
+    /// were guessing.
+    private func setScreenshotsWatched(_ wanted: Bool) {
+        guard wanted else {
+            if let id = watchedScreenshotsID { folderWatch.removeFolder(id) }
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = screenshotsTarget
+        panel.prompt = "Watch"
+        panel.message = "Perch will copy new screenshots from this folder onto the shelf."
+        NSApp.activate()
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        screenshotsPick = url.path
+        folderWatch.addFolder(at: url)
+    }
+
+    /// `~`-abbreviated for display only, against the real home — inside the
+    /// sandbox `NSHomeDirectory()` is the container (same reason
+    /// `FolderWatchCenter` goes through `RiceFiles.home`).
+    private static func abbreviate(_ path: String) -> String {
+        let home = RiceFiles.home.path
+        guard path.hasPrefix(home) else { return path }
+        return "~" + path.dropFirst(home.count)
     }
 
     private static func name(of displayPath: String?) -> String {
