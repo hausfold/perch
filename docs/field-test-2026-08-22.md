@@ -400,9 +400,9 @@ shipped perch** — which also explains why they resisted a plist-shaped
 diagnosis. Confirm by testing a real notarized release, and fix the dev path so
 `bench try` can feel-test the Finder doors at all:
 
-- **perch — done in this PR.** All five targets derive from a project-level
+- **perch — done in this PR.** All six targets derive from a project-level
   `PERCH_BUNDLE_ID = com.hausfold.perch`: `$(PERCH_BUNDLE_ID)`,
-  `.finder-action`, `.cli`, `.ios`, `.ios.share`. Verified both directions —
+  `.finder-action`, `.cli`, `.tests`, `.ios`, `.ios.share`. Verified both directions —
   a normal build's ids are unchanged (`com.hausfold.perch` /
   `com.hausfold.perch.finder-action` / `com.hausfold.perch.ios` /
   `com.hausfold.perch.ios.share`, diffed against a pre-change build), and
@@ -417,12 +417,14 @@ depends on the extension being live. After they do, the check is: `bench try`,
 then select 3 files in Finder — the Quick Action should appear, and Login Items
 & Extensions ▸ System Services Extensions should have a Perch row to switch.
 
-**One thing that is a real perch bug regardless**, and the better explanation
-for "Services listed twice" than duplicate installs: the app declares a legacy
-`NSServices` entry titled "Add to Perch Shelf" in `Perch/Config/Info.plist`
-*and* ships an appex Services extension with the same display name. Those are
-two independent Services providers; on a machine with a single Perch installed
-they still give two rows. Decide which door perch wants and delete the other.
+**Two doors with one name is deliberate, so don't "fix" it.** The app declares
+a legacy `NSServices` entry titled "Add to Perch Shelf" *and* ships an appex
+Services extension with the same display name — the decision is stated at the
+head of `Perch/Config/Info.plist` and in `ARCHITECTURE.md`: the extension runs
+without waking the app, the classic Service is eligible for the menu's top
+level and is two clicks shorter. They land in different submenus, so they are
+not the two rows #4 reported; the duplicates were the stale registrations in
+(i).
 
 **#4 · Quick Actions.** `PerchFinderAction/Info.plist` declares
 `NSExtensionPointIdentifier = com.apple.services` with

@@ -57,7 +57,8 @@ protocol + crypto + the staging layer both platforms use), `PerchMobileCore/`
 `HandoffClient` is the sender half both of them run).
 
 Every target's bundle id derives from one project-level `PERCH_BUNDLE_ID`
-(`$(PERCH_BUNDLE_ID)`, `.finder-action`, `.cli`, `.ios`, `.ios.share`). Rename
+(`$(PERCH_BUNDLE_ID)`, `.finder-action`, `.cli`, `.tests`, `.ios`,
+`.ios.share`). Rename
 the family with **that** override, never with `PRODUCT_BUNDLE_IDENTIFIER=` on
 the xcodebuild command line — a command-line `PRODUCT_BUNDLE_IDENTIFIER`
 applies to every target in the scheme and collapses the app, the Finder Action
