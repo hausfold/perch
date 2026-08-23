@@ -28,7 +28,7 @@ is provably the only thing going wrong.
 | ~~1~~ | ~~Shelf hover-opens ~1 notch-width either side of the notch~~ | Platform | **Fixed** — hit-test the pointer, don't trust the tracking area | ~~**A**~~ |
 | ~~13~~ | ~~Secondary display never shows a drop target~~ | Platform | **Fixed** — `screen: nil`; the frames were already global | ~~**A**~~ |
 | 10 | Open/close animation janks at ~250 items (scrolling is fine) | UI | **Fixed in code** — lazy strip + cached icons; not yet feel-tested | **B** |
-| 9 | 50 folders dropped into Finder land in a diagonal line | UI | **Open** — first theory disproved | **B** |
+| 9 | 50 folders dropped into Finder land in a diagonal line | UI | **Fixed in code** — the frames were the pile Finder untangled; not yet feel-tested | **B** |
 | ~~7~~ | ~~Rename a staged file in Finder → tile can never be dragged out, and vanishes~~ | Store | **Fixed** — re-resolve; decision in `ARCHITECTURE.md` | ~~**C**~~ |
 | 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | **Fixed in tests** — dedupe gone, FSEvents sees the rewrite; not yet feel-tested | **D** |
 | 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | **Addressed, still unreproduced** — the stream now resumes from a persisted position | **D** |
@@ -118,39 +118,75 @@ which is the designed fallback. Drag-*all* doesn't use the tiles' drag sources
 at all — `dragAllHandle` has its own `FileDragSourceView`
 (`ShelfPanelView.swift:240`).
 
-### B2 · Multi-item drag-out lands in a diagonal line (#9)
+### ~~B2 · Multi-item drag-out lands in a diagonal line (#9)~~
+
+**Fixed in code, still owed a feel-test.**
 
 **Symptom.** Drag 50 folders out into an empty Finder window → they are placed
 along a top-left→bottom-right diagonal, and Finder's Clean Up keeps the
 diagonal.
 
-**First theory, and why it is dead.** `FileDragSourceView.swift:141-142` does
-cascade the drag frames — `offset = min(index, 4) * 3` — but the `min(index, 4)`
-clamp stops it after five items. For a 50-folder drag the offsets are
-`0, 3, 6, 9, 12, 12, 12, …`: **46 of the 50 items already share an identical
-frame**, so a 3pt cascade cannot be producing a 50-icon diagonal, and "make the
-frames identical" would change nothing for 46 of them. (Confirmed this is the
-live path: the drag-all handle at `ShelfPanelView.swift:240` hands `store.items`
-to a single `FileDragSourceView`.)
+**First theory, and why it was dead.** `FileDragSourceView` cascaded the drag
+frames — `offset = min(index, 4) * 3` — but the `min(index, 4)` clamp stopped it
+after five items. For a 50-folder drag the offsets were `0, 3, 6, 9, 12, 12,
+12, …`, so **46 of the 50 items already shared an identical frame** and a 3 pt
+cascade could not be drawing a 50-icon diagonal.
 
-**So this one is open.** The likely answer is that Finder cascades a
-multi-item drop *itself* when the drag gives it no distinct positions to work
-from — i.e. the diagonal is Finder's own default and the fix is to stop letting
-it decide. Investigate in this order:
-1. Drop 6 items vs 50 into an empty icon-view window. If both cascade
-   identically, it is Finder's placement, not our frames.
-2. Try dropping onto a **list-view** or **column-view** window, and onto the
-   Desktop. If those are fine, it is purely icon-view placement.
-3. Compare against a 50-file drag out of another shelf app (Dropover, Yoink) —
-   if theirs land in a grid, diff what they put on the pasteboard.
+**The real cause, and the clamp is still where it lives — as a pile, not as a
+cascade.** A dragging frame is not decoration. `setDraggingFrame` sets the
+item's `NSDraggingFormationNone` position, and that layout is what a
+destination places the arriving files by — `NSDragging.h` says so at
+`animatesToDestination`: "if the final destination frames do not match the
+current `NSDraggingFormationNone` frames, then enumerate through the
+draggingItems … to set their `NSDraggingFormationNone` frames to the correct
+destinations." So the drag was not asking Finder for a diagonal; it was asking
+for **one position, forty-six times**. Finder resolved the pile-up the only way
+an icon view can, by de-overlapping — and de-overlapping cascades. Hence a
+diagonal that no 3 pt offset in perch is long enough to explain, and that Clean
+Up preserves because by then the icons really are at those positions.
 
-**Only then** decide the fix. Candidates: set no dragging frames at all and let
-Finder place; or set frames on a real grid so Finder's honouring of them
-produces the layout you want.
+That the clamp existed for a good reason is the trap: it made the drag *look*
+like a tidy five-deep pile. But the look of a drag is `NSDraggingFormation`'s
+job, not the frames' — `.stack` is defined as "drag images are laid out
+overlapping diagonally", applied to the visuals without moving the positions a
+destination reads. Splitting the two is the entire point of the API, and it is
+what Finder does dragging its own multi-selection: a stack under the pointer, a
+grid on arrival.
+
+**The fix.** `DragLayout.frames(count:center:)` lays the items out on a real
+grid (8 columns, 128 pt cells, centred on the tile so the pointer stays in the
+middle of the pile), and `session.draggingFormation = .stack` keeps the drag
+looking like one object. A single-item drag is unchanged — its image still sits
+exactly on the tile. `DragLayoutTests` pins the properties the old layout broke:
+every item gets a distinct frame, no two frames intersect, and the grid wraps
+into rows rather than running 50 wide.
+
+**Honest about what this is.** The mechanism is read out of `NSDragging.h` and
+the source, not off a debugger — same standard as the rest of this file. The
+frames were provably wrong and are provably right now; whether that is the
+*whole* of #9 is what the feel-test says.
+
+**Watch out.** 50 items is a 128 pt grid eight wide and seven deep — about
+900 × 820 pt of `.none` frames, centred on a tile that sits at the notch, so
+roughly the top half of that block is above the edge of the display. `.stack` is
+what keeps it from being seen; if the formation ever fails to take, the drag
+sprays across the screen rather than merely looking untidy. The cell is
+deliberately wider than a Finder icon-view cell at its largest — two frames that
+overlap in the destination's grid are two frames it has to de-overlap, which is
+the bug this replaces — so shrinking it to calm the visual trades the fix away.
 
 **Verify.** 5 folders and 50 folders, dropped into (a) an empty Finder window in
 icon view, (b) a list-view window, (c) the Desktop. Icons arrive in Finder's
-normal grid. Also drop onto a terminal and confirm 50 paths still paste.
+normal grid, not a diagonal. Watch the drag itself on the way there — it must
+still look like one pile under the pointer, not a spray of 50 icons; that is the
+one thing `.stack` is carrying and the only way the fix can look wrong. Also
+drop 50 onto a terminal and confirm 50 paths still paste.
+
+**If it still cascades**, the next question is whether Finder is placing from
+the `.stack` frames rather than the `.none` ones, in which case the answer is
+`.none` formation plus a visually tighter grid — and the comparison worth having
+first is a 50-file drag out of Finder itself, which lands correctly and is
+therefore the working example to diff against.
 
 ---
 
