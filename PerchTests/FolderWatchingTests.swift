@@ -98,6 +98,7 @@ final class FolderWatcherTests: XCTestCase {
         private let lock = NSLock()
         private var imported: [(name: String, sizeAtImport: Int, token: String)] = []
         private var ledgers: [Set<String>] = []
+        private var adopted: [String] = []
         private var eventIDs: [UInt64] = []
 
         func recordImport(of url: URL, token: String = "") {
@@ -108,6 +109,12 @@ final class FolderWatcherTests: XCTestCase {
         func recordLedger(_ tokens: Set<String>) {
             lock.withLock { ledgers.append(tokens) }
         }
+
+        func recordAdoption(of token: String) {
+            lock.withLock { adopted.append(token) }
+        }
+
+        var adoptedTokens: [String] { lock.withLock { adopted } }
 
         var importedNames: [String] { lock.withLock { imported.map(\.name) } }
         var importedSizes: [Int] { lock.withLock { imported.map(\.sizeAtImport) } }
@@ -127,8 +134,10 @@ final class FolderWatcherTests: XCTestCase {
         sinceEventID: UInt64? = nil,
         requiredStableProbes: Int = 2,
         positionReportInterval: TimeInterval = 0,
+        exportLedger: ExportLedger = ExportLedger(),
         log: ImportLog,
-        onImport: XCTestExpectation? = nil
+        onImport: XCTestExpectation? = nil,
+        onAdopt: XCTestExpectation? = nil
     ) -> FolderWatcher {
         let watcher = FolderWatcher(
             folderID: UUID(),
@@ -146,9 +155,14 @@ final class FolderWatcherTests: XCTestCase {
             // to be asserted here; every test but the throttle's own wants a
             // position the moment there is one.
             positionReportInterval: positionReportInterval,
+            exportLedger: exportLedger,
             onImport: { url, token in
                 log.recordImport(of: url, token: token)
                 onImport?.fulfill()
+            },
+            onAdopt: { token in
+                log.recordAdoption(of: token)
+                onAdopt?.fulfill()
             },
             onLedgerReplaced: { tokens in
                 log.recordLedger(tokens)
@@ -552,6 +566,141 @@ final class FolderWatcherTests: XCTestCase {
         XCTAssertTrue(log.replacedLedgers.first?.allSatisfy(FolderWatchRules.isCurrentFormat) == true)
     }
 
+
+    // MARK: - Drag-out into a watched folder
+
+    /// The round-trip: `~/Downloads` and `~/Desktop` are both the folders
+    /// people watch and the folders people drag onto, and an export lands
+    /// there as a brand-new inode — an identity no ledger has seen. Without
+    /// the export ledger the watcher shelves the item the user just took out,
+    /// which reads as the tile never leaving.
+    func testAFilePerchExportedIsAdoptedRatherThanShelvedBack() throws {
+        let directory = try makeTemporaryDirectory()
+        let source = try makeTemporaryDirectory().appending(path: "staged.txt")
+        try Data("exported".utf8).write(to: source)
+
+        let exportLedger = ExportLedger()
+        let log = ImportLog()
+        let adopted = expectation(description: "export adopted")
+        let watcher = makeWatcher(
+            over: directory,
+            exportLedger: exportLedger,
+            log: log,
+            onAdopt: adopted
+        )
+        // What `FolderWatchCenter` wires in production: perch writes the last
+        // byte itself, so the folder can fall quiet with no event left to
+        // trigger the scan that would claim the file.
+        exportLedger.onWritten = { [weak watcher] _ in watcher?.rescan() }
+        watcher.start(seedExisting: false)
+
+        // Exactly the promise's sequence: reserve, copy, confirm.
+        let destination = directory.appending(path: "staged.txt")
+        exportLedger.willWrite(to: destination)
+        try FileManager.default.copyItem(at: source, to: destination)
+        exportLedger.didWrite(to: destination)
+
+        wait(for: [adopted], timeout: 5)
+        // Long enough for a probe cycle to have promoted it, had it started one.
+        Thread.sleep(forTimeInterval: 0.4)
+        XCTAssertEqual(log.importedNames, [], "a drag-out must not come straight back")
+        XCTAssertEqual(
+            log.adoptedTokens,
+            [try FolderWatchRules.identityToken(forFileAt: destination)],
+            "the token is ledgered so a later scan does not treat it as an arrival"
+        )
+    }
+
+    /// Adopting one file must not put the watcher to sleep: the folder is
+    /// still watched, and the next genuine arrival still belongs on the shelf.
+    func testTheWatcherKeepsImportingAfterAnAdoption() throws {
+        let directory = try makeTemporaryDirectory()
+        let exportLedger = ExportLedger()
+        let log = ImportLog()
+        let adopted = expectation(description: "export adopted")
+        let landed = expectation(description: "the later arrival imported")
+        let watcher = makeWatcher(
+            over: directory,
+            exportLedger: exportLedger,
+            log: log,
+            onImport: landed,
+            onAdopt: adopted
+        )
+        exportLedger.onWritten = { [weak watcher] _ in watcher?.rescan() }
+        watcher.start(seedExisting: false)
+
+        let destination = directory.appending(path: "note.txt")
+        exportLedger.willWrite(to: destination)
+        try Data("ours".utf8).write(to: destination)
+        exportLedger.didWrite(to: destination)
+        wait(for: [adopted], timeout: 5)
+
+        try Data("theirs".utf8).write(to: directory.appending(path: "other.txt"))
+        wait(for: [landed], timeout: 5)
+        XCTAssertEqual(log.importedNames, ["other.txt"])
+    }
+
+    /// A probe can already be running at the path an export lands on — a file
+    /// deleted a moment before the copy claimed its name. The scan has to ask
+    /// the export ledger *before* it skips past on "already probing", or the
+    /// verdict is never read and the probe hands the item back.
+    func testAnExportIsAdoptedEvenWhenAProbeWasAlreadyRunningAtThatPath() throws {
+        let directory = try makeTemporaryDirectory()
+        let exportLedger = ExportLedger()
+        let log = ImportLog()
+        let adopted = expectation(description: "export adopted")
+        let watcher = makeWatcher(
+            over: directory,
+            // Long enough that the probe started below is still running when
+            // the export announces itself, without the test racing a clock.
+            requiredStableProbes: 100,
+            exportLedger: exportLedger,
+            log: log,
+            onAdopt: adopted
+        )
+        exportLedger.onWritten = { [weak watcher] _ in watcher?.rescan() }
+        watcher.start(seedExisting: false)
+
+        let contested = directory.appending(path: "contested.txt")
+        try Data("somebody else's file".utf8).write(to: contested)
+        waitUntil("a probe is running") { log.importedNames.isEmpty }
+        Thread.sleep(forTimeInterval: 0.3)
+
+        // Now perch writes its own export onto that same name.
+        exportLedger.willWrite(to: contested)
+        try Data("perch's export".utf8).write(to: contested)
+        exportLedger.didWrite(to: contested)
+
+        wait(for: [adopted], timeout: 5)
+        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertEqual(log.importedNames, [], "the running probe must not promote perch's own write")
+    }
+
+    /// A promise whose copy threw leaves nothing of ours at that path, so the
+    /// reservation must not swallow whatever genuinely arrives there next.
+    func testACancelledExportDoesNotSwallowARealArrival() throws {
+        let directory = try makeTemporaryDirectory()
+        let exportLedger = ExportLedger()
+        let log = ImportLog()
+        let landed = expectation(description: "the real arrival imported")
+        let watcher = makeWatcher(
+            over: directory,
+            exportLedger: exportLedger,
+            log: log,
+            onImport: landed
+        )
+        watcher.start(seedExisting: false)
+
+        let destination = directory.appending(path: "contested.txt")
+        exportLedger.willWrite(to: destination)
+        exportLedger.cancelWrite(at: destination)
+        try Data("a genuine download".utf8).write(to: destination)
+
+        wait(for: [landed], timeout: 5)
+        XCTAssertEqual(log.importedNames, ["contested.txt"])
+        XCTAssertEqual(log.adoptedTokens, [])
+    }
+
     private func waitUntil(
         _ what: String,
         timeout: TimeInterval = 5,
@@ -564,6 +713,135 @@ final class FolderWatcherTests: XCTestCase {
             }
             Thread.sleep(forTimeInterval: 0.02)
         }
+    }
+}
+
+/// The book the export path and the watchers share. Its whole job is to be
+/// right about *which* file is perch's own, so each verdict gets a case.
+final class ExportLedgerTests: XCTestCase {
+    func testAPathNobodyReservedIsUnrelated() throws {
+        let directory = try makeTemporaryDirectory()
+        let file = directory.appending(path: "stranger.txt")
+        try Data("hi".utf8).write(to: file)
+
+        let ledger = ExportLedger()
+        XCTAssertEqual(
+            ledger.claim(file, token: try FolderWatchRules.identityToken(forFileAt: file)),
+            .unrelated
+        )
+    }
+
+    func testAReservationIsInFlightUntilTheCopyConfirms() throws {
+        let directory = try makeTemporaryDirectory()
+        let file = directory.appending(path: "half.txt")
+
+        let ledger = ExportLedger()
+        ledger.willWrite(to: file)
+        // The copy has started; the file exists but its identity is not final.
+        try Data("part".utf8).write(to: file)
+        XCTAssertEqual(
+            ledger.claim(file, token: try FolderWatchRules.identityToken(forFileAt: file)),
+            .inFlight,
+            "a half-written export must not be ledgered at the identity it has mid-copy"
+        )
+
+        try Data("part and the rest".utf8).write(to: file)
+        ledger.didWrite(to: file)
+        let settled = try FolderWatchRules.identityToken(forFileAt: file)
+        XCTAssertEqual(ledger.claim(file, token: settled), .ours)
+        XCTAssertEqual(
+            ledger.claim(file, token: settled),
+            .unrelated,
+            "the claim is consumed — a second sighting is an ordinary arrival"
+        )
+    }
+
+    func testAnIdentityThatMovedOnIsSomebodyElsesFile() throws {
+        let directory = try makeTemporaryDirectory()
+        let file = directory.appending(path: "replaced.txt")
+
+        let ledger = ExportLedger()
+        ledger.willWrite(to: file)
+        try Data("ours".utf8).write(to: file)
+        ledger.didWrite(to: file)
+
+        // Same path, different contents: `curl -o` onto what perch exported.
+        try Data("theirs, and longer".utf8).write(to: file)
+        XCTAssertEqual(
+            ledger.claim(file, token: try FolderWatchRules.identityToken(forFileAt: file)),
+            .unrelated
+        )
+    }
+
+    func testAnInFlightReservationIsBoundedByTheCopyNotByTheClock() throws {
+        let directory = try makeTemporaryDirectory()
+        let file = directory.appending(path: "huge.bin")
+
+        let ledger = ExportLedger(lifetime: 0.05)
+        ledger.willWrite(to: file)
+        try Data("still going".utf8).write(to: file)
+        Thread.sleep(forTimeInterval: 0.2)
+        XCTAssertEqual(
+            ledger.claim(file, token: try FolderWatchRules.identityToken(forFileAt: file)),
+            .inFlight,
+            "a multi-gigabyte copy onto a slow volume must not have its reservation expire mid-write"
+        )
+    }
+
+    func testAFileWrittenToScratchAndMovedIntoPlaceIsMatchedByIdentity() throws {
+        let scratch = try makeTemporaryDirectory()
+        let folder = try makeTemporaryDirectory()
+        let written = scratch.appending(path: "report.pdf")
+
+        // What a receiver that stages its own copy does: perch is handed the
+        // scratch path, and the file only reaches the watched folder after.
+        let ledger = ExportLedger()
+        ledger.willWrite(to: written)
+        try Data("exported".utf8).write(to: written)
+        ledger.didWrite(to: written)
+
+        let landed = folder.appending(path: "report.pdf")
+        try FileManager.default.moveItem(at: written, to: landed)
+        XCTAssertEqual(
+            ledger.claim(landed, token: try FolderWatchRules.identityToken(forFileAt: landed)),
+            .ours,
+            "a move on one volume carries the identity the token is built from"
+        )
+    }
+
+    func testAReservationExpires() throws {
+        let directory = try makeTemporaryDirectory()
+        let file = directory.appending(path: "abandoned.txt")
+
+        let ledger = ExportLedger(lifetime: 0.05)
+        ledger.willWrite(to: file)
+        try Data("nobody claimed me".utf8).write(to: file)
+        ledger.didWrite(to: file)
+        Thread.sleep(forTimeInterval: 0.2)
+        XCTAssertEqual(
+            ledger.claim(file, token: try FolderWatchRules.identityToken(forFileAt: file)),
+            .unrelated,
+            "a destination outside every watched folder must not blind that path forever"
+        )
+    }
+
+    func testTheDestinationIsMatchedThroughSymlinkedPathSpellings() throws {
+        let directory = try makeTemporaryDirectory()
+        let file = directory.appending(path: "spelled.txt")
+        try Data("same file".utf8).write(to: file)
+
+        let ledger = ExportLedger()
+        ledger.willWrite(to: file)
+        ledger.didWrite(to: file)
+
+        // What a watcher hands back: the folder URL its bookmark resolved to,
+        // with the entry appended. `/var` against `/private/var` is the
+        // disagreement every temporary directory walks into.
+        let asWatcherSeesIt = directory.resolvingSymlinksInPath().appending(path: "spelled.txt")
+        XCTAssertEqual(
+            ledger.claim(asWatcherSeesIt, token: try FolderWatchRules.identityToken(forFileAt: file)),
+            .ours
+        )
     }
 }
 

@@ -307,6 +307,16 @@ final class TransferPipelineTests: XCTestCase {
 
         XCTAssertEqual(try String(contentsOf: destination, encoding: .utf8), "saved")
         XCTAssertTrue(FileManager.default.fileExists(atPath: stagedURL.path))
+        // A save panel's default destinations are the folders people watch, so
+        // a Save As… into one is the same round-trip a drag-out is: the
+        // watcher has to recognise perch's own write rather than shelve it.
+        XCTAssertEqual(
+            ExportLedger.shared.claim(
+                destination,
+                token: try FolderWatchRules.identityToken(forFileAt: destination)
+            ),
+            .ours
+        )
 
         // The panel takes the user's answer to "replace it?" and then hands us
         // an existing path anyway; `copyItem` alone would fail there.
@@ -315,6 +325,15 @@ final class TransferPipelineTests: XCTestCase {
 
         XCTAssertEqual(try String(contentsOf: destination, encoding: .utf8), "saved")
         XCTAssertTrue(FileManager.default.fileExists(atPath: stagedURL.path))
+        // `replaceItemAt` swaps in a file from the replacement directory, so
+        // overwriting lands a fresh identity and needs announcing just as much.
+        XCTAssertEqual(
+            ExportLedger.shared.claim(
+                destination,
+                token: try FolderWatchRules.identityToken(forFileAt: destination)
+            ),
+            .ours
+        )
 
         // And the replace is all-or-nothing. A copy that fails must leave what
         // was already at the destination untouched — deleting first and then
@@ -327,6 +346,15 @@ final class TransferPipelineTests: XCTestCase {
             XCTFail("Copying from a missing staged file should fail")
         } catch {
             XCTAssertEqual(try String(contentsOf: destination, encoding: .utf8), "theirs")
+            // Nothing of perch's landed, so the reservation must be gone —
+            // leaving it would swallow whatever genuinely arrives there next.
+            XCTAssertEqual(
+                ExportLedger.shared.claim(
+                    destination,
+                    token: try FolderWatchRules.identityToken(forFileAt: destination)
+                ),
+                .unrelated
+            )
         }
     }
 }

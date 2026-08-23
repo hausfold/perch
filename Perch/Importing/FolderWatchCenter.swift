@@ -18,6 +18,9 @@ final class FolderWatchCenter: ObservableObject {
 
     private let shelf: ShelfStore
     private let folderStore: WatchedFolderStore
+    /// What perch is writing into watched folders itself, so a drag-out is
+    /// adopted rather than shelved straight back. See `ExportLedger`.
+    private let exportLedger: ExportLedger
     private var watchers: [UUID: FolderWatcher] = [:]
     private var resolvedPaths: [UUID: String] = [:]
     /// Where each configured folder was last seen, INCLUDING the ones whose
@@ -37,12 +40,25 @@ final class FolderWatchCenter: ObservableObject {
     private var watcherGenerations: [UUID: UUID] = [:]
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "WatchedFolders")
 
-    init(shelf: ShelfStore, folders: WatchedFolderStore) {
+    init(
+        shelf: ShelfStore,
+        folders: WatchedFolderStore,
+        exportLedger: ExportLedger = .shared
+    ) {
         self.shelf = shelf
         folderStore = folders
+        self.exportLedger = exportLedger
     }
 
     func start() {
+        // An export writes the last byte itself, so the destination folder can
+        // fall quiet with nothing left to trigger a scan. Nudge the watcher
+        // that owns it instead of waiting for one.
+        exportLedger.onWritten = { [weak self] url in
+            Task { @MainActor in
+                self?.rescanFolder(containing: url)
+            }
+        }
         for folder in folderStore.folders {
             startWatching(folder, seedExisting: false)
         }
@@ -50,11 +66,24 @@ final class FolderWatchCenter: ObservableObject {
     }
 
     func stop() {
+        exportLedger.onWritten = nil
         for watcher in watchers.values {
             watcher.stop()
         }
         watchers.removeAll()
         watcherGenerations.removeAll()
+    }
+
+    /// A file just written into one of the watched folders — look again there.
+    /// Only the folder itself: a watcher lists its own directory and nothing
+    /// below it, so a drop into a subfolder was never going to be imported.
+    private func rescanFolder(containing url: URL) {
+        let parent = url.deletingLastPathComponent()
+            .standardizedFileURL.resolvingSymlinksInPath().path
+        guard let folderID = resolvedPaths.first(where: { $0.value == parent })?.key else {
+            return
+        }
+        watchers[folderID]?.rescan()
     }
 
     /// The id of the folder now being watched — the existing one when this is
@@ -179,6 +208,7 @@ final class FolderWatchCenter: ObservableObject {
             folderURL: url,
             ledger: folder.importedTokens,
             sinceEventID: folder.lastEventID,
+            exportLedger: exportLedger,
             onImport: { [weak self] fileURL, token in
                 Task { @MainActor in
                     guard let self, self.watchers[folderID] != nil else { return }
@@ -195,6 +225,16 @@ final class FolderWatchCenter: ObservableObject {
                             self.watchers[folderID]?.forgetImport(token)
                         }
                     }
+                }
+            },
+            onAdopt: { [weak self] token in
+                Task { @MainActor in
+                    guard let self, self.watchers[folderID] != nil else { return }
+                    // Nothing to stage — the bytes are the ones perch just
+                    // wrote out of the shelf. Persisting the token is what
+                    // stops a later scan treating it as an arrival once the
+                    // in-memory claim is gone.
+                    self.folderStore.markImported(token, for: folderID)
                 }
             },
             onLedgerReplaced: { [weak self] tokens in

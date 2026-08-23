@@ -102,7 +102,10 @@ then resumes gives you **two** tiles — the short one perch shelved during the
 stall, and the finished file — because by the rule above the finished file is a
 different file. Clear the short one; the complete one is the later tile.) New folders appearing inside a watched
 folder are not auto-imported; folders still reach the shelf through every
-deliberate door. A watched folder copies what arrives and never touches the
+deliberate door. **Dragging an item out of the shelf into a watched folder
+does not put it back** — perch recognises what it just wrote and ledgers it
+without shelving it, so dropping onto a watched Desktop behaves like dropping
+anywhere else. A watched folder copies what arrives and never touches the
 original — same invariant as every other door.
 
 ## Colors

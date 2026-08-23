@@ -235,11 +235,21 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
         // starts: that item now waits for the verdict below however long the
         // copy runs, instead of being handed off as a plain-URL drop.
         report(export.id, .promiseStarted)
+        // Announce the destination before a byte of it exists. Dropping into a
+        // folder perch also watches is the ordinary case — `~/Downloads` and
+        // `~/Desktop` are what people watch and what people drag onto — and
+        // the copy's own first write is the directory event that starts that
+        // folder's scan. Reserve first, or the watcher shelves the item the
+        // user just took out. See `ExportLedger`.
+        let ledger = ExportLedger.shared
+        ledger.willWrite(to: url)
         do {
             try FileManager.default.copyItem(at: export.url, to: url)
+            ledger.didWrite(to: url)
             completionHandler(nil)
             report(export.id, .copied)
         } catch {
+            ledger.cancelWrite(at: url)
             completionHandler(error)
             report(export.id, .failed)
         }
