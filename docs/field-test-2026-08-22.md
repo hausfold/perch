@@ -30,7 +30,7 @@ is provably the only thing going wrong.
 | 10 | Open/close animation janks at ~250 items (scrolling is fine) | UI | Confirmed cause | **B** |
 | 9 | 50 folders dropped into Finder land in a diagonal line | UI | **Open** — first theory disproved | **B** |
 | ~~7~~ | ~~Rename a staged file in Finder → tile can never be dragged out, and vanishes~~ | Store | **Fixed** — re-resolve; decision in `ARCHITECTURE.md` | ~~**C**~~ |
-| 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | Leading hypothesis + 1 confirmed adjacent bug | **D** |
+| 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | **Half fixed** — dedupe gone; a directory kqueue never sees the rewrite | **D** |
 | 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | Unresolved by reading | **D** |
 | 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | Two candidates | **E** |
 | 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | Needs a clean-machine check first | **F** |
@@ -210,75 +210,54 @@ bytes belong to whatever took an earlier drop.
 
 ## Run D — Watched folders (`Perch/Importing/`)
 
-### D1 · A failed import is ledgered anyway, so it never retries (confirmed, fix regardless)
+### ~~D1 · A failed import is ledgered anyway, so it never retries~~ — **fixed**
 
-`FolderWatcher.promote` (`Perch/Importing/FolderWatcher.swift:223`) inserts the
-identity token into the ledger and *then* calls `onImport`;
-`FolderWatchCenter.attachWatcher`'s `onImport` closure calls
-`folderStore.markImported(token, …)` **before** `shelf.importFileURLs([fileURL])`
-and never learns whether staging succeeded. One transient failure and that file
-is permanently invisible to the watcher. Ledger on success, not on attempt.
+`ShelfStore.importFileURLs` now takes a per-URL completion, and
+`FolderWatchCenter` ledgers on success instead of on attempt; a failure calls
+`FolderWatcher.forgetImport(_:)`, which takes the token back out so the next
+directory event probes the file again. The token still goes into the *in-memory*
+ledger at promote time, so a second event can't start a second import mid-flight.
+`testAFailedImportIsRetriedOnTheNextEvent`.
 
-### D2 · `curl -o` arrivals never land (#6)
+### D2 · `curl -o` arrivals never land (#6) — **half fixed, and the other half is bigger than the hypothesis**
 
-**Symptom.** `curl -o ~/Downloads/slow.bin …` — nothing appears mid-write
-(correct) and nothing appears when it finishes (wrong). Repeated with and
-without `--limit-rate`. A browser download to the same folder lands fine, so
-the watcher itself is alive.
+The dedupe half was exactly as diagnosed and is fixed: `identityToken` now hashes
+**size and modification date** alongside inode and birth date, so truncating and
+rewriting a path is a new arrival rather than a match against the first download
+forever. A pure rename still does not re-import (`testARenameStillDoesNotReimport`),
+which is the property the token exists for. Tokens carry a `v2:` format tag, and a
+ledger in an older format is *adopted* on the next launch rather than pruned to
+nothing — without that, upgrading would have re-imported everything in
+`~/Downloads` at once. The product decision (replaced contents = new arrival) is
+in `docs/reference.md`.
 
-**Leading hypothesis (medium-high confidence).**
-`FolderWatchRules.identityToken` (`FolderWatcher.swift:21`) hashes **inode +
-birth date**, deliberately, so a rename or edit-in-place does not re-import.
-`curl -o` on an existing path *truncates and rewrites* — same inode, same birth
-date, same token. Once `slow.bin` has been ledgered once, **every later
-`curl -o ~/Downloads/slow.bin` is deduped forever**, which is precisely the
-"even this one shows nothing" report. A browser avoids it by writing
-`…​.crdownload` and renaming to a fresh name each time.
+**But that alone does not make `curl -o` land, and this is the real finding of
+Run D.** A directory kqueue fires on entries appearing, disappearing and being
+renamed. It does **not** fire when something writes into a file that is already
+in the directory — which is precisely what `curl -o` does to an existing path
+(`O_TRUNC`, same inode, same entry). So no event arrives, `scan()` never runs,
+and the fixed token never gets a chance to differ. `FolderWatcher`'s own class
+comment states this kqueue property; what nobody had joined up is that it makes
+in-place rewrites invisible end to end. `testARewrittenFileIsNoLongerDedupedAgainstItsOwnEarlierContents`
+has to create a second file purely to fire an event, and says so.
 
-Combined with D1, one silently-failed first import would also produce
-"never again" with no successful import having ever happened.
+**What is left, and it is a design call, not a patch.** Something has to notice a
+write into an existing file:
+- **FSEvents instead of a directory kqueue.** Reports `ItemModified` per path,
+  coalesced and cheap, and its stored event ID replays what happened while the
+  app was not running — which is #8 (D3) as well. This is the one to pick if
+  either bug matters; it is a rewrite of `FolderWatcher`'s event source, not of
+  its probe or its ledger.
+- **A low-frequency rescan tick.** Ten lines, no design change, and it burns a
+  `contentsOfDirectory` plus a `stat` per file forever, on battery.
 
-**Diagnose first, in this order.**
-1. `rm ~/Downloads/slow.bin` then curl to that name → does it land? (isolates
-   inode reuse from everything else)
-2. `curl -o ~/Downloads/$(uuidgen).bin …` → does it land? (same)
-3. `log stream --predicate 'subsystem == "com.hausfold.perch"'` while curling —
-   `Shelf`/`WatchedFolders` categories.
+### D3 · No catch-up on relaunch (#8) — **untouched, and probably the same door**
 
-If (1)/(2) land, the bug is the dedupe rule, not the watcher.
-
-**Fix sketch (if confirmed).** The token must change when the *content* is
-replaced. Add the size and modification date to the hashed identity, or store
-the last-seen `(size, mtime)` beside the token and treat a change as a new
-arrival. Keep the property the token exists for: a pure rename, and an
-edit-in-place that the shelf already holds, must still not re-import. Extend
-`FolderWatchingTests` with a truncate-and-rewrite case.
-
-### D3 · No catch-up on relaunch (#8)
-
-**Symptom.** Quit Perch → drop a file into `~/Downloads` → relaunch → the file
-never lands.
-
-**Reading did not explain this.** The catch-up path exists and looks right:
-`AppRuntime.start()` → `FolderWatchCenter.start()` → `startWatching(seedExisting:
-false)` → `FolderWatcher.initialScan` (`FolderWatcher.swift:153`) prunes the
-ledger to what is present and then calls `scan()`, which probes and promotes any
-unledgered file after ~0.5 s. **Instrument before changing anything.**
-
-Things to rule out, cheapest first:
-- Was the file's token already in the ledger? (moving a file *into* `~/Downloads`
-  preserves inode + birth date — the same D2 mechanism, from a different angle)
-- Does `startWatching`'s detached bookmark resolve at all on a cold launch?
-  `attachWatcher` bails silently on a stale bookmark → `markUnavailable`, and
-  the only trace is a log line. Check Settings ▸ Watched Folders for an orange
-  (unavailable) row after relaunch.
-- Is the kqueue racing app launch — does the file land if you *touch* it after
-  the app is up?
-
-Fix D1 and D2 first; re-test D3 afterwards. There is a fair chance it is the
-same root cause seen from the other end.
-
----
+Not reproduced; nothing changed here. Note that FSEvents' historical replay would
+address it directly, and that the launch path (`initialScan` → prune → `scan`) is
+covered by `testLaunchScanPrunesGoneFilesAndCatchesUpOnUnledgeredOnes` and does
+work in a test, so the suspicion falls on the bookmark resolving or the kqueue
+arming rather than on the scan.
 
 ## Run E — Non-downloaded iCloud file sticks on "Downloading" (#2)
 

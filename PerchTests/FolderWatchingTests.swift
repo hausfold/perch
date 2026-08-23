@@ -18,23 +18,26 @@ final class FolderWatchRulesTests: XCTestCase {
         XCTAssertFalse(FolderWatchRules.isCandidateName(""))
     }
 
-    func testIdentityTokenSurvivesRenameAndEditButNotRecreation() throws {
+    func testIdentityTokenSurvivesRenameButChangesOnRewrite() throws {
         let directory = try makeTemporaryDirectory()
         let original = directory.appending(path: "a.txt")
         try Data("one".utf8).write(to: original)
         let token = try FolderWatchRules.identityToken(forFileAt: original)
 
-        // Renaming and editing keep the inode and birth date, so the identity
-        // holds — a shelved file touched up in place must not land twice.
+        // Renaming keeps the inode and birth date, and does not touch the
+        // contents — so the identity holds, and a shelved file the user renames
+        // must not land twice.
         let renamed = directory.appending(path: "b.txt")
         try FileManager.default.moveItem(at: original, to: renamed)
         XCTAssertEqual(try FolderWatchRules.identityToken(forFileAt: renamed), token)
 
+        // Rewriting it does change the identity: same inode, new contents is a
+        // new arrival (#6 — that is what `curl -o` to an existing path does).
         let handle = try FileHandle(forWritingTo: renamed)
         try handle.seekToEnd()
         try handle.write(contentsOf: Data(" two".utf8))
         try handle.close()
-        XCTAssertEqual(try FolderWatchRules.identityToken(forFileAt: renamed), token)
+        XCTAssertNotEqual(try FolderWatchRules.identityToken(forFileAt: renamed), token)
 
         // A different file is a different identity.
         let other = directory.appending(path: "c.txt")
@@ -78,12 +81,12 @@ final class FolderWatcherTests: XCTestCase {
     /// Everything a watcher reported, safe to poke from its queue and the test.
     private final class ImportLog: @unchecked Sendable {
         private let lock = NSLock()
-        private var imported: [(name: String, sizeAtImport: Int)] = []
+        private var imported: [(name: String, sizeAtImport: Int, token: String)] = []
         private var ledgers: [Set<String>] = []
 
-        func recordImport(of url: URL) {
+        func recordImport(of url: URL, token: String = "") {
             let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? -1
-            lock.withLock { imported.append((url.lastPathComponent, size)) }
+            lock.withLock { imported.append((url.lastPathComponent, size, token)) }
         }
 
         func recordLedger(_ tokens: Set<String>) {
@@ -92,6 +95,7 @@ final class FolderWatcherTests: XCTestCase {
 
         var importedNames: [String] { lock.withLock { imported.map(\.name) } }
         var importedSizes: [Int] { lock.withLock { imported.map(\.sizeAtImport) } }
+        var importedTokens: [String] { lock.withLock { imported.map(\.token) } }
         var replacedLedgers: [Set<String>] { lock.withLock { ledgers } }
     }
 
@@ -109,8 +113,8 @@ final class FolderWatcherTests: XCTestCase {
             holdsSecurityScope: false,
             probeInterval: 0.05,
             requiredStableProbes: requiredStableProbes,
-            onImport: { url, _ in
-                log.recordImport(of: url)
+            onImport: { url, token in
+                log.recordImport(of: url, token: token)
                 onImport?.fulfill()
             },
             onLedgerReplaced: { tokens in
@@ -216,7 +220,7 @@ final class FolderWatcherTests: XCTestCase {
         try Data("missed".utf8).write(to: missed)
 
         let stayedToken = try FolderWatchRules.identityToken(forFileAt: stayed)
-        let goneToken = String(repeating: "0", count: 64)
+        let goneToken = "\(FolderWatchRules.tokenFormat):" + String(repeating: "0", count: 64)
 
         let log = ImportLog()
         let landed = expectation(description: "unledgered file caught up")
@@ -231,6 +235,108 @@ final class FolderWatcherTests: XCTestCase {
         wait(for: [landed], timeout: 5)
         XCTAssertEqual(log.importedNames, ["arrived-while-quit.png"])
         XCTAssertEqual(log.replacedLedgers, [[stayedToken]])
+    }
+
+    /// #6, the half that is fixed here: a rewritten file is no longer deduped
+    /// against its own earlier contents. `curl -o ~/Downloads/x.bin` truncates
+    /// and rewrites an existing path, keeping its inode and birth date, so an
+    /// identity built from those alone matched the first download forever.
+    ///
+    /// Note what this test has to do to make it land: create a *second* file to
+    /// fire a directory event. A directory kqueue reports entries appearing,
+    /// disappearing and being renamed — never a write into a file that is
+    /// already there. So the rewrite alone still produces no event and no scan;
+    /// see the Run D notes in `docs/field-test-2026-08-22.md`.
+    func testARewrittenFileIsNoLongerDedupedAgainstItsOwnEarlierContents() throws {
+        let directory = try makeTemporaryDirectory()
+        let target = directory.appending(path: "slow.bin")
+        try Data("first".utf8).write(to: target)
+
+        let log = ImportLog()
+        // No expectation here: this file is meant to import twice, and an
+        // XCTestExpectation traps on the second fulfill.
+        let watcher = makeWatcher(over: directory, log: log)
+        watcher.start(seedExisting: false)
+        waitUntil("the first download lands") { log.importedNames == ["slow.bin"] }
+
+        // Same path, same inode, new contents — what `curl -o` does.
+        let handle = try FileHandle(forWritingTo: target)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data("a second, longer download".utf8))
+        try handle.close()
+        // Any directory event at all is enough to make the watcher look again.
+        try Data("nudge".utf8).write(to: directory.appending(path: "other.txt"))
+
+        waitUntil("the rewritten file lands again") {
+            log.importedNames.filter { $0 == "slow.bin" }.count == 2
+        }
+        let slowImports = log.importedTokens.enumerated()
+            .filter { log.importedNames[$0.offset] == "slow.bin" }
+            .map(\.element)
+        XCTAssertNotEqual(slowImports.first, slowImports.last)
+    }
+
+    /// A pure rename must still not re-import — the property the token exists
+    /// for, and the one the content half must not cost.
+    func testARenameStillDoesNotReimport() throws {
+        let directory = try makeTemporaryDirectory()
+        let original = directory.appending(path: "scan.pdf")
+        try Data("contents".utf8).write(to: original)
+
+        let log = ImportLog()
+        let landed = expectation(description: "file imported once")
+        let watcher = makeWatcher(over: directory, log: log, onImport: landed)
+        watcher.start(seedExisting: false)
+        wait(for: [landed], timeout: 5)
+
+        try FileManager.default.moveItem(at: original, to: directory.appending(path: "scan-final.pdf"))
+        Thread.sleep(forTimeInterval: 0.4)
+        XCTAssertEqual(log.importedNames, ["scan.pdf"])
+    }
+
+    /// D1: the ledger records arrivals that *landed*. A file whose staging
+    /// failed has to be reachable again, or one transient error makes it
+    /// permanently invisible to the watcher.
+    func testAFailedImportIsRetriedOnTheNextEvent() throws {
+        let directory = try makeTemporaryDirectory()
+        let log = ImportLog()
+        let watcher = makeWatcher(over: directory, log: log)
+        watcher.start(seedExisting: false)
+
+        let file = directory.appending(path: "flaky.txt")
+        try Data("hello".utf8).write(to: file)
+        waitUntil("the first attempt") { log.importedNames == ["flaky.txt"] }
+
+        // Staging failed: the center hands the token back.
+        watcher.forgetImport(log.importedTokens[0])
+        // Any later directory event re-probes it.
+        try Data("nudge".utf8).write(to: directory.appending(path: "other.txt"))
+
+        waitUntil("the failed file is retried") { log.importedNames.filter { $0 == "flaky.txt" }.count == 2 }
+    }
+
+    /// A ledger written before the token recipe changed matches nothing, so
+    /// pruning it would empty it and the catch-up scan would import the whole
+    /// folder at once. Adopt what is there instead — once, on that launch.
+    func testALedgerInAnOlderTokenFormatIsAdoptedRatherThanReimported() throws {
+        let directory = try makeTemporaryDirectory()
+        try Data("one".utf8).write(to: directory.appending(path: "a.txt"))
+        try Data("two".utf8).write(to: directory.appending(path: "b.txt"))
+
+        let log = ImportLog()
+        // 64 hex chars, no format prefix: exactly what perch used to persist.
+        let watcher = makeWatcher(
+            over: directory,
+            ledger: [String(repeating: "a", count: 64)],
+            log: log
+        )
+        watcher.start(seedExisting: false)
+
+        waitUntil("the ledger is re-seeded") { log.replacedLedgers.count == 1 }
+        Thread.sleep(forTimeInterval: 0.4)
+        XCTAssertEqual(log.importedNames, [], "an upgrade must not flood the shelf")
+        XCTAssertEqual(log.replacedLedgers.first?.count, 2)
+        XCTAssertTrue(log.replacedLedgers.first?.allSatisfy(FolderWatchRules.isCurrentFormat) == true)
     }
 
     private func waitUntil(

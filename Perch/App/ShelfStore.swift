@@ -59,7 +59,11 @@ final class ShelfStore: ObservableObject {
         retentionTimer = timer
     }
 
-    func importFileURLs(_ urls: [URL]) {
+    /// - Parameter completion: called on the main actor once per URL, with
+    ///   whether that file reached the shelf. A watched folder needs this to
+    ///   ledger an arrival on *success* rather than on attempt — see
+    ///   `FolderWatcher.forgetImport`. Every other caller ignores it.
+    func importFileURLs(_ urls: [URL], completion: (@MainActor (URL, Bool) -> Void)? = nil) {
         for url in urls {
             let transferID = UUID()
             pendingTransfers.append(
@@ -81,8 +85,10 @@ final class ShelfStore: ObservableObject {
                         }
                     }
                     finishTransfer(transferID, with: .success(item))
+                    completion?(url, true)
                 } catch {
                     finishTransfer(transferID, with: .failure(error))
+                    completion?(url, false)
                 }
             }
         }

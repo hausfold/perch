@@ -171,8 +171,19 @@ final class FolderWatchCenter: ObservableObject {
             onImport: { [weak self] fileURL, token in
                 Task { @MainActor in
                     guard let self, self.watchers[folderID] != nil else { return }
-                    self.folderStore.markImported(token, for: folderID)
-                    self.shelf.importFileURLs([fileURL])
+                    // Ledgered on success, never on attempt. Recording the
+                    // attempt made one transient staging failure permanent:
+                    // the file was marked imported, so no later event ever
+                    // looked at it again.
+                    self.shelf.importFileURLs([fileURL]) { [weak self] _, landed in
+                        guard let self else { return }
+                        if landed {
+                            self.folderStore.markImported(token, for: folderID)
+                        } else {
+                            self.logger.error("A watched arrival failed to stage; it will be retried")
+                            self.watchers[folderID]?.forgetImport(token)
+                        }
+                    }
                 }
             },
             onLedgerReplaced: { [weak self] tokens in
