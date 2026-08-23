@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import OSLog
 
 /// Which files a watched folder is willing to shelve. Pure, so the rules are
 /// testable without a filesystem.
@@ -78,6 +79,7 @@ final class FolderWatcher: @unchecked Sendable {
     private let onLedgerReplaced: @Sendable (Set<String>) -> Void
     /// The folder could not be opened for watching. Called on the watcher queue.
     private let onUnavailable: @Sendable () -> Void
+    private let logger = Logger(subsystem: "com.hausfold.perch", category: "WatchedFolders")
 
     private let queue: DispatchQueue
     private var source: DispatchSourceFileSystemObject?
@@ -185,6 +187,12 @@ final class FolderWatcher: @unchecked Sendable {
         // adding the folder does. Costs one launch's catch-up, once ever, and
         // only for a folder that was already being watched across the upgrade.
         if !ledger.isEmpty, ledger.contains(where: { !FolderWatchRules.isCurrentFormat($0) }) {
+            // Says why a launch did no catch-up, once ever, per folder. A
+            // count only — the folder's path lives in its bookmark and nowhere
+            // else, least of all in a log.
+            logger.info(
+                "Watched folder ledger upgraded; adopted \(current.count, privacy: .public) existing file(s) instead of importing them"
+            )
             ledger = current
             onLedgerReplaced(ledger)
             return

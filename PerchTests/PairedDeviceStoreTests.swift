@@ -176,7 +176,8 @@ final class PairedDeviceStoreTests: XCTestCase {
     /// exactly how perch ships — is SIGKILLed at exec, and the App Group perch
     /// does have is not accepted as a substitute.
     func testTheDataProtectionKeychainRefusesAProcessWithNoAccessGroup() {
-        var query = Query.add(service: service, account: UUID(), data: Data("x".utf8))
+        let account = UUID()
+        var query = Query.add(service: service, account: account, data: Data("x".utf8))
         query[kSecUseDataProtectionKeychain as String] = true
 
         let status = SecItemAdd(query as CFDictionary, nil)
@@ -186,7 +187,9 @@ final class PairedDeviceStoreTests: XCTestCase {
             "if this ever passes, revisit the type comment on PairedDeviceStore"
         )
         if status == errSecSuccess {
-            var cleanup = Query.item(service: service, account: UUID())
+            // On the day this stops being refused, tearDown cannot reach it —
+            // it queries the other Keychain — so clean up the same account here.
+            var cleanup = Query.item(service: service, account: account)
             cleanup[kSecUseDataProtectionKeychain as String] = true
             SecItemDelete(cleanup as CFDictionary)
         }

@@ -215,7 +215,9 @@ bytes belong to whatever took an earlier drop.
 `ShelfStore.importFileURLs` now takes a per-URL completion, and
 `FolderWatchCenter` ledgers on success instead of on attempt; a failure calls
 `FolderWatcher.forgetImport(_:)`, which takes the token back out so the next
-directory event probes the file again. The token still goes into the *in-memory*
+directory event probes the file again — *the next event*, which inherits D2's
+open half below: nothing re-probes on its own. It also self-heals at relaunch,
+since the persisted ledger never got the token. The token still goes into the *in-memory*
 ledger at promote time, so a second event can't start a second import mid-flight.
 `testAFailedImportIsRetriedOnTheNextEvent`.
 
