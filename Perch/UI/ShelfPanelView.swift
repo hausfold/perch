@@ -245,9 +245,9 @@ struct ShelfPanelView: View {
                     // Collapse every tile at once; the strip empties as the
                     // stack lifts off. Pinned tiles stay put and need no grace
                     // bookkeeping because export never deletes or detaches them.
-                    state.beginExport(
-                        of: Set(store.items.lazy.filter { !$0.isPinned }.map(\.id))
-                    )
+                    let exporting = Set(store.items.lazy.filter { !$0.isPinned }.map(\.id))
+                    state.beginExport(of: exporting)
+                    store.beginExport(of: exporting)
                 },
                 onExportEnded: {
                     state.isDropActive = false
@@ -261,8 +261,18 @@ struct ShelfPanelView: View {
 
     /// Resolves a shelf item to something the drag source can vend by promise,
     /// or nil when its staged copy can't be located.
+    ///
+    /// This resolves rather than trusting `relativePath`, and it has to: the
+    /// same pasteboard carries the plain `public.file-url` for promise-blind
+    /// receivers, and a terminal that pastes a dead path has no verdict to
+    /// report and nothing to undo — the grace timer hands the item off and its
+    /// bytes are detached regardless. `liftForExport` is the authoritative
+    /// check for *whether the tile leaves*, but only the URL vended here
+    /// decides what the destination actually receives. One `fileExists` per
+    /// visible item; the directory is only listed when the recorded name is
+    /// already gone.
     private func exportItem(for item: ShelfItem) -> ExportItem? {
-        guard let url = item.fileURL(inside: store.repository.rootURL) else { return nil }
+        guard let url = store.stagedURL(for: item) else { return nil }
         let fileType = item.contentTypeIdentifier
             ?? (item.kind == .folder ? UTType.folder.identifier : UTType.data.identifier)
         return ExportItem(id: item.id, url: url, fileType: fileType, fileName: item.displayName)
@@ -326,7 +336,7 @@ struct ShelfPanelView: View {
                 ForEach(store.items) { item in
                     FileTile(
                         item: item,
-                        fileURL: item.fileURL(inside: store.repository.rootURL),
+                        fileURL: store.stagedURL(for: item),
                         exportItems: exportItem(for: item).map { [$0] } ?? [],
                         isExiting: state.draggingOutIDs.contains(item.id) && !item.isPinned,
                         onReveal: { store.reveal(item) },
@@ -336,7 +346,9 @@ struct ShelfPanelView: View {
                         onOpen: { store.open(item) },
                         onExportStarted: {
                             state.isDropActive = true
-                            state.beginExport(of: item.isPinned ? [] : [item.id])
+                            let exporting: Set<UUID> = item.isPinned ? [] : [item.id]
+                            state.beginExport(of: exporting)
+                            store.beginExport(of: exporting)
                         },
                         onExportEnded: {
                             state.isDropActive = false

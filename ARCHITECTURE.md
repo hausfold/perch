@@ -294,6 +294,32 @@ event.
 Every logical import owns a UUID directory. The user-visible filename remains
 unchanged, while two `photo.jpg` files never share a filesystem namespace.
 
+**The container is the identity; the filename is not.** A tile's
+`relativePath` is a durable hint, not the link to its bytes — because
+**Show in Finder** hands the user a real file in a real folder, and renaming
+it there is a reasonable thing to do. `StagingRepository.resolvedURL(for:)` is
+the one way to ask where an item's bytes are: the recorded path if it still
+exists, otherwise the container's single visible child, which after a rename
+is unambiguously the same item. The shelf follows the rename — same id, same
+pin, same slot, new `displayName` — at the moment the panel next opens
+(`ShelfPanelController.expand`) and again on the next launch.
+
+Three answers are deliberately refused rather than guessed, and all return
+nil — a real answer every caller honours, because handing a destination the
+wrong file is worse than refusing the drag:
+
+- a container holding more than one visible child;
+- a container another live item still claims. A promised **batch** shares one
+  container between several items, so the single child left after a sibling's
+  file is deleted is as likely to be the sibling. Callers pass their
+  neighbours (`alongside:`) — the shelf's items plus anything lifted mid-drag
+  — so this case is answerable at all;
+- a *detached* container, whose bytes belong to whatever took an earlier drop
+  and must never be re-resolved back onto the shelf.
+
+`StagingRepository.remove` resolves the same way and for the same reason:
+deleting is the one place where guessing wrong destroys something.
+
 ### Termination and recovery
 
 Only completed imports enter the atomic manifest. Ordinary copies use a hidden
@@ -334,6 +360,21 @@ out removes it from the shelf the moment a destination accepts the drop —
 letting go is the gesture, and a shelf still counting the item reads as stuck.
 The item is *lifted*, not deleted: its staged bytes stay put, and a destination
 that then refuses it or fails its copy puts the item back in its old slot.
+
+Two rules keep that transaction from losing a tile. `liftForExport` never
+removes an item whose bytes it cannot resolve — nothing can have copied them,
+so nothing earned the removal, and the refusal surfaces as an error instead of
+a silently shorter shelf. And the verdicts are **unordered by construction**:
+`.accepted` is reported inline from `draggingSession(_:endedAt:)` — the last
+moment the drag source is guaranteed alive, so it may not wait on a hop — while
+`.copied` / `.failed` hop to the main actor from the promise queue. Either
+hopped verdict can therefore land *first*, and both are held: `returnToShelf`
+records a refusal that arrives before its lift so `liftForExport` can decline to
+remove the tile, and `confirmCopied` records an early copy so `liftForExport`
+can settle the bytes instead of leaving them to be re-adopted as a stranger at
+the next launch. A verdict is scoped to the drag that produced it —
+`beginExport` clears both sets, and every export path calls it, the Shortcuts
+one included.
 
 **Save to…** is the non-destructive way out, and deliberately not an export at
 all: it copies the staged bytes to a location the user picks in an `NSSavePanel`

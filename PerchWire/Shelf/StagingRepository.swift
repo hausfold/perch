@@ -66,13 +66,15 @@ final class StagingRepository: @unchecked Sendable {
             case .absent, .unreadable: decoded = []
             }
 
-            let existing = decoded.filter { item in
-                guard let url = item.fileURL(inside: rootURL) else { return false }
-                // Detach is authoritative even if the manifest was never
-                // rewritten (a crash between the two): those bytes belong to
-                // whatever took the drop, not to the shelf.
-                return fileManager.fileExists(atPath: url.path)
-                    && !isDetached(url.deletingLastPathComponent())
+            let existing = decoded.compactMap { item -> ShelfItem? in
+                // Resolving rather than merely existence-checking is what lets
+                // a file renamed in Finder come back as *itself* — same id,
+                // same pin, same slot — instead of being dropped here and
+                // re-adopted below as a brand-new item.
+                guard let url = resolvedURLUnlocked(for: item, alongside: decoded) else {
+                    return nil
+                }
+                return item.restaged(at: url, inside: rootURL) ?? item
             }
             let recovered = recoverUntrackedFiles(excluding: Set(existing.map(\.relativePath)))
             let result = (existing + recovered).sorted { $0.addedAt < $1.addedAt }
@@ -152,10 +154,85 @@ final class StagingRepository: @unchecked Sendable {
         )
     }
 
-    func remove(_ item: ShelfItem) throws {
-        guard let url = item.fileURL(inside: rootURL) else {
+    /// Where an item's bytes are *right now*, or nil if they are unreachable.
+    ///
+    /// `relativePath` is a durable hint, not the identity. An import allocates
+    /// its own `<uuid>` container, so the container is what names an item for
+    /// good and the filename inside it belongs to whoever hit **Show in
+    /// Finder** — renaming there is a reasonable thing to do and must not
+    /// orphan the tile. A container left holding exactly one visible child
+    /// after the named entry vanished, with no other item claiming it, is
+    /// unambiguous: that child is this item under a new name.
+    ///
+    /// Nil is a real answer and callers must honour it: the bytes were deleted
+    /// or moved out of the container, and anything that acts on a stale URL
+    /// from here loses the tile for nothing.
+    ///
+    /// - Parameter alongside: every other item the shelf is holding, including
+    ///   any lifted mid-drag. Most containers hold one item, but a promised
+    ///   *batch* shares one between several (`beginPromisedImports`) — and
+    ///   there the one child left in the container could as easily be a
+    ///   sibling as this item under a new name. Passing the neighbours is what
+    ///   lets that case be refused instead of vending the wrong file.
+    /// `alongside` is an autoclosure because the sibling list is only ever
+    /// consulted on the rare fallback branch — building it eagerly would make
+    /// a per-item call site quadratic, and one of them is the path that opens
+    /// the panel.
+    func resolvedURL(
+        for item: ShelfItem,
+        alongside others: @autoclosure () -> [ShelfItem] = []
+    ) -> URL? {
+        lock.withLock { resolvedURLUnlocked(for: item, alongside: others()) }
+    }
+
+    private func resolvedURLUnlocked(
+        for item: ShelfItem,
+        alongside others: @autoclosure () -> [ShelfItem]
+    ) -> URL? {
+        guard let url = item.fileURL(inside: rootURL) else { return nil }
+        let container = url.deletingLastPathComponent()
+        // Detach is authoritative even if the manifest was never rewritten (a
+        // crash between the two): those bytes belong to whatever took the drop,
+        // not to the shelf — and re-resolution must not be the thing that
+        // hands them back out.
+        guard container == rootURL || !isDetached(container) else { return nil }
+        if fileManager.fileExists(atPath: url.path) { return url }
+        // A bare file directly in the root has no container to re-read, and
+        // the root holds every other item besides.
+        guard container != rootURL else { return nil }
+        // Someone else still claims this container: which visible child is
+        // whose is no longer answerable from the filesystem alone.
+        let isShared = others().contains { other in
+            other.id != item.id
+                && other.fileURL(inside: rootURL)?.deletingLastPathComponent() == container
+        }
+        guard !isShared else { return nil }
+        let visible = (try? fileManager.contentsOfDirectory(
+            at: container,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        // Two visible children means guessing, and a wrong guess hands a
+        // destination the wrong file. One is the whole invariant.
+        guard visible.count == 1 else { return nil }
+        return visible[0].standardizedFileURL
+    }
+
+    /// - Parameter alongside: as for `resolvedURL(for:alongside:)`. Deleting is
+    ///   the one place where guessing wrong destroys something, so a caller
+    ///   whose containers may be shared must pass its neighbours.
+    func remove(
+        _ item: ShelfItem,
+        alongside others: @autoclosure () -> [ShelfItem] = []
+    ) throws {
+        guard let hinted = item.fileURL(inside: rootURL) else {
             throw StagingRepositoryError.unsafePath
         }
+        // Delete what the item *is*, not what it was called at import: a
+        // renamed file left behind here would sit in staging forever, since
+        // the empty-parent walk below stops at a container that still has
+        // content in it.
+        let url = resolvedURL(for: item, alongside: others()) ?? hinted
         if fileManager.fileExists(atPath: url.path) {
             try fileManager.removeItem(at: url)
         }
@@ -210,11 +287,20 @@ final class StagingRepository: @unchecked Sendable {
     /// handle spares them. Expiry honouring it too is what keeps that word
     /// meaning one thing; without it the timer takes exactly the tiles someone
     /// pinned because they mattered.
-    func prune(olderThan cutoff: Date, items: [ShelfItem]) throws -> [ShelfItem] {
+    /// - Parameter alsoHoldingBytes: items that are *not* in `items` but whose
+    ///   staged bytes are still on disk — anything a drag has lifted and not
+    ///   yet settled. They cannot expire, but they can share a container with
+    ///   something that does, and `remove` must not resolve into their bytes.
+    func prune(
+        olderThan cutoff: Date,
+        items: [ShelfItem],
+        alsoHoldingBytes others: [ShelfItem] = []
+    ) throws -> [ShelfItem] {
         let retained = items.filter { $0.addedAt >= cutoff || $0.isPinned }
         let removed = items.filter { $0.addedAt < cutoff && !$0.isPinned }
+        let neighbours = items + others
         for item in removed {
-            try? remove(item)
+            try? remove(item, alongside: neighbours)
         }
         try persist(retained)
         return retained

@@ -232,9 +232,11 @@ final class MobileReceiver: ObservableObject {
     }
 
     private func locate(_ itemID: UUID) throws -> LocatedItem {
+        // `stagedURL` already answers nil for bytes it cannot reach, and it
+        // follows a file renamed in Finder — a send-to-phone must not fail
+        // just because the user tidied the name up.
         guard let item = store.items.first(where: { $0.id == itemID }),
-              let url = item.fileURL(inside: store.repository.rootURL),
-              FileManager.default.fileExists(atPath: url.path)
+              let url = store.stagedURL(for: item)
         else {
             throw ServeError.gone
         }

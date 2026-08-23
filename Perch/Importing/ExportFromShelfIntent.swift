@@ -37,12 +37,20 @@ struct ExportFromShelfIntent: AppIntent {
         let ids = Set(items.map(\.id))
         let staged = store.items.filter { ids.contains($0.id) }
         let files: [IntentFile] = staged.compactMap { item in
-            guard let url = item.fileURL(inside: store.repository.rootURL) else { return nil }
+            // Resolved, not the recorded path: a Shortcut is a plain-URL
+            // destination that never reports back, so a stale URL here is
+            // handed out and then detached with nothing able to undo it.
+            guard let url = store.stagedURL(for: item) else { return nil }
             return IntentFile(fileURL: url, filename: item.displayName, type: item.contentType)
         }
         guard files.isEmpty == false || items.isEmpty else {
             throw ExportFromShelfIntentError.itemsNoLongerOnShelf
         }
+        // This export never goes through the drag source, so it opens the
+        // transaction itself — otherwise a verdict left over from an earlier
+        // drag could silently suppress the lift while the Shortcut still gets
+        // its file.
+        store.beginExport(of: ids)
         store.liftForExport(ids)
         store.handOff(ids)
         return .result(value: files)
