@@ -72,9 +72,26 @@ final class ShelfWindowSystem {
 
     func openShelfOnPointerScreen() {
         let point = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main
-        guard let screen, let panel = panels[screen.perchIdentifier] else { return }
-        panel.expand()
+        let onPointerScreen = NSScreen.screens
+            .first { $0.frame.contains(point) }
+            .flatMap { panels[$0.perchIdentifier] }
+        // The pointer may be on a display with no panel of its own — with the
+        // setting off that is every display but one. Fall back to the primary
+        // display's shelf rather than doing nothing; never to an arbitrary
+        // dictionary entry, whose order is undefined.
+        let fallback = ShelfWindowSystem.primaryScreen()
+            .flatMap { panels[$0.perchIdentifier] }
+        (onPointerScreen ?? fallback)?.expand()
+    }
+
+    /// The display the single-panel case belongs on.
+    ///
+    /// Not `NSScreen.main`: that is the *key window's* screen, so with focus on
+    /// a secondary display the one shelf would be built for that display
+    /// instead. `NSScreen.screens[0]` is the zero-origin display — the one
+    /// carrying the menu bar, and the one with the notch on a laptop.
+    private static func primaryScreen() -> NSScreen? {
+        NSScreen.screens.first ?? NSScreen.main
     }
 
     private func rebuildPanels() {
@@ -84,13 +101,18 @@ final class ShelfWindowSystem {
         let screens: [NSScreen]
         if settings.showOnAllDisplays {
             screens = NSScreen.screens
-        } else if let main = NSScreen.main {
-            screens = [main]
+        } else if let primary = ShelfWindowSystem.primaryScreen() {
+            screens = [primary]
         } else {
             screens = []
         }
 
         for screen in screens {
+            // Mirrored displays can report the same NSScreenNumber. Assigning
+            // into the dictionary would drop the earlier controller *without
+            // closing it*, leaving an orphaned panel on the notch that nothing
+            // can collapse and that eats every click on the one below it.
+            guard panels[screen.perchIdentifier] == nil else { continue }
             let controller = ShelfPanelController(
                 screen: screen,
                 store: store,

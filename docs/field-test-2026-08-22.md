@@ -25,8 +25,8 @@ is provably the only thing going wrong.
 
 | # | Symptom | Area | Verdict | Run |
 |---|---|---|---|---|
-| 1 | Shelf hover-opens ~1 notch-width either side of the notch | Platform | Confirmed cause | **A** |
-| 13 | Secondary display never shows a drop target | Platform | Strong hypothesis | **A** |
+| ~~1~~ | ~~Shelf hover-opens ~1 notch-width either side of the notch~~ | Platform | **Fixed** — hit-test the pointer, don't trust the tracking area | ~~**A**~~ |
+| ~~13~~ | ~~Secondary display never shows a drop target~~ | Platform | **Fixed** — `screen: nil`; the frames were already global | ~~**A**~~ |
 | 10 | Open/close animation janks at ~250 items (scrolling is fine) | UI | Confirmed cause | **B** |
 | 9 | 50 folders dropped into Finder land in a diagonal line | UI | **Open** — first theory disproved | **B** |
 | ~~7~~ | ~~Rename a staged file in Finder → tile can never be dragged out, and vanishes~~ | Store | **Fixed** — re-resolve; decision in `ARCHITECTURE.md` | ~~**C**~~ |
@@ -41,102 +41,25 @@ is provably the only thing going wrong.
 
 ---
 
-## Run A — Notch geometry (`Perch/Platform/`)
+## ~~Run A — Notch geometry (`Perch/Platform/`)~~
 
-Two independent bugs, one file each, one PR.
+**Landed.**
 
-### A1 · Passive hover opens a band ~3× the notch (#1)
-
-**Symptom.** With items on the shelf and nothing being dragged, moving the
-pointer along the menu bar pops the shelf open roughly one notch-width to the
-left and right of the notch. It should only open over the housing itself.
-
-**Repro.** Put one item on the shelf. Move the pointer along the menu bar from
-the far left toward the notch. Note where it opens.
-
-**History — read this before you "fix the width".** This has been narrowed
-twice already and still misbehaves: `65bc959` (#55) and `3413871` (#78). The
-geometry is *already* correct; the trigger is not reading it.
-
-**Root cause (high confidence).**
-`ShelfGeometry.hoverTriggerWidth` computes ≈ notch width + 12pt and
-`ShelfHostingView.updateTrackingAreas()` installs a correspondingly narrow
-`NSTrackingArea` — `Perch/Platform/ShelfPanelController.swift:300` and the
-`hoverRect` at `:321`. But `mouseEntered(with:)` / `mouseExited(with:)` at
-`:339`/`:343` fire for **every** tracking area whose owner is this view, and
-`NSHostingView` installs its own full-bounds tracking area with itself as owner.
-So the wide hosting-view area calls our override and expands the shelf; the
-narrow area we installed is irrelevant. That is exactly why narrowing the rect
-twice changed nothing.
-
-**Confirmed empirically.** A subclass of `NSHostingView` whose root view
-contains `.onHover` ends up with **two** tracking areas, both owned by the
-subclass: ours, and SwiftUI's at full bounds with options
-`mouseEnteredAndExited | mouseMoved | activeAlways | inVisibleRect`. Remove the
-`.onHover` and the second one is not installed at all. Ours is
-`ShelfPanelView.swift:534`. Note the irony: the comment at
-`ShelfPanelController.swift:302-306` warns against `.inVisibleRect` for exactly
-this reason, and `super.updateTrackingAreas()` at `:315` then re-adds an area
-that uses it.
-
-**Fix sketch.** Stop trusting *which* area fired. Either:
-- gate on identity — `guard event.trackingArea === trackingAreaReference`
-  in both overrides (cheap, but relies on AppKit handing back our instance); or
-- drop the tracking area for hover entirely and hit-test the pointer:
-  convert `NSEvent.mouseLocation` into the panel's coordinate space and compare
-  against `hoverRect` inside `onPointerEntered`, before `expand()`.
-
-Prefer the second — it is testable without a window server and it also fixes the
-symmetric exit case. Whichever you pick, the wide catch band for *drags* must
-stay exactly as wide as it is now (that is `collapsedWidth`, and #13/#55/#78 all
-depended on it).
-
-**Verify.** Build, quit the installed copy, run `.../Contents/MacOS/Perch`.
-One item on the shelf; sweep the menu bar left→right. Opens only over the
-housing. Then drag a file along the same path — still caught in the wide band.
-
-**Watch out.** `hide()` sets `hoverSuppressed`; keep that path working (menu-bar
-/ sketchybar items beside the notch must stay clickable after "Hide").
-
-### A2 · Secondary displays get a panel at the wrong coordinates (#13)
-
-**Symptom.** With "Show a drop target on every display" **on**, only the main
-display shows a shelf. (With it **off**, one panel on the main display is the
-intended behaviour — see the second note below for why even that can misplace.)
-
-**Root cause (strong hypothesis — the API contract is verbatim, the macOS 26
-runtime behaviour is not yet observed. Land the test case first).**
-`ShelfWindowSystem.rebuildPanels()` does build one controller per
-`NSScreen.screens`, so the panels exist — they are just placed off-screen.
-`ShelfPanelController` computes `geometry.collapsedFrame` in **global** screen
-coordinates from `screen.frame` (`Perch/Platform/ScreenGeometry.swift`), then
-passes that rect to
-`NSPanel.init(contentRect:styleMask:backing:defer:screen:)` **with a non-nil
-`screen:`** — `Perch/Platform/ShelfPanelController.swift:32-37`. That
-initializer documents `contentRect` as relative to the given screen's
-lower-left corner, so the origin is applied twice. On the main display
-(origin 0,0) the double-offset is zero and it looks fine; on any secondary
-display the panel lands one screen-origin away from where it belongs.
-
-**Fix sketch.** Pass `screen: nil` and keep the global rect (simplest), or keep
-`screen:` and subtract `screen.frame.origin` from the rect. Add a
-`ScreenGeometryTests` case with a screen whose `frame.origin` is non-zero,
-asserting the frame that reaches the panel.
-
-**Verify.** Two displays, setting **on**: a catch band on each. Setting **off**:
-one, on the main display. Drag a file to the notch/top edge of the secondary
-display and confirm it catches. Then `⌘`-drag the menu bar between displays
-(fires `didChangeScreenParametersNotification` → `rebuildPanels`) and re-check.
-
-**Watch out — two more failure modes with the same symptom.**
-- `panels` is keyed by `perchIdentifier`; two mirrored displays can report the
-  same `NSScreenNumber`, and a duplicate key silently drops a panel.
-- With the setting **off**, `rebuildPanels` uses `NSScreen.main`
-  (`ShelfWindowSystem.swift:85-91`) — which is the **key-window** screen, not
-  the zero-origin one. So the single-panel case is misplaced by the same
-  double-offset whenever focus is on a secondary display.
-
----
+- **A1 (#1)** — the hover trigger no longer trusts *which* tracking area fired.
+  `ShelfHostingView` hit-tests the pointer against `ShelfHoverRegion`, and
+  `ShelfHoverGate` turns those samples into edges: opening is edge-triggered on
+  the hit test, while `mouseExited` is always forwarded, because it is the only
+  signal that the pointer left the panel and `scheduleCollapse` is the only
+  passive way back to a collapsed shelf. The wide drag-catch band is untouched.
+  Covered by `ShelfHoverRegionTests`, which needs no window server — the reason
+  #55 and #78 could only be judged by sweeping a real menu bar.
+- **A2 (#13)** — the panel is created with `screen: nil`; `ShelfGeometry`'s
+  frames were already global, so passing the screen applied its origin twice.
+  Also: the single-panel case now uses the zero-origin display rather than
+  `NSScreen.main` (the *key window's* screen), and a duplicate
+  `perchIdentifier` from mirrored displays is skipped instead of silently
+  displacing a live panel. Covered by
+  `ScreenGeometryTests.testSecondaryDisplayFramesAreGlobalNotScreenRelative`.
 
 ## Run B — Shelf list rendering (`Perch/UI/`)
 

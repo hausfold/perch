@@ -63,6 +63,40 @@ final class ScreenGeometryTests: XCTestCase {
         XCTAssertEqual(geometry.collapsedFrame.maxY, screen.frame.maxY)
     }
 
+    /// #13, characterization: the frames a secondary display's panel is built
+    /// from are in *global* coordinates, not relative to that screen's origin.
+    /// That is the premise `screen: nil` at the `NSPanel` initializer in
+    /// `ShelfPanelController` rests on — passing the screen too applies this
+    /// origin a second time. This pins the premise, not the initializer
+    /// argument: nothing here fails if someone puts `screen: screen` back.
+    func testSecondaryDisplayFramesAreGlobalNotScreenRelative() {
+        let origin = CGPoint(x: 1512, y: 240)
+        let screen = ScreenDescriptor(
+            frame: CGRect(origin: origin, size: CGSize(width: 1920, height: 1080)),
+            visibleFrame: CGRect(x: origin.x, y: origin.y, width: 1920, height: 1055),
+            safeAreaTop: 0,
+            auxiliaryTopLeftArea: nil,
+            auxiliaryTopRightArea: nil
+        )
+
+        let geometry = ShelfGeometry(screen: screen)
+
+        for frame in [geometry.collapsedFrame, geometry.expandedFrame] {
+            XCTAssertGreaterThanOrEqual(frame.minX, screen.frame.minX)
+            XCTAssertLessThanOrEqual(frame.maxX, screen.frame.maxX)
+            XCTAssertGreaterThan(frame.minY, screen.frame.minY)
+            XCTAssertEqual(frame.midX, screen.frame.midX)
+        }
+        XCTAssertEqual(geometry.collapsedFrame.maxY, screen.frame.maxY)
+        // The tell: a screen-relative reading of the same rect would be far off
+        // this display entirely.
+        XCTAssertFalse(
+            screen.frame.contains(
+                geometry.collapsedFrame.offsetBy(dx: origin.x, dy: origin.y)
+            )
+        )
+    }
+
     func testExpandedShelfStaysInsideNarrowDisplay() {
         let screen = ScreenDescriptor(
             frame: CGRect(x: 0, y: 0, width: 380, height: 600),

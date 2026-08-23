@@ -31,12 +31,21 @@ final class ShelfPanelController: NSObject {
             expandedContentWidth: geometry.expandedContentWidth,
             topEdgeDepth: geometry.topEdgeDepth
         )
+        // `screen: nil`, deliberately. `ShelfGeometry` computes its frames in
+        // *global* screen coordinates (as does the `expandedFrame.contains(
+        // NSEvent.mouseLocation)` check in `scheduleCollapse`), and the
+        // `screen:` parameter documents `contentRect` as relative to that
+        // screen's lower-left corner — so passing both applies the screen
+        // origin twice. On the zero-origin display the error is nil and it
+        // looks fine; on any secondary display the panel lands one screen
+        // origin away, which is why "show on every display" produced no
+        // reachable drop target there (#13).
         panel = ShelfPanel(
             contentRect: geometry.collapsedFrame,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false,
-            screen: screen
+            screen: nil
         )
         super.init()
 
@@ -323,31 +332,59 @@ final class ShelfHostingView<Content: View>: NSHostingView<Content> {
     }
 
     /// Centered sub-rect of `bounds` used for hover-to-expand. See
-    /// `hoverTriggerWidth`.
+    /// `hoverTriggerWidth` and `ShelfHoverRegion`.
     private var hoverRect: NSRect {
-        var rect = bounds
-        if let hoverTriggerWidth, hoverTriggerWidth < rect.width {
-            rect = rect.insetBy(dx: (rect.width - hoverTriggerWidth) / 2, dy: 0)
+        ShelfHoverRegion.rect(
+            in: bounds,
+            width: hoverTriggerWidth,
+            height: hoverTriggerHeight,
+            isFlipped: isFlipped
+        )
+    }
+
+    /// Enter/exit edges for the passive-hover trigger. See `ShelfHoverGate`.
+    ///
+    /// The trigger cannot key off which tracking area fired: `NSHostingView`
+    /// installs its own full-bounds area (options `mouseEnteredAndExited |
+    /// mouseMoved | activeAlways | inVisibleRect`) with *this* view as owner as
+    /// soon as the SwiftUI tree uses `.onHover`, so these overrides run for the
+    /// entire wide drag-catch band as well as for the narrow band installed
+    /// above. That is why narrowing `hoverTriggerWidth` twice (#55, #78)
+    /// changed nothing: the geometry was already right and the trigger was not
+    /// reading it. Hit-test the pointer instead.
+    private var hoverGate = ShelfHoverGate()
+
+    private func reportHover(_ signal: ShelfHoverGate.Signal, for event: NSEvent) {
+        let inside = hoverRect.contains(convert(event.locationInWindow, from: nil))
+        switch hoverGate.update(signal, isInBand: inside) {
+        case .entered: onPointerEntered?()
+        case .exited: onPointerExited?()
+        case .none: break
         }
-        if let hoverTriggerHeight, hoverTriggerHeight < rect.height {
-            // Anchored to the top edge of the panel (the notch), not centered:
-            // the slack in the collapsed frame is all below the housing.
-            rect = NSRect(
-                x: rect.minX,
-                y: isFlipped ? rect.minY : rect.maxY - hoverTriggerHeight,
-                width: rect.width,
-                height: hoverTriggerHeight
-            )
-        }
-        return rect
     }
 
     override func mouseEntered(with event: NSEvent) {
-        onPointerEntered?()
+        reportHover(.sample, for: event)
     }
 
     override func mouseExited(with event: NSEvent) {
-        onPointerExited?()
+        // Always forwarded, never edge-gated: this is the only signal that the
+        // pointer left the panel, and `scheduleCollapse` is the only passive
+        // path back to a collapsed shelf. Gating it on "was in the band" leaves
+        // a shelf the user hovered open, then moved down into, expanded
+        // forever. The collapse it schedules re-checks the live pointer
+        // location, so an exit reported early is harmless.
+        reportHover(.left, for: event)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        // Crossing from the wide band into the narrow one does fire our own
+        // area's `mouseEntered`, but a fast sweep can land the first event a
+        // point or two outside it. Moves keep the gate honest whenever the
+        // hosting view's own `mouseMoved` area exists; without it, enter/exit
+        // alone are already exact, because then ours is the only area.
+        reportHover(.sample, for: event)
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
