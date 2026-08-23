@@ -131,9 +131,9 @@ them are copied onto the shelf by `FolderWatchCenter` /
 rescan; a candidate must pass name rules (no hidden files, no in-progress
 browser suffixes), be a regular file, and hold its size still across two
 probes before it is handed to the same `ShelfStore.importFileURLs` path a drop
-uses. A per-folder ledger of hashed inode+birth identities — never a name or a
-path — decides what is new, is seeded with the folder's existing contents on
-add, and catches up at launch on arrivals perch missed. Copy only, always: the
+uses. A per-folder ledger of hashed inode + birth + size + mtime identities —
+never a name or a path — decides what is new, is seeded with the folder's
+existing contents on add, and catches up at launch on arrivals perch missed. Copy only, always: the
 original never leaves the folder, so retention expiry deletes perch's copy and
 nothing of the user's.
 
@@ -280,14 +280,20 @@ A watcher sees files before they are whole — Chrome's `.crdownload`, Safari's
 over a truncated copy. So a watched arrival is imported only after it passes
 name rules, is a regular file, and holds size and modification date still
 across consecutive probes; a file that never settles is probed cheaply forever
-and imported never. Directory kqueues do not report writes to a file's
-contents, which is fine: entry changes trigger the rescan, and the probe owns
-the question of doneness. What counts as *new* is a per-folder ledger of
-SHA-256(inode + birth date) tokens, so renaming or editing a shelved file in
-place never re-imports it, and nothing about a source's name or path is
-persisted or logged. Marking is at-most-once, when the file is handed to
-import — a failed staging shows its error once rather than retrying on every
-event.
+and imported never. What counts as *new* is a per-folder ledger of
+SHA-256(inode + birth date + size + mtime) tokens, so renaming a shelved file
+never re-imports it while **replacing its contents does** — a rewritten file is
+a new arrival wearing the old one's name, which is what `curl -o` over an
+existing download is. Nothing about a source's name or path is persisted or
+logged. The tokens carry a format tag, and a ledger written by an older perch is
+adopted wholesale on the next launch rather than compared and found empty, which
+would re-import the entire folder; that one launch does no catch-up.
+
+Marking is on **success**, not on hand-off: a failed staging takes its token
+back out, so the next directory event tries again rather than the file being
+invisible forever. Directory kqueues do not report writes to a file's contents,
+so a rewrite in place produces no event until something else changes in the
+folder — the open half of #6, in `docs/field-test-2026-08-22.md`.
 
 ### Name collisions
 

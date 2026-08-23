@@ -30,12 +30,12 @@ is provably the only thing going wrong.
 | 10 | Open/close animation janks at ~250 items (scrolling is fine) | UI | Confirmed cause | **B** |
 | 9 | 50 folders dropped into Finder land in a diagonal line | UI | **Open** — first theory disproved | **B** |
 | ~~7~~ | ~~Rename a staged file in Finder → tile can never be dragged out, and vanishes~~ | Store | **Fixed** — re-resolve; decision in `ARCHITECTURE.md` | ~~**C**~~ |
-| 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | Leading hypothesis + 1 confirmed adjacent bug | **D** |
+| 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | **Half fixed** — dedupe gone; a directory kqueue never sees the rewrite | **D** |
 | 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | Unresolved by reading | **D** |
 | 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | Two candidates | **E** |
 | 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | Needs a clean-machine check first | **F** |
 | 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | Probably an obsolete claim | **F** |
-| 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Regression** — #82's fix didn't hold | **G** |
+| 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Open** — Keychain exonerated by measurement; look at the UI | **G** |
 | 3 | 3 GB file "lands immediately" instead of showing progress | — | **Not a bug** — bad expectation | — |
 | 11 | Phone Wi-Fi off, Mac still receives | — | **Not a bug** — bad expectation | — |
 
@@ -210,75 +210,56 @@ bytes belong to whatever took an earlier drop.
 
 ## Run D — Watched folders (`Perch/Importing/`)
 
-### D1 · A failed import is ledgered anyway, so it never retries (confirmed, fix regardless)
+### ~~D1 · A failed import is ledgered anyway, so it never retries~~ — **fixed**
 
-`FolderWatcher.promote` (`Perch/Importing/FolderWatcher.swift:223`) inserts the
-identity token into the ledger and *then* calls `onImport`;
-`FolderWatchCenter.attachWatcher`'s `onImport` closure calls
-`folderStore.markImported(token, …)` **before** `shelf.importFileURLs([fileURL])`
-and never learns whether staging succeeded. One transient failure and that file
-is permanently invisible to the watcher. Ledger on success, not on attempt.
+`ShelfStore.importFileURLs` now takes a per-URL completion, and
+`FolderWatchCenter` ledgers on success instead of on attempt; a failure calls
+`FolderWatcher.forgetImport(_:)`, which takes the token back out so the next
+directory event probes the file again — *the next event*, which inherits D2's
+open half below: nothing re-probes on its own. It also self-heals at relaunch,
+since the persisted ledger never got the token. The token still goes into the *in-memory*
+ledger at promote time, so a second event can't start a second import mid-flight.
+`testAFailedImportIsRetriedOnTheNextEvent`.
 
-### D2 · `curl -o` arrivals never land (#6)
+### D2 · `curl -o` arrivals never land (#6) — **half fixed, and the other half is bigger than the hypothesis**
 
-**Symptom.** `curl -o ~/Downloads/slow.bin …` — nothing appears mid-write
-(correct) and nothing appears when it finishes (wrong). Repeated with and
-without `--limit-rate`. A browser download to the same folder lands fine, so
-the watcher itself is alive.
+The dedupe half was exactly as diagnosed and is fixed: `identityToken` now hashes
+**size and modification date** alongside inode and birth date, so truncating and
+rewriting a path is a new arrival rather than a match against the first download
+forever. A pure rename still does not re-import (`testARenameStillDoesNotReimport`),
+which is the property the token exists for. Tokens carry a `v2:` format tag, and a
+ledger in an older format is *adopted* on the next launch rather than pruned to
+nothing — without that, upgrading would have re-imported everything in
+`~/Downloads` at once. The product decision (replaced contents = new arrival) is
+in `docs/reference.md`.
 
-**Leading hypothesis (medium-high confidence).**
-`FolderWatchRules.identityToken` (`FolderWatcher.swift:21`) hashes **inode +
-birth date**, deliberately, so a rename or edit-in-place does not re-import.
-`curl -o` on an existing path *truncates and rewrites* — same inode, same birth
-date, same token. Once `slow.bin` has been ledgered once, **every later
-`curl -o ~/Downloads/slow.bin` is deduped forever**, which is precisely the
-"even this one shows nothing" report. A browser avoids it by writing
-`…​.crdownload` and renaming to a fresh name each time.
+**But that alone does not make `curl -o` land, and this is the real finding of
+Run D.** A directory kqueue fires on entries appearing, disappearing and being
+renamed. It does **not** fire when something writes into a file that is already
+in the directory — which is precisely what `curl -o` does to an existing path
+(`O_TRUNC`, same inode, same entry). So no event arrives, `scan()` never runs,
+and the fixed token never gets a chance to differ. `FolderWatcher`'s own class
+comment states this kqueue property; what nobody had joined up is that it makes
+in-place rewrites invisible end to end. `testARewrittenFileIsNoLongerDedupedAgainstItsOwnEarlierContents`
+has to create a second file purely to fire an event, and says so.
 
-Combined with D1, one silently-failed first import would also produce
-"never again" with no successful import having ever happened.
+**What is left, and it is a design call, not a patch.** Something has to notice a
+write into an existing file:
+- **FSEvents instead of a directory kqueue.** Reports `ItemModified` per path,
+  coalesced and cheap, and its stored event ID replays what happened while the
+  app was not running — which is #8 (D3) as well. This is the one to pick if
+  either bug matters; it is a rewrite of `FolderWatcher`'s event source, not of
+  its probe or its ledger.
+- **A low-frequency rescan tick.** Ten lines, no design change, and it burns a
+  `contentsOfDirectory` plus a `stat` per file forever, on battery.
 
-**Diagnose first, in this order.**
-1. `rm ~/Downloads/slow.bin` then curl to that name → does it land? (isolates
-   inode reuse from everything else)
-2. `curl -o ~/Downloads/$(uuidgen).bin …` → does it land? (same)
-3. `log stream --predicate 'subsystem == "com.hausfold.perch"'` while curling —
-   `Shelf`/`WatchedFolders` categories.
+### D3 · No catch-up on relaunch (#8) — **untouched, and probably the same door**
 
-If (1)/(2) land, the bug is the dedupe rule, not the watcher.
-
-**Fix sketch (if confirmed).** The token must change when the *content* is
-replaced. Add the size and modification date to the hashed identity, or store
-the last-seen `(size, mtime)` beside the token and treat a change as a new
-arrival. Keep the property the token exists for: a pure rename, and an
-edit-in-place that the shelf already holds, must still not re-import. Extend
-`FolderWatchingTests` with a truncate-and-rewrite case.
-
-### D3 · No catch-up on relaunch (#8)
-
-**Symptom.** Quit Perch → drop a file into `~/Downloads` → relaunch → the file
-never lands.
-
-**Reading did not explain this.** The catch-up path exists and looks right:
-`AppRuntime.start()` → `FolderWatchCenter.start()` → `startWatching(seedExisting:
-false)` → `FolderWatcher.initialScan` (`FolderWatcher.swift:153`) prunes the
-ledger to what is present and then calls `scan()`, which probes and promotes any
-unledgered file after ~0.5 s. **Instrument before changing anything.**
-
-Things to rule out, cheapest first:
-- Was the file's token already in the ledger? (moving a file *into* `~/Downloads`
-  preserves inode + birth date — the same D2 mechanism, from a different angle)
-- Does `startWatching`'s detached bookmark resolve at all on a cold launch?
-  `attachWatcher` bails silently on a stale bookmark → `markUnavailable`, and
-  the only trace is a log line. Check Settings ▸ Watched Folders for an orange
-  (unavailable) row after relaunch.
-- Is the kqueue racing app launch — does the file land if you *touch* it after
-  the app is up?
-
-Fix D1 and D2 first; re-test D3 afterwards. There is a fair chance it is the
-same root cause seen from the other end.
-
----
+Not reproduced; nothing changed here. Note that FSEvents' historical replay would
+address it directly, and that the launch path (`initialScan` → prune → `scan`) is
+covered by `testLaunchScanPrunesGoneFilesAndCatchesUpOnUnledgeredOnes` and does
+work in a test, so the suspicion falls on the bookmark resolving or the kqueue
+arming rather than on the scan.
 
 ## Run E — Non-downloaded iCloud file sticks on "Downloading" (#2)
 
@@ -372,58 +353,53 @@ Quick Actions shows it once, Services shows it once, and both land 3 tiles with
 ## Run G — Settings ▸ Devices says "No devices paired" while the phone works (#12)
 
 **Symptom.** Phone and Mac are paired and delivering. Settings ▸ Devices shows
-"No devices paired yet." Revoke is therefore unreachable, so the revoke test could not be run at all.
+"No devices paired yet." Revoke is therefore unreachable, so the revoke test
+could not be run at all.
 
-**History — this was "fixed" one day ago and the fix did not work.**
-`3b40264` (#82) diagnosed `all()` as `errSecParam` (-50) from asking the
-file-based Keychain for `kSecMatchLimitAll` **together with** `kSecReturnData`,
-and split it into the two-step read that is in the tree now. That PR shipped
-**unbuilt and unrun** by its own admission, and its verify step 1 was "pair a
-phone, it should appear in Settings". This field test *is* that step, and it
-failed. So the two-step workaround either did not address the real cause or
-introduced a second one — treat the `errSecParam` explanation as **disproved
-until the log says otherwise**, exactly like #1's #55/#78.
+**Still open — but the Keychain theory is now disproved by measurement, not by
+reading.** Both #82's fix *and* the migration that was going to replace it are
+off the table. `PairedDeviceStore` was instrumented and put under test in a
+signed, sandboxed Perch host (`xcodebuild test` *without*
+`CODE_SIGNING_ALLOWED=NO`, which is what makes the app sandboxed and entitled
+the way the shipped one is). What that host actually returns:
 
-**Fault localised; the cause itself is still open.** Two different Keychain
-reads back the two behaviours:
-- Delivery uses `PairedDeviceStore.peer(for:)` — a single-account lookup with
-  `kSecReturnData`. It works, which proves the item is in the Keychain.
-- The list uses `PairedDeviceStore.all()`
-  (`Perch/Mobile/PairedDeviceStore.swift:22`) — `kSecMatchLimitAll` +
-  `kSecReturnAttributes` against the **file-based** Keychain, then a second
-  read per account. That enumeration is returning nothing.
+| call | status |
+|---|---|
+| `SecItemAdd` | `0` |
+| single-account read (delivery's path) | `0` |
+| `kSecMatchLimitAll` + `kSecReturnAttributes` (step one of `all()`) | `0`, **1 row** |
+| the same plus `kSecReturnData` | `-50` — #82's `errSecParam`, confirmed |
+| anything with `kSecUseDataProtectionKeychain` | `-34018` |
 
-`all()` already logs on failure. Get the status code first:
+So **the enumeration works**, #82's two-step read is correct and is not a hack
+to be tidied away, and #12 is *not* a Keychain-listing bug. `all()` now logs its
+row count on success as well as its status on failure, which is what the next
+pairing needs to say which of the three outcomes it is. The full round trip —
+store, read, list, revoke, re-pair — is covered by `PairedDeviceStoreTests`,
+which passes both signed and unsigned.
+
+**Where to look next**, now that the store is exonerated: `MobileReceiver`'s
+`@Published pairedDevices` is the only other thing between the Keychain and the
+label. It is refreshed in exactly three places (`init`, `finishPairing`,
+`revoke`), so the question is whether the instance Settings renders is the
+instance that paired, and whether `finishPairing` ran at all for the pairing in
+the room. Reproducing needs the phone and the installed Developer-ID build:
 
 ```sh
 log stream --predicate 'subsystem == "com.hausfold.perch" && category == "PairedDevices"'
 ```
 
-Three outcomes, three different bugs:
-- `Keychain list failed: <status>` → the enumeration is still refused, and the
-  status is not what #82 assumed. If it is `-50` again, the two-step read did
-  not change anything that mattered.
-- `Keychain list skipped N unreadable device(s)` → step one works and the
-  per-account `peer(for:)` read is what dies. #82 added that line for exactly
-  this case; it is the most informative outcome.
-- **Silence with an empty list** → the enumeration succeeds and genuinely
-  returns zero rows, meaning the item `peer(for:)` finds is not visible to a
-  `kSecMatchLimitAll` query at all — an access-group or
-  `kSecAttrSynchronizable` mismatch, not a limit-all problem.
+Pair, and read the count line. `Keychain list: 1 paired device(s)` with an empty
+Settings list moves this to the UI; `no paired devices` moves it to whether the
+pairing was ever stored.
 
-**Fix sketch.** With the in-place workaround already tried and failed, the
-durable fix is to move every query in this file — add, read,
-list, delete — onto the data-protection Keychain
-(`kSecUseDataProtectionKeychain: true`), which supports `kSecMatchLimitAll`
-together with `kSecReturnData` and collapses the two-step hack in `all()` into
-one query. **See the decision below — this is not a free change.**
-
-**Verify.** Pair a phone → it appears in Settings ▸ Devices immediately (not
-just after relaunch). Relaunch → still listed. Revoke → the phone can no longer
-deliver (currently untestable) and re-pairing from scratch
-works. `WireLoopbackTests` should cover revoke-then-deliver.
-
----
+**Watch out.** Do not "fix" this by moving to the data-protection Keychain. It
+needs a Keychain access group; naming one needs a `keychain-access-groups`
+entitlement, which is provisioning-profile-gated, and perch ships
+Developer-ID-signed with **no** profile — a binary carrying that entitlement
+without one is SIGKILLed at exec (measured). The App Group perch already has is
+not accepted as a substitute (`-34018`). Both facts are pinned by tests, next to
+the code that depends on them.
 
 ## Not bugs — fix the test script instead
 
@@ -456,25 +432,14 @@ feature, and the test was asserting the opposite.
 
 ## Needs a call from Julien
 
-**G · Keychain migration — 4/5.**
-Moving `PairedDeviceStore` to the data-protection Keychain fixes the enumeration
-properly, but every phone paired against the current file-based Keychain
-**stops being recognised** unless the change ships with a read-old/write-new
-migration. The comment at `PairedDeviceStore.swift:16-21` already calls this out.
-
-- **Option A — migrate.** Read from the file-based Keychain, write to the
-  data-protection one, keep the fallback read for one release, then drop it.
-  ~40 extra lines and one migration test.
-- **Option B — patch `all()` in place, again.** Keep the file-based Keychain and
-  fix whatever the logged status turns out to be. Smaller diff, but the two-step
-  enumeration hack stays, and so does the class of bug. **This is what #82 was,
-  one day ago, and it did not hold.**
-
-**Recommendation: A**, with the fallback read — the current listing is already
-lying to the user about a security-relevant fact ("no devices can reach this
-Mac" when one can), and one in-place attempt has already failed. **Reversal cost:** if A ships without the fallback read, every
-existing pairing must be redone by hand on both devices; with the fallback read,
-reverting is a straight revert.
+~~**G · Keychain migration — 4/5.**~~ **Answered: neither option — the question
+was wrong.** Julien chose Option A (migrate, no fallback, re-pair by hand). It
+turns out not to be available: the data-protection Keychain refuses perch
+outright, for a reason no amount of migration code changes. And Option B has
+nothing left to fix — the file-based enumeration was measured working. The
+decision that *did* land is stated where it binds, in the type comment on
+`PairedDeviceStore` and in the two tests that pin it. Run G stays open on the
+`MobileReceiver`/UI side.
 
 ~~**C · Rename semantics — 3/5.**~~ **Answered: (a)**, re-resolve — the staged
 filename is the user's to edit and the shelf follows it. Stated in

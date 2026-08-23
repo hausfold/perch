@@ -111,8 +111,9 @@ final class WatchedFolderStore: ObservableObject {
         persist()
     }
 
-    /// An arrival was handed to import — remembered now, at most once, so a
-    /// staging failure surfaces once instead of retrying on every event.
+    /// An arrival *landed* on the shelf. Called only once staging says so —
+    /// recording the hand-off instead made one transient failure permanent,
+    /// because the ledger then held a file that had never actually arrived.
     func markImported(_ token: String, for id: UUID) {
         guard let index = folders.firstIndex(where: { $0.id == id }) else { return }
         folders[index].importedTokens.insert(token)

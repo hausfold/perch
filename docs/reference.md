@@ -88,7 +88,11 @@ machine `haus.shelf.watchScreenshots` turns it off for you.
 
 What already sits in a folder when you add it stays off the shelf; only what
 arrives afterwards lands, including things that arrived while perch wasn't
-running. Half-written downloads (`.crdownload`, `.part`, `.download`…) wait
+running. **Replacing a file's contents counts as a new arrival** — download or
+save over one twice and you get two tiles, because what is there now is a
+different file wearing the old one's name. Renaming doesn't: the tile you
+already have is that file, whatever it is called now.
+Half-written downloads (`.crdownload`, `.part`, `.download`…) wait
 until they finish and are renamed — that rename is the real completion signal —
 and any other file is imported only after its size has stopped changing for a
 moment, so a normally written file never lands mid-write. (A writer that stalls

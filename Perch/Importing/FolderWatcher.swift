@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import OSLog
 
 /// Which files a watched folder is willing to shelve. Pure, so the rules are
 /// testable without a filesystem.
@@ -15,22 +16,43 @@ enum FolderWatchRules {
         return !inProgressExtensions.contains((name as NSString).pathExtension.lowercased())
     }
 
-    /// A file's identity for the import ledger: inode and birth date, hashed.
-    /// Survives rename and edit-in-place, changes when the file is recreated,
-    /// and never encodes a name or a path.
+    /// Tags the token's recipe. A ledger written by an older perch cannot be
+    /// compared with tokens from a newer one — the hash inputs changed — and a
+    /// ledger that silently fails to match means every file in the folder
+    /// reads as a new arrival. `FolderWatcher.initialScan` looks for this and
+    /// re-seeds instead. Bump it whenever `identityToken`'s inputs change.
+    static let tokenFormat = "v2"
+
+    static func isCurrentFormat(_ token: String) -> Bool {
+        token.hasPrefix("\(tokenFormat):")
+    }
+
+    /// A file's identity for the import ledger: inode, birth date, **size and
+    /// modification date**, hashed. Survives a rename; changes when the file is
+    /// recreated *or rewritten in place*; never encodes a name or a path.
+    ///
+    /// The content half is load-bearing. `curl -o ~/Downloads/x.bin` truncates
+    /// and rewrites an existing path — same inode, same birth date — so an
+    /// identity built from those two alone deduped every later download to that
+    /// name against the first one, forever, and the file never appeared again
+    /// (#6). A browser dodged it only by writing `…​.crdownload` and renaming to
+    /// a fresh name each time. Replaced contents are a new arrival; see
+    /// `docs/reference.md`.
     static func identityToken(forFileAt url: URL) throws -> String {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         let inode = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
         let created = (attributes[.creationDate] as? Date)?.timeIntervalSinceReferenceDate ?? 0
+        let size = (attributes[.size] as? NSNumber)?.int64Value ?? -1
+        let modified = (attributes[.modificationDate] as? Date)?.timeIntervalSinceReferenceDate ?? 0
         // A mount reporting neither inode nor birth date (some network
         // filesystems) would collapse every file into one identity and shelve
         // only the first arrival ever. Fall back to the name — hashed, never
         // stored — and give up rename-stability there instead.
-        let identity = (inode == 0 && created == 0)
+        let origin = (inode == 0 && created == 0)
             ? "name:\(url.lastPathComponent)"
             : "\(inode):\(created)"
-        let digest = SHA256.hash(data: Data(identity.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
+        let digest = SHA256.hash(data: Data("\(origin):\(size):\(modified)".utf8))
+        return "\(tokenFormat):" + digest.map { String(format: "%02x", $0) }.joined()
     }
 }
 
@@ -57,6 +79,7 @@ final class FolderWatcher: @unchecked Sendable {
     private let onLedgerReplaced: @Sendable (Set<String>) -> Void
     /// The folder could not be opened for watching. Called on the watcher queue.
     private let onUnavailable: @Sendable () -> Void
+    private let logger = Logger(subsystem: "com.hausfold.perch", category: "WatchedFolders")
 
     private let queue: DispatchQueue
     private var source: DispatchSourceFileSystemObject?
@@ -158,6 +181,22 @@ final class FolderWatcher: @unchecked Sendable {
             onLedgerReplaced(ledger)
             return
         }
+        // A ledger from an older token format matches nothing in `current`, so
+        // pruning would empty it and the scan below would import the folder's
+        // entire contents at once. Adopt what is there instead — the same thing
+        // adding the folder does. Costs one launch's catch-up, once ever, and
+        // only for a folder that was already being watched across the upgrade.
+        if !ledger.isEmpty, ledger.contains(where: { !FolderWatchRules.isCurrentFormat($0) }) {
+            // Says why a launch did no catch-up, once ever, per folder. A
+            // count only — the folder's path lives in its bookmark and nowhere
+            // else, least of all in a log.
+            logger.info(
+                "Watched folder ledger upgraded; adopted \(current.count, privacy: .public) existing file(s) instead of importing them"
+            )
+            ledger = current
+            onLedgerReplaced(ledger)
+            return
+        }
         // A token whose file is gone can never fire again; dropping it keeps
         // the ledger bounded by what the folder actually holds.
         let surviving = ledger.intersection(current)
@@ -228,8 +267,25 @@ final class FolderWatcher: @unchecked Sendable {
         else {
             return
         }
+        // Held in memory from here so a second event for the same file cannot
+        // start a second import while this one is in flight. It reaches the
+        // *persisted* ledger only once staging says it landed — see
+        // `forgetImport`.
         ledger.insert(token)
         onImport(url, token)
+    }
+
+    /// Staging refused or failed this arrival: take the token back out, so the
+    /// next directory event probes and imports the file again.
+    ///
+    /// Without this a single transient failure — a volume that blinked, a
+    /// staging error — made that file permanently invisible to the watcher,
+    /// because the ledger recorded the *attempt*.
+    func forgetImport(_ token: String) {
+        queue.async { [self] in
+            guard !stopped else { return }
+            ledger.remove(token)
+        }
     }
 
     private func regularFiles() -> [URL] {
