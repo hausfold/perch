@@ -35,7 +35,7 @@ is provably the only thing going wrong.
 | 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | Two candidates | **E** |
 | 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | Needs a clean-machine check first | **F** |
 | 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | Probably an obsolete claim | **F** |
-| 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Regression** — #82's fix didn't hold | **G** |
+| 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Open** — Keychain exonerated by measurement; look at the UI | **G** |
 | 3 | 3 GB file "lands immediately" instead of showing progress | — | **Not a bug** — bad expectation | — |
 | 11 | Phone Wi-Fi off, Mac still receives | — | **Not a bug** — bad expectation | — |
 
@@ -372,58 +372,53 @@ Quick Actions shows it once, Services shows it once, and both land 3 tiles with
 ## Run G — Settings ▸ Devices says "No devices paired" while the phone works (#12)
 
 **Symptom.** Phone and Mac are paired and delivering. Settings ▸ Devices shows
-"No devices paired yet." Revoke is therefore unreachable, so the revoke test could not be run at all.
+"No devices paired yet." Revoke is therefore unreachable, so the revoke test
+could not be run at all.
 
-**History — this was "fixed" one day ago and the fix did not work.**
-`3b40264` (#82) diagnosed `all()` as `errSecParam` (-50) from asking the
-file-based Keychain for `kSecMatchLimitAll` **together with** `kSecReturnData`,
-and split it into the two-step read that is in the tree now. That PR shipped
-**unbuilt and unrun** by its own admission, and its verify step 1 was "pair a
-phone, it should appear in Settings". This field test *is* that step, and it
-failed. So the two-step workaround either did not address the real cause or
-introduced a second one — treat the `errSecParam` explanation as **disproved
-until the log says otherwise**, exactly like #1's #55/#78.
+**Still open — but the Keychain theory is now disproved by measurement, not by
+reading.** Both #82's fix *and* the migration that was going to replace it are
+off the table. `PairedDeviceStore` was instrumented and put under test in a
+signed, sandboxed Perch host (`xcodebuild test` *without*
+`CODE_SIGNING_ALLOWED=NO`, which is what makes the app sandboxed and entitled
+the way the shipped one is). What that host actually returns:
 
-**Fault localised; the cause itself is still open.** Two different Keychain
-reads back the two behaviours:
-- Delivery uses `PairedDeviceStore.peer(for:)` — a single-account lookup with
-  `kSecReturnData`. It works, which proves the item is in the Keychain.
-- The list uses `PairedDeviceStore.all()`
-  (`Perch/Mobile/PairedDeviceStore.swift:22`) — `kSecMatchLimitAll` +
-  `kSecReturnAttributes` against the **file-based** Keychain, then a second
-  read per account. That enumeration is returning nothing.
+| call | status |
+|---|---|
+| `SecItemAdd` | `0` |
+| single-account read (delivery's path) | `0` |
+| `kSecMatchLimitAll` + `kSecReturnAttributes` (step one of `all()`) | `0`, **1 row** |
+| the same plus `kSecReturnData` | `-50` — #82's `errSecParam`, confirmed |
+| anything with `kSecUseDataProtectionKeychain` | `-34018` |
 
-`all()` already logs on failure. Get the status code first:
+So **the enumeration works**, #82's two-step read is correct and is not a hack
+to be tidied away, and #12 is *not* a Keychain-listing bug. `all()` now logs its
+row count on success as well as its status on failure, which is what the next
+pairing needs to say which of the three outcomes it is. The full round trip —
+store, read, list, revoke, re-pair — is covered by `PairedDeviceStoreTests`,
+which passes both signed and unsigned.
+
+**Where to look next**, now that the store is exonerated: `MobileReceiver`'s
+`@Published pairedDevices` is the only other thing between the Keychain and the
+label. It is refreshed in exactly three places (`init`, `finishPairing`,
+`revoke`), so the question is whether the instance Settings renders is the
+instance that paired, and whether `finishPairing` ran at all for the pairing in
+the room. Reproducing needs the phone and the installed Developer-ID build:
 
 ```sh
 log stream --predicate 'subsystem == "com.hausfold.perch" && category == "PairedDevices"'
 ```
 
-Three outcomes, three different bugs:
-- `Keychain list failed: <status>` → the enumeration is still refused, and the
-  status is not what #82 assumed. If it is `-50` again, the two-step read did
-  not change anything that mattered.
-- `Keychain list skipped N unreadable device(s)` → step one works and the
-  per-account `peer(for:)` read is what dies. #82 added that line for exactly
-  this case; it is the most informative outcome.
-- **Silence with an empty list** → the enumeration succeeds and genuinely
-  returns zero rows, meaning the item `peer(for:)` finds is not visible to a
-  `kSecMatchLimitAll` query at all — an access-group or
-  `kSecAttrSynchronizable` mismatch, not a limit-all problem.
+Pair, and read the count line. `Keychain list: 1 paired device(s)` with an empty
+Settings list moves this to the UI; `no paired devices` moves it to whether the
+pairing was ever stored.
 
-**Fix sketch.** With the in-place workaround already tried and failed, the
-durable fix is to move every query in this file — add, read,
-list, delete — onto the data-protection Keychain
-(`kSecUseDataProtectionKeychain: true`), which supports `kSecMatchLimitAll`
-together with `kSecReturnData` and collapses the two-step hack in `all()` into
-one query. **See the decision below — this is not a free change.**
-
-**Verify.** Pair a phone → it appears in Settings ▸ Devices immediately (not
-just after relaunch). Relaunch → still listed. Revoke → the phone can no longer
-deliver (currently untestable) and re-pairing from scratch
-works. `WireLoopbackTests` should cover revoke-then-deliver.
-
----
+**Watch out.** Do not "fix" this by moving to the data-protection Keychain. It
+needs a Keychain access group; naming one needs a `keychain-access-groups`
+entitlement, which is provisioning-profile-gated, and perch ships
+Developer-ID-signed with **no** profile — a binary carrying that entitlement
+without one is SIGKILLed at exec (measured). The App Group perch already has is
+not accepted as a substitute (`-34018`). Both facts are pinned by tests, next to
+the code that depends on them.
 
 ## Not bugs — fix the test script instead
 
@@ -456,25 +451,14 @@ feature, and the test was asserting the opposite.
 
 ## Needs a call from Julien
 
-**G · Keychain migration — 4/5.**
-Moving `PairedDeviceStore` to the data-protection Keychain fixes the enumeration
-properly, but every phone paired against the current file-based Keychain
-**stops being recognised** unless the change ships with a read-old/write-new
-migration. The comment at `PairedDeviceStore.swift:16-21` already calls this out.
-
-- **Option A — migrate.** Read from the file-based Keychain, write to the
-  data-protection one, keep the fallback read for one release, then drop it.
-  ~40 extra lines and one migration test.
-- **Option B — patch `all()` in place, again.** Keep the file-based Keychain and
-  fix whatever the logged status turns out to be. Smaller diff, but the two-step
-  enumeration hack stays, and so does the class of bug. **This is what #82 was,
-  one day ago, and it did not hold.**
-
-**Recommendation: A**, with the fallback read — the current listing is already
-lying to the user about a security-relevant fact ("no devices can reach this
-Mac" when one can), and one in-place attempt has already failed. **Reversal cost:** if A ships without the fallback read, every
-existing pairing must be redone by hand on both devices; with the fallback read,
-reverting is a straight revert.
+~~**G · Keychain migration — 4/5.**~~ **Answered: neither option — the question
+was wrong.** Julien chose Option A (migrate, no fallback, re-pair by hand). It
+turns out not to be available: the data-protection Keychain refuses perch
+outright, for a reason no amount of migration code changes. And Option B has
+nothing left to fix — the file-based enumeration was measured working. The
+decision that *did* land is stated where it binds, in the type comment on
+`PairedDeviceStore` and in the two tests that pin it. Run G stays open on the
+`MobileReceiver`/UI side.
 
 ~~**C · Rename semantics — 3/5.**~~ **Answered: (a)**, re-resolve — the staged
 filename is the user's to edit and the shelf follows it. Stated in
