@@ -253,6 +253,23 @@ purely to fire a directory event, and now nothing else in the folder changes.
 `curl -o ~/Downloads/slow.bin` twice over the same path with `~/Downloads` watched
 and confirm two tiles.
 
+**What this makes visible, and it is a probe question, not an event-source one.**
+The probe promotes a file whose size and mtime hold still for `probeInterval ×
+requiredStableProbes` ≈ 1 s. A single download that stalls longer than that and
+then resumes was *already* being shelved early and truncated — the probe has
+always been a net under the naming convention, not a proof of doneness. What the
+kqueue did was hide the second half: no event for the resumed write, so the
+truncated copy was the only thing you ever got and the finished file never landed.
+FSEvents sees the resume, so you now get the truncated tile **and** the complete
+one. Measured, not theorised: a 1000 B file promoted during a stall, then grown to
+6000 B, lands as `["stall.bin", "stall.bin"]` at sizes `[1000, 6000]`.
+
+Strictly more of the right bytes than before, and one extra tile to clear. Noted
+in `docs/reference.md`. The lever, if the tile bothers more than the truncation
+did, is `requiredStableProbes` — raising it widens the quiet window a stall has to
+beat, at the cost of delaying every ordinary arrival by the same amount. Left
+alone here on purpose: this run changed the event source and nothing else.
+
 ### D3 · No catch-up on relaunch (#8) — **addressed, still unreproduced**
 
 Never reproduced, and nothing here claims it is closed. What changed is that the

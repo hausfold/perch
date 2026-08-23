@@ -28,6 +28,13 @@ final class FolderWatchCenter: ObservableObject {
     /// persisted trace of a folder. Dropped on `removeFolder`, so a folder the
     /// person took out is genuinely gone.
     private var lastKnownPaths: [UUID: String] = [:]
+    /// Which incarnation of each folder's watcher is the current one. A
+    /// watcher that has been stopped and replaced — a bookmark that stopped
+    /// resolving and came back — can still have a stream position in flight
+    /// to the main actor, and "some watcher is installed" does not prove it
+    /// is *this* one. Letting a stale report through would rewind the
+    /// persisted position under its successor.
+    private var watcherGenerations: [UUID: UUID] = [:]
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "WatchedFolders")
 
     init(shelf: ShelfStore, folders: WatchedFolderStore) {
@@ -47,6 +54,7 @@ final class FolderWatchCenter: ObservableObject {
             watcher.stop()
         }
         watchers.removeAll()
+        watcherGenerations.removeAll()
     }
 
     /// The id of the folder now being watched — the existing one when this is
@@ -106,6 +114,7 @@ final class FolderWatchCenter: ObservableObject {
     func removeFolder(_ id: UUID) {
         watchers[id]?.stop()
         watchers[id] = nil
+        watcherGenerations[id] = nil
         resolvedPaths[id] = nil
         lastKnownPaths[id] = nil
         folderStore.remove(id)
@@ -164,6 +173,7 @@ final class FolderWatchCenter: ObservableObject {
         if let refreshedBookmark {
             folderStore.updateBookmark(folderID, to: refreshedBookmark)
         }
+        let generation = UUID()
         let watcher = FolderWatcher(
             folderID: folderID,
             folderURL: url,
@@ -194,10 +204,7 @@ final class FolderWatchCenter: ObservableObject {
             },
             onEventID: { [weak self] eventID in
                 Task { @MainActor in
-                    // Only while this watcher is still the folder's watcher:
-                    // a stopped one must not push its last position over a
-                    // successor's, which would rewind the replay window.
-                    guard let self, self.watchers[folderID] != nil else { return }
+                    guard let self, self.watcherGenerations[folderID] == generation else { return }
                     self.folderStore.setLastEventID(eventID, for: folderID)
                 }
             },
@@ -209,6 +216,7 @@ final class FolderWatchCenter: ObservableObject {
             }
         )
         watchers[folderID] = watcher
+        watcherGenerations[folderID] = generation
         let canonical = url.standardizedFileURL.resolvingSymlinksInPath().path
         resolvedPaths[folderID] = canonical
         lastKnownPaths[folderID] = canonical
@@ -219,6 +227,7 @@ final class FolderWatchCenter: ObservableObject {
     private func markUnavailable(_ id: UUID) {
         watchers[id]?.stop()
         watchers[id] = nil
+        watcherGenerations[id] = nil
         resolvedPaths[id] = nil
         refreshRows()
     }

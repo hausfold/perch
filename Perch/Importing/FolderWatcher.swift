@@ -75,6 +75,12 @@ enum FolderWatchRules {
 /// Only the event source changed. The probe, the ledger, `forgetImport` and
 /// the `v2` re-seed are the same, and every event still answers with a full
 /// `scan()` — which is what makes a dropped or coalesced batch harmless.
+///
+/// **A watcher must be `stop()`ped.** A C callback cannot hold a weak
+/// reference, so the stream's context retains the watcher and `stop()`'s
+/// release is what lets it go. One that is simply dropped leaks itself, a
+/// live stream still scanning and importing, and one kernel security-scope
+/// grant. `FolderWatchCenter` stops every watcher it drops.
 final class FolderWatcher: @unchecked Sendable {
     let folderID: UUID
 
@@ -86,6 +92,14 @@ final class FolderWatcher: @unchecked Sendable {
     /// with `kFSEventStreamCreateFlagNoDefer`, so the first event after a
     /// quiet spell still arrives at once and only a storm gets batched.
     private let eventLatency: CFTimeInterval
+    /// The floor between two reported stream positions. FSEvents watches a
+    /// path *recursively* and `FileEvents` reports every write underneath it,
+    /// so a build directory or a sync client working somewhere inside a
+    /// watched `~/Desktop` produces a batch every latency window, forever.
+    /// Reporting each one would re-encode and atomically rewrite the whole
+    /// config that often, on battery. Losing the last few seconds of position
+    /// to an abrupt quit costs a slightly wider replay and nothing else.
+    private let positionReportInterval: TimeInterval
     /// An arrival held still — hand it to import. Called on the watcher queue.
     private let onImport: @Sendable (URL, String) -> Void
     /// Seeding or launch pruning rewrote the ledger. Called on the watcher queue.
@@ -105,6 +119,10 @@ final class FolderWatcher: @unchecked Sendable {
     /// `UInt64.max` and so can never be beaten by the high-water comparison
     /// in `handle(eventIDs:count:)`.
     private var resumeEventID: FSEventStreamEventId?
+    /// Set while a position is known but deliberately unreported, and cleared
+    /// by the trailing report that follows.
+    private var unreportedEventID: FSEventStreamEventId?
+    private var lastReportedAt: DispatchTime?
     private var scopeActive = false
     private var stopped = false
     private var ledger: Set<String>
@@ -125,6 +143,7 @@ final class FolderWatcher: @unchecked Sendable {
         probeInterval: TimeInterval = 0.5,
         requiredStableProbes: Int = 2,
         eventLatency: TimeInterval = 0.5,
+        positionReportInterval: TimeInterval = 5,
         onImport: @escaping @Sendable (URL, String) -> Void,
         onLedgerReplaced: @escaping @Sendable (Set<String>) -> Void,
         onEventID: @escaping @Sendable (UInt64) -> Void = { _ in },
@@ -138,6 +157,7 @@ final class FolderWatcher: @unchecked Sendable {
         self.probeInterval = probeInterval
         self.requiredStableProbes = requiredStableProbes
         self.eventLatency = eventLatency
+        self.positionReportInterval = positionReportInterval
         self.onImport = onImport
         self.onLedgerReplaced = onLedgerReplaced
         self.onEventID = onEventID
@@ -231,6 +251,13 @@ final class FolderWatcher: @unchecked Sendable {
         queue.async { [self] in
             stopped = true
             probes.removeAll()
+            // Whatever the throttle was still holding: better a position a
+            // few seconds old than none. Harmless for a folder being removed
+            // — the store no longer has a row to write it to.
+            if let unreportedEventID {
+                self.unreportedEventID = nil
+                onEventID(unreportedEventID)
+            }
             if let stream {
                 FSEventStreamStop(stream)
                 FSEventStreamInvalidate(stream)
@@ -260,9 +287,45 @@ final class FolderWatcher: @unchecked Sendable {
         for index in 0..<count where eventIDs[index] > highest {
             highest = eventIDs[index]
         }
-        guard highest > 0, highest > resumeEventID ?? 0 else { return }
+        // Any id the stream actually delivered is authoritative, so this moves
+        // to it rather than only ever upward. A stored position can be *above*
+        // this machine's counter — a restored backup, a volume carried across
+        // Macs — and an upward-only guard would then freeze it there forever:
+        // every launch resumes from an id with no history and the replay
+        // quietly dies for that folder. `> 0` is the end-of-history marker,
+        // which carries id zero and is not a position.
+        guard highest > 0, highest != resumeEventID else { return }
         resumeEventID = highest
-        onEventID(highest)
+        report(highest)
+    }
+
+    /// Hands a stream position out at most every `positionReportInterval`,
+    /// with a trailing report so the last one in a burst is never the one
+    /// that gets dropped.
+    private func report(_ eventID: FSEventStreamEventId) {
+        let now = DispatchTime.now()
+        if let previous = lastReportedAt {
+            let elapsed = Double(now.uptimeNanoseconds - previous.uptimeNanoseconds) / 1_000_000_000
+            guard elapsed >= positionReportInterval else {
+                guard unreportedEventID == nil else {
+                    // A trailing report is already scheduled; it will pick up
+                    // whatever the newest position is when it fires.
+                    unreportedEventID = eventID
+                    return
+                }
+                unreportedEventID = eventID
+                queue.asyncAfter(deadline: .now() + (positionReportInterval - elapsed)) { [weak self] in
+                    guard let self, !stopped, let pending = unreportedEventID else { return }
+                    unreportedEventID = nil
+                    lastReportedAt = .now()
+                    onEventID(pending)
+                }
+                return
+            }
+        }
+        unreportedEventID = nil
+        lastReportedAt = now
+        onEventID(eventID)
     }
 
     // MARK: - Scanning (watcher queue only)

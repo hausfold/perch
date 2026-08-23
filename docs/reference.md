@@ -97,7 +97,10 @@ until they finish and are renamed — that rename is the real completion signal 
 and any other file is imported only after its size has stopped changing for a
 moment, so a normally written file never lands mid-write. (A writer that stalls
 for over a second can still be shelved early; the probe is a net under the
-naming convention, not a proof of doneness.) New folders appearing inside a watched
+naming convention, not a proof of doneness. A download that stalls that long and
+then resumes gives you **two** tiles — the short one perch shelved during the
+stall, and the finished file — because by the rule above the finished file is a
+different file. Clear the short one; the complete one is the later tile.) New folders appearing inside a watched
 folder are not auto-imported; folders still reach the shelf through every
 deliberate door. A watched folder copies what arrives and never touches the
 original — same invariant as every other door.

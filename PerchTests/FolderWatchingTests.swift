@@ -126,6 +126,7 @@ final class FolderWatcherTests: XCTestCase {
         ledger: Set<String> = [],
         sinceEventID: UInt64? = nil,
         requiredStableProbes: Int = 2,
+        positionReportInterval: TimeInterval = 0,
         log: ImportLog,
         onImport: XCTestExpectation? = nil
     ) -> FolderWatcher {
@@ -141,6 +142,10 @@ final class FolderWatcherTests: XCTestCase {
             // multi-step test below wait on the batcher rather than on the
             // behaviour it is asserting.
             eventLatency: 0.05,
+            // The production 5 s floor exists to spare the config file, not
+            // to be asserted here; every test but the throttle's own wants a
+            // position the moment there is one.
+            positionReportInterval: positionReportInterval,
             onImport: { url, token in
                 log.recordImport(of: url, token: token)
                 onImport?.fulfill()
@@ -370,16 +375,55 @@ final class FolderWatcherTests: XCTestCase {
         waitUntil("the missed writes are replayed", timeout: 15) { !replayed.reportedEventIDs.isEmpty }
         XCTAssertGreaterThan(try XCTUnwrap(replayed.reportedEventIDs.last), resumeFrom)
         XCTAssertEqual(replayed.importedNames, [], "a fully ledgered folder imports nothing on replay")
+        let replayedThrough = try XCTUnwrap(replayed.reportedEventIDs.last)
         resumed.stop()
 
-        // The control: the same quiet folder, started with no position, hears
-        // nothing at all — which is what a folder perch just added does, and
-        // what every launch did before positions were persisted.
+        // The control: the same folder, started with no position. It must not
+        // replay any of that history — which is what a folder perch just added
+        // does, and what every launch did before positions were persisted.
+        // Asserted by making it speak rather than by sleeping and hoping: it
+        // is given a brand-new file, and the *first* thing it ever reports has
+        // to be that file, not the writes it was started after.
         let blind = ImportLog()
         let fresh = makeWatcher(over: directory, ledger: ledger, log: blind)
         fresh.start(seedExisting: false)
-        Thread.sleep(forTimeInterval: 1.0)
-        XCTAssertEqual(blind.reportedEventIDs, [], "starting at since-now must replay nothing")
+        try Data("four".utf8).write(to: directory.appending(path: "d.txt"))
+        waitUntil("the control hears its own arrival", timeout: 15) { !blind.reportedEventIDs.isEmpty }
+        XCTAssertGreaterThan(
+            try XCTUnwrap(blind.reportedEventIDs.first),
+            replayedThrough,
+            "starting at since-now must replay nothing that happened before it"
+        )
+    }
+
+    /// FSEvents watches recursively and reports every write underneath a
+    /// watched folder, so an unthrottled position report would re-encode and
+    /// rewrite the whole config once per latency window for as long as
+    /// anything in the subtree is busy. The floor holds, and the last position
+    /// in a burst is still the one that gets reported — dropping *that* one
+    /// would leave the persisted position permanently behind.
+    func testStreamPositionsAreThrottledButTheLastOneStillArrives() throws {
+        let directory = try makeTemporaryDirectory()
+        let log = ImportLog()
+        let watcher = makeWatcher(over: directory, positionReportInterval: 0.6, log: log)
+        watcher.start(seedExisting: false)
+
+        for index in 0..<8 {
+            try Data("x".utf8).write(to: directory.appending(path: "f\(index).txt"))
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        waitUntil("the first position") { !log.reportedEventIDs.isEmpty }
+        XCTAssertLessThanOrEqual(
+            log.reportedEventIDs.count, 3,
+            "eight arrivals over ~0.8 s must not cost eight config writes"
+        )
+
+        // The trailing report: whatever the throttle was holding when the
+        // burst stopped still has to come out.
+        let highest = try XCTUnwrap(log.reportedEventIDs.max())
+        waitUntil("the trailing position", timeout: 15) {
+            (log.reportedEventIDs.max() ?? 0) > highest
+        }
     }
 
     /// A pure rename must still not re-import — the property the token exists
