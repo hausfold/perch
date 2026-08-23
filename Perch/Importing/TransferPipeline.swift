@@ -246,9 +246,18 @@ final class TransferPipeline: @unchecked Sendable {
                 sourceURL.stopAccessingSecurityScopedResource()
             }
         }
-        guard try cloudWaiter.isUndownloadedCloudItem(sourceURL) else { return }
+        // Both of these are blocking syscalls too — the first on the path of
+        // *every* import, the second an XPC round trip to the ubiquity daemon —
+        // so they go off the cooperative pool with the polls (`CloudSyscallQueue`).
+        // Holding the security scope across the hop is fine: the grant is
+        // process-wide, not thread-local.
+        guard try await CloudSyscallQueue.run({ [cloudWaiter] in
+            try cloudWaiter.isUndownloadedCloudItem(sourceURL)
+        }) else { return }
         phaseChanged(.downloadingFromCloud(elapsedSeconds: 0))
-        try cloudWaiter.startDownload(sourceURL)
+        try await CloudSyscallQueue.run { [cloudWaiter] in
+            try cloudWaiter.startDownload(sourceURL)
+        }
         try await cloudWaiter.wait(for: sourceURL) { elapsed in
             phaseChanged(.downloadingFromCloud(elapsedSeconds: elapsed))
         }

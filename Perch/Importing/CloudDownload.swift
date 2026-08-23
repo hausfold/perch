@@ -12,6 +12,55 @@ enum CloudDownloadProgress: Equatable, Sendable {
     case notStarted
 }
 
+/// The one thread every cloud syscall runs on.
+///
+/// Every call the cloud path makes is a *synchronous* file syscall — the
+/// "is this evicted?" check on the path of every import, the
+/// `startDownloadingUbiquitousItem` request, and a probe every 250 ms for up to
+/// two minutes. Called inline from an async function they run on the
+/// cooperative pool, which has one thread per core and cannot grow, so fifty
+/// files dropped at once put fifty blocking calls on it and starve every other
+/// async task in the app — the imports queued behind them included. That is the
+/// loose end #2's fix left: leaving the operation queue removed the two-slot cap
+/// on concurrent waiters along with the stall it was causing, and
+/// `ShelfStore.importFileURLs` spawns one unstructured `Task` per dropped URL
+/// with no cap of its own.
+///
+/// **Bounding the waits instead would be the wrong fix.** iCloud fetches in
+/// parallel, so a queued-up waiter would not ask for its download until an
+/// earlier one finished, and its 120 s deadline would start late — putting
+/// ordinary drops back behind cloud ones is exactly the bug #2's fix removed.
+/// What has to be bounded is the *blocking work*, not the waiting: every waiter
+/// still runs its own clock, its own deadline and its own download, and only the
+/// syscalls are single-file.
+///
+/// The cost is stated plainly, because serial means head-of-line: one wedged
+/// syscall delays every other cloud call behind it. It cannot move a *deadline*
+/// — that instant is wall-clock — but the deadline is only **checked** after the
+/// probe returns, so a wedged probe delays when a timeout fires and is reported,
+/// as well as the elapsed seconds on screen. The calls being serialised are
+/// local metadata reads and one daemon request, which is why one lane is enough.
+enum CloudSyscallQueue {
+    /// `.userInitiated` to match the import pipeline it gates. A queue created
+    /// with an explicit lower QoS is *not* raised by an `async` submission —
+    /// there is no synchronous waiter to donate priority — so `.utility` here
+    /// would run the probe below the import blocked on it, on a throttled I/O
+    /// tier, and make the syscall slower than it was inline.
+    private static let queue = DispatchQueue(
+        label: "com.hausfold.perch.cloud-syscall",
+        qos: .userInitiated
+    )
+
+    /// Runs one blocking cloud syscall off the cooperative pool, one at a time.
+    static func run<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                continuation.resume(with: Result(catching: work))
+            }
+        }
+    }
+}
+
 /// Waits for iCloud to bring an evicted file down.
 ///
 /// Deliberately `async` and poll-based rather than a blocking loop: this is the
@@ -67,7 +116,8 @@ struct CloudDownloadWaiter: Sendable {
         var lastElapsed = -1
 
         while true {
-            switch try probe(url) {
+            // Off the cooperative pool and one at a time — see `CloudSyscallQueue`.
+            switch try await CloudSyscallQueue.run({ [probe] in try probe(url) }) {
             case .downloaded:
                 return
             case .downloading:
