@@ -367,10 +367,14 @@ so nothing earned the removal, and the refusal surfaces as an error instead of
 a silently shorter shelf. And the verdicts are **unordered by construction**:
 `.accepted` is reported inline from `draggingSession(_:endedAt:)` — the last
 moment the drag source is guaranteed alive, so it may not wait on a hop — while
-`.copied` / `.failed` hop to the main actor from the promise queue. A promise
-that fails fast therefore lands its refusal *first*. `returnToShelf` records a
-refusal that arrives before its lift and `liftForExport` honours it, rather than
-removing the tile after the only thing that could have put it back has run.
+`.copied` / `.failed` hop to the main actor from the promise queue. Either
+hopped verdict can therefore land *first*, and both are held: `returnToShelf`
+records a refusal that arrives before its lift so `liftForExport` can decline to
+remove the tile, and `confirmCopied` records an early copy so `liftForExport`
+can settle the bytes instead of leaving them to be re-adopted as a stranger at
+the next launch. A verdict is scoped to the drag that produced it —
+`beginExport` clears both sets, and every export path calls it, the Shortcuts
+one included.
 
 **Save to…** is the non-destructive way out, and deliberately not an export at
 all: it copies the staged bytes to a location the user picks in an `NSSavePanel`

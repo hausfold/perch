@@ -21,9 +21,11 @@ final class ShelfStore: ObservableObject {
     // with the slot each came from so a refused one lands back in place. Their
     // staged bytes are still on disk — see `liftForExport`.
     private var lifted: [UUID: (item: ShelfItem, index: Int)] = [:]
-    // Items whose drag-out was refused before anything lifted them. See
-    // `returnToShelf`.
+    // Items whose drag-out verdict arrived before anything lifted them. Both
+    // hopped verdicts can overtake the inline `.accepted`; see `returnToShelf`
+    // and `confirmCopied`.
     private var refusedBeforeLift: Set<UUID> = []
+    private var copiedBeforeLift: Set<UUID> = []
     private var retentionTimer: Timer?
 
     init(
@@ -349,6 +351,7 @@ final class ShelfStore: ObservableObject {
     /// stale refusal can't suppress this drag's lift — see `returnToShelf`.
     func beginExport(of ids: Set<UUID>) {
         refusedBeforeLift.subtract(ids)
+        copiedBeforeLift.subtract(ids)
     }
 
     /// A drop was accepted: take unpinned items off the shelf now, before
@@ -363,6 +366,10 @@ final class ShelfStore: ObservableObject {
     /// `confirmCopied` (deleted) or `handOff` (detached).
     func liftForExport(_ ids: Set<UUID>) {
         var liftedNow: Set<UUID> = []
+        var alreadyCopied: Set<UUID> = []
+        // Hoisted: it is the same list for every id, and rebuilding it per
+        // iteration made a drag-all quadratic.
+        let siblings = itemsHoldingStagedBytes
         for id in ids {
             guard let index = items.firstIndex(where: { $0.id == id }),
                   !items[index].isPinned
@@ -379,15 +386,20 @@ final class ShelfStore: ObservableObject {
             // Never lift an item whose bytes we cannot find. A staged file
             // renamed out from under the shelf resolves; one that was deleted
             // does not, and no destination can have taken a copy of it.
-            guard repository.resolvedURL(
-                for: items[index],
-                alongside: itemsHoldingStagedBytes
-            ) != nil else {
+            guard repository.resolvedURL(for: items[index], alongside: siblings) != nil else {
                 report(ShelfExportError.stagedFileMissing(items[index].displayName))
                 continue
             }
             lifted[id] = (items[index], index)
             liftedNow.insert(id)
+            // The mirror of the refusal above: a fast local copy can report
+            // `.copied` before the drag session reports `.accepted`, and
+            // `confirmCopied` had nothing to settle when it did. Settle it now,
+            // or the bytes leak in staging and the next launch re-adopts them
+            // as a stranger.
+            if copiedBeforeLift.remove(id) != nil {
+                alreadyCopied.insert(id)
+            }
         }
         items.removeAll { liftedNow.contains($0.id) }
         // The manifest drops them too: if Perch dies mid-export the bytes are
@@ -397,6 +409,9 @@ final class ShelfStore: ObservableObject {
             try repository.persist(items)
         } catch {
             report(error)
+        }
+        for id in alreadyCopied {
+            confirmCopied(id)
         }
     }
 
@@ -422,7 +437,13 @@ final class ShelfStore: ObservableObject {
 
     /// The destination confirmed it holds its own copy — the staged one can go.
     func confirmCopied(_ id: UUID) {
-        guard let entry = lifted.removeValue(forKey: id) else { return }
+        guard let entry = lifted.removeValue(forKey: id) else {
+            // Nothing lifted it yet — the copy finished before the drag session
+            // reported the drop. `liftForExport` settles it when the
+            // `.accepted` lands; dropping it here leaks the staged bytes.
+            copiedBeforeLift.insert(id)
+            return
+        }
         do {
             try repository.remove(entry.item, alongside: itemsHoldingStagedBytes)
         } catch {
@@ -452,18 +473,25 @@ final class ShelfStore: ObservableObject {
             items = []
             // Anything lifted for an in-flight drag had its bytes deleted just
             // now; letting `returnToShelf` reinsert it would show a tile that
-            // points at nothing.
+            // points at nothing. The pending verdicts go with them — there is
+            // nothing left for them to settle.
             lifted.removeAll()
+            refusedBeforeLift.removeAll()
+            copiedBeforeLift.removeAll()
         } catch {
             report(error)
         }
     }
 
+    /// Where this item's staged bytes are right now — the one way anything
+    /// outside the store should ask. Nil means unreachable, and every caller
+    /// has to treat that as "don't act", not "use the recorded path anyway".
+    func stagedURL(for item: ShelfItem) -> URL? {
+        repository.resolvedURL(for: item, alongside: itemsHoldingStagedBytes)
+    }
+
     func reveal(_ item: ShelfItem) {
-        guard let url = repository.resolvedURL(
-            for: item,
-            alongside: itemsHoldingStagedBytes
-        ) else { return }
+        guard let url = stagedURL(for: item) else { return }
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
@@ -478,11 +506,9 @@ final class ShelfStore: ObservableObject {
     func refreshStagedNames() {
         var updated = items
         var changed = false
+        let siblings = itemsHoldingStagedBytes
         for index in updated.indices {
-            guard let url = repository.resolvedURL(
-                for: updated[index],
-                alongside: itemsHoldingStagedBytes
-            ),
+            guard let url = repository.resolvedURL(for: updated[index], alongside: siblings),
                   let renamed = updated[index].restaged(at: url, inside: repository.rootURL)
             else {
                 // A tile whose bytes are unreachable stays put: the shelf must
@@ -527,10 +553,7 @@ final class ShelfStore: ObservableObject {
     /// raised without activating lands behind the frontmost app and reads as a
     /// hang with no visible cause.
     func save(_ item: ShelfItem) {
-        guard let source = repository.resolvedURL(
-            for: item,
-            alongside: itemsHoldingStagedBytes
-        ) else { return }
+        guard let source = stagedURL(for: item) else { return }
 
         let panel = NSSavePanel()
         // `displayName` is the staged file's own name — sanitized at import and
@@ -576,10 +599,7 @@ final class ShelfStore: ObservableObject {
     /// window + responder-chain controller) can't be driven without breaking
     /// that design. The out-of-process previewer sidesteps all of it.
     func open(_ item: ShelfItem) {
-        guard let url = repository.resolvedURL(
-            for: item,
-            alongside: itemsHoldingStagedBytes
-        ) else { return }
+        guard let url = stagedURL(for: item) else { return }
         if shouldQuickLook(item) {
             quickLook(url)
         } else {
@@ -699,7 +719,11 @@ final class ShelfStore: ObservableObject {
             return
         }
         do {
-            items = try repository.prune(olderThan: cutoff, items: items)
+            items = try repository.prune(
+                olderThan: cutoff,
+                items: items,
+                alsoHoldingBytes: lifted.values.map(\.item)
+            )
         } catch {
             report(error)
         }

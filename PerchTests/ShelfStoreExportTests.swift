@@ -154,7 +154,7 @@ final class ShelfStoreExportTests: XCTestCase {
         XCTAssertEqual(followed.displayName, "keeper.png")
 
         store.liftForExport([followed.id])
-        XCTAssertTrue(store.items.isEmpty, "and it exports like any other tile")
+        XCTAssertTrue(store.items.isEmpty, "and it leaves the shelf like any other tile")
         store.confirmCopied(followed.id)
         XCTAssertFalse(FileManager.default.fileExists(atPath: renamed.path))
     }
@@ -264,6 +264,62 @@ final class ShelfStoreExportTests: XCTestCase {
             FileManager.default.fileExists(atPath: try stagedURL(of: second).path),
             "and its bytes are still there to drag again"
         )
+    }
+
+    /// The mirror of the above: a fast local copy can report `.copied` before
+    /// the drag session reports `.accepted`. Dropping that verdict leaked the
+    /// staged bytes, and the next launch re-adopted them as a stranger.
+    func testACopiedVerdictArrivingBeforeTheLiftStillSettlesTheBytes() throws {
+        try makeShelf()
+        let item = try stageItem()
+        let staged = try stagedURL(of: item)
+        store.beginExport(of: [item.id])
+
+        store.confirmCopied(item.id)
+        store.liftForExport([item.id])
+
+        XCTAssertTrue(store.items.isEmpty, "it still leaves the shelf")
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: staged.path),
+            "and its bytes go, rather than lingering to be re-adopted next launch"
+        )
+        XCTAssertTrue(repository.load().isEmpty)
+    }
+
+    func testAnEarlyCopiedVerdictDoesNotSettleTheNextDrag() throws {
+        try makeShelf()
+        let item = try stageItem()
+        let staged = try stagedURL(of: item)
+        store.beginExport(of: [item.id])
+        store.confirmCopied(item.id)
+
+        // A new drag: the stale verdict must not delete this one's bytes.
+        store.beginExport(of: [item.id])
+        store.liftForExport([item.id])
+
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: staged.path),
+            "nothing has reported a copy for *this* drag yet"
+        )
+        store.returnToShelf(item.id)
+        XCTAssertEqual(store.items.map(\.id), [item.id])
+    }
+
+    /// A pinned tile never enters the lifted transaction, so its drag's
+    /// `.failed` always finds nothing lifted and records a refusal for an id
+    /// that is *still on the shelf*. Unpinning and dragging it must work.
+    func testAPinnedTilesRefusalDoesNotHauntItAfterUnpinning() throws {
+        try makeShelf()
+        let item = try stageItem()
+        store.setPinned(true, for: item)
+        store.beginExport(of: [])
+        store.returnToShelf(item.id)
+
+        store.setPinned(false, for: item)
+        store.beginExport(of: [item.id])
+        store.liftForExport([item.id])
+
+        XCTAssertTrue(store.items.isEmpty)
     }
 
     /// The refusal is scoped to the drag that produced it — a later drag of the

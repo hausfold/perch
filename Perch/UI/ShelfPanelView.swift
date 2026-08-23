@@ -262,15 +262,17 @@ struct ShelfPanelView: View {
     /// Resolves a shelf item to something the drag source can vend by promise,
     /// or nil when its staged copy can't be located.
     ///
-    /// Deliberately the recorded path rather than
-    /// `StagingRepository.resolvedURL(for:)`: this runs for every item on every
-    /// body evaluation, and the item it reads was already made current by
-    /// `ShelfStore.refreshStagedNames()` when the panel opened. A staged file
-    /// that goes missing *between* opening and the drop is caught by
-    /// `liftForExport`, which is the authoritative check and the one that
-    /// decides whether the tile leaves.
+    /// This resolves rather than trusting `relativePath`, and it has to: the
+    /// same pasteboard carries the plain `public.file-url` for promise-blind
+    /// receivers, and a terminal that pastes a dead path has no verdict to
+    /// report and nothing to undo — the grace timer hands the item off and its
+    /// bytes are detached regardless. `liftForExport` is the authoritative
+    /// check for *whether the tile leaves*, but only the URL vended here
+    /// decides what the destination actually receives. One `fileExists` per
+    /// visible item; the directory is only listed when the recorded name is
+    /// already gone.
     private func exportItem(for item: ShelfItem) -> ExportItem? {
-        guard let url = item.fileURL(inside: store.repository.rootURL) else { return nil }
+        guard let url = store.stagedURL(for: item) else { return nil }
         let fileType = item.contentTypeIdentifier
             ?? (item.kind == .folder ? UTType.folder.identifier : UTType.data.identifier)
         return ExportItem(id: item.id, url: url, fileType: fileType, fileName: item.displayName)
@@ -334,7 +336,7 @@ struct ShelfPanelView: View {
                 ForEach(store.items) { item in
                     FileTile(
                         item: item,
-                        fileURL: item.fileURL(inside: store.repository.rootURL),
+                        fileURL: store.stagedURL(for: item),
                         exportItems: exportItem(for: item).map { [$0] } ?? [],
                         isExiting: state.draggingOutIDs.contains(item.id) && !item.isPinned,
                         onReveal: { store.reveal(item) },

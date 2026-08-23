@@ -92,16 +92,19 @@ struct ShelfItem: Codable, Identifiable, Hashable, Sendable {
     /// rather than orphaning the tile, so `displayName` follows it too. Returns
     /// nil when nothing moved, so callers can tell "already current" from
     /// "rewrite the manifest".
+    ///
+    /// Deliberately no `resolvingSymlinksInPath()`: that lstats every component
+    /// of a deep Application Support path, and this runs once per shelf item on
+    /// the path that opens the panel. `StagingRepository` resolves its root once
+    /// at init and only ever hands back URLs built from it, so both sides are
+    /// already resolved by construction.
     func restaged(at url: URL, inside root: URL) -> ShelfItem? {
-        let rootComponents = root.standardizedFileURL.resolvingSymlinksInPath().pathComponents
-        let components = url.standardizedFileURL.resolvingSymlinksInPath().pathComponents
-        guard components.count > rootComponents.count,
-              components.starts(with: rootComponents)
-        else {
-            return nil
-        }
-        let path = components.dropFirst(rootComponents.count).joined(separator: "/")
-        guard path != relativePath else { return nil }
+        var rootPath = root.standardizedFileURL.path
+        while rootPath.hasSuffix("/") { rootPath.removeLast() }
+        let absolute = url.standardizedFileURL.path
+        guard absolute.hasPrefix(rootPath + "/") else { return nil }
+        let path = String(absolute.dropFirst(rootPath.count + 1))
+        guard !path.isEmpty, path != relativePath else { return nil }
         return ShelfItem(
             id: id,
             displayName: url.lastPathComponent,

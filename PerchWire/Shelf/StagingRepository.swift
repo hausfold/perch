@@ -174,13 +174,20 @@ final class StagingRepository: @unchecked Sendable {
     ///   there the one child left in the container could as easily be a
     ///   sibling as this item under a new name. Passing the neighbours is what
     ///   lets that case be refused instead of vending the wrong file.
-    func resolvedURL(for item: ShelfItem, alongside others: [ShelfItem] = []) -> URL? {
-        lock.withLock { resolvedURLUnlocked(for: item, alongside: others) }
+    /// `alongside` is an autoclosure because the sibling list is only ever
+    /// consulted on the rare fallback branch — building it eagerly would make
+    /// a per-item call site quadratic, and one of them is the path that opens
+    /// the panel.
+    func resolvedURL(
+        for item: ShelfItem,
+        alongside others: @autoclosure () -> [ShelfItem] = []
+    ) -> URL? {
+        lock.withLock { resolvedURLUnlocked(for: item, alongside: others()) }
     }
 
     private func resolvedURLUnlocked(
         for item: ShelfItem,
-        alongside others: [ShelfItem]
+        alongside others: @autoclosure () -> [ShelfItem]
     ) -> URL? {
         guard let url = item.fileURL(inside: rootURL) else { return nil }
         let container = url.deletingLastPathComponent()
@@ -195,7 +202,7 @@ final class StagingRepository: @unchecked Sendable {
         guard container != rootURL else { return nil }
         // Someone else still claims this container: which visible child is
         // whose is no longer answerable from the filesystem alone.
-        let isShared = others.contains { other in
+        let isShared = others().contains { other in
             other.id != item.id
                 && other.fileURL(inside: rootURL)?.deletingLastPathComponent() == container
         }
@@ -214,7 +221,10 @@ final class StagingRepository: @unchecked Sendable {
     /// - Parameter alongside: as for `resolvedURL(for:alongside:)`. Deleting is
     ///   the one place where guessing wrong destroys something, so a caller
     ///   whose containers may be shared must pass its neighbours.
-    func remove(_ item: ShelfItem, alongside others: [ShelfItem] = []) throws {
+    func remove(
+        _ item: ShelfItem,
+        alongside others: @autoclosure () -> [ShelfItem] = []
+    ) throws {
         guard let hinted = item.fileURL(inside: rootURL) else {
             throw StagingRepositoryError.unsafePath
         }
@@ -222,7 +232,7 @@ final class StagingRepository: @unchecked Sendable {
         // renamed file left behind here would sit in staging forever, since
         // the empty-parent walk below stops at a container that still has
         // content in it.
-        let url = resolvedURL(for: item, alongside: others) ?? hinted
+        let url = resolvedURL(for: item, alongside: others()) ?? hinted
         if fileManager.fileExists(atPath: url.path) {
             try fileManager.removeItem(at: url)
         }
@@ -277,11 +287,20 @@ final class StagingRepository: @unchecked Sendable {
     /// handle spares them. Expiry honouring it too is what keeps that word
     /// meaning one thing; without it the timer takes exactly the tiles someone
     /// pinned because they mattered.
-    func prune(olderThan cutoff: Date, items: [ShelfItem]) throws -> [ShelfItem] {
+    /// - Parameter alsoHoldingBytes: items that are *not* in `items` but whose
+    ///   staged bytes are still on disk — anything a drag has lifted and not
+    ///   yet settled. They cannot expire, but they can share a container with
+    ///   something that does, and `remove` must not resolve into their bytes.
+    func prune(
+        olderThan cutoff: Date,
+        items: [ShelfItem],
+        alsoHoldingBytes others: [ShelfItem] = []
+    ) throws -> [ShelfItem] {
         let retained = items.filter { $0.addedAt >= cutoff || $0.isPinned }
         let removed = items.filter { $0.addedAt < cutoff && !$0.isPinned }
+        let neighbours = items + others
         for item in removed {
-            try? remove(item, alongside: items)
+            try? remove(item, alongside: neighbours)
         }
         try persist(retained)
         return retained
