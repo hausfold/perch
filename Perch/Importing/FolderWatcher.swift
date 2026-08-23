@@ -102,6 +102,9 @@ final class FolderWatcher: @unchecked Sendable {
     private let positionReportInterval: TimeInterval
     /// An arrival held still — hand it to import. Called on the watcher queue.
     private let onImport: @Sendable (URL, String) -> Void
+    /// A file perch wrote here itself — ledger it, but shelve nothing. Called
+    /// on the watcher queue. See `ExportLedger`.
+    private let onAdopt: @Sendable (String) -> Void
     /// Seeding or launch pruning rewrote the ledger. Called on the watcher queue.
     private let onLedgerReplaced: @Sendable (Set<String>) -> Void
     /// This folder is now scanned up to that stream position; persist it so
@@ -110,6 +113,9 @@ final class FolderWatcher: @unchecked Sendable {
     /// The folder could not be opened for watching. Called on the watcher queue.
     private let onUnavailable: @Sendable () -> Void
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "WatchedFolders")
+
+    /// Which files in this folder perch is writing out of the shelf itself.
+    private let exportLedger: ExportLedger
 
     private let queue: DispatchQueue
     private var stream: FSEventStreamRef?
@@ -144,7 +150,9 @@ final class FolderWatcher: @unchecked Sendable {
         requiredStableProbes: Int = 2,
         eventLatency: TimeInterval = 0.5,
         positionReportInterval: TimeInterval = 5,
+        exportLedger: ExportLedger = .shared,
         onImport: @escaping @Sendable (URL, String) -> Void,
+        onAdopt: @escaping @Sendable (String) -> Void = { _ in },
         onLedgerReplaced: @escaping @Sendable (Set<String>) -> Void,
         onEventID: @escaping @Sendable (UInt64) -> Void = { _ in },
         onUnavailable: @escaping @Sendable () -> Void = {}
@@ -158,7 +166,9 @@ final class FolderWatcher: @unchecked Sendable {
         self.requiredStableProbes = requiredStableProbes
         self.eventLatency = eventLatency
         self.positionReportInterval = positionReportInterval
+        self.exportLedger = exportLedger
         self.onImport = onImport
+        self.onAdopt = onAdopt
         self.onLedgerReplaced = onLedgerReplaced
         self.onEventID = onEventID
         self.onUnavailable = onUnavailable
@@ -375,6 +385,21 @@ final class FolderWatcher: @unchecked Sendable {
             else {
                 continue
             }
+            // Something perch is writing out of the shelf, or has just
+            // finished writing. Adopting it costs one ledger entry and stops
+            // a drag-out into a watched folder handing the item straight
+            // back; `.inFlight` waits, because a half-written copy has
+            // neither its final bytes nor its final identity.
+            switch exportLedger.claim(url, token: token) {
+            case .unrelated:
+                break
+            case .inFlight:
+                continue
+            case .ours:
+                ledger.insert(token)
+                onAdopt(token)
+                continue
+            }
             probes[url.path] = ProbeSample(size: -1, modified: .distantPast)
             probe(url)
         }
@@ -430,6 +455,18 @@ final class FolderWatcher: @unchecked Sendable {
         // `forgetImport`.
         ledger.insert(token)
         onImport(url, token)
+    }
+
+    /// Look again now, without waiting for a directory event.
+    ///
+    /// A finished export is the case that needs it: perch wrote the last byte
+    /// itself, so if the folder then goes quiet there is no further event and
+    /// the file would sit unclaimed until an unrelated arrival woke the scan.
+    func rescan() {
+        queue.async { [self] in
+            guard !stopped, stream != nil else { return }
+            scan()
+        }
     }
 
     /// Staging refused or failed this arrival: take the token back out, so the

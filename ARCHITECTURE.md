@@ -325,6 +325,16 @@ Marking is on **success**, not on hand-off: a failed staging takes its token
 back out, so the next FSEvents batch tries again rather than the file being
 invisible forever.
 
+The same identity rule turns a drag-out into a watched folder against itself:
+an export is a copy, so it lands as a brand-new inode that no ledger has seen,
+and `~/Downloads` and `~/Desktop` are both what people watch and what people
+drag onto. `ExportLedger` is the book that keeps the two apart — the promise
+reserves its destination *before* `copyItem` writes a byte, because that write
+is the directory event that starts the scan, and the watcher adopts what perch
+wrote instead of shelving it. A receiver that takes the plain `public.file-url`
+copies the file itself and never tells us where, so that one is out of reach;
+it is the promise path — Finder's — that this covers.
+
 ### Name collisions
 
 Every logical import owns a UUID directory. The user-visible filename remains
