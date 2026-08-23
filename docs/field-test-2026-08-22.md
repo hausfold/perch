@@ -27,13 +27,13 @@ is provably the only thing going wrong.
 |---|---|---|---|---|
 | ~~1~~ | ~~Shelf hover-opens ~1 notch-width either side of the notch~~ | Platform | **Fixed** — hit-test the pointer, don't trust the tracking area | ~~**A**~~ |
 | ~~13~~ | ~~Secondary display never shows a drop target~~ | Platform | **Fixed** — `screen: nil`; the frames were already global | ~~**A**~~ |
-| 10 | Open/close animation janks at ~250 items (scrolling is fine) | UI | Confirmed cause | **B** |
+| 10 | Open/close animation janks at ~250 items (scrolling is fine) | UI | **Fixed in code** — lazy strip + cached icons; not yet feel-tested | **B** |
 | 9 | 50 folders dropped into Finder land in a diagonal line | UI | **Open** — first theory disproved | **B** |
 | ~~7~~ | ~~Rename a staged file in Finder → tile can never be dragged out, and vanishes~~ | Store | **Fixed** — re-resolve; decision in `ARCHITECTURE.md` | ~~**C**~~ |
 | 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | **Fixed in tests** — dedupe gone, FSEvents sees the rewrite; not yet feel-tested | **D** |
 | 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | **Addressed, still unreproduced** — the stream now resumes from a persisted position | **D** |
 | 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | Two candidates | **E** |
-| 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | Needs a clean-machine check first | **F** |
+| 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | **Cause found** — three Perch bundles registered on this Mac | **F** |
 | 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | Probably an obsolete claim | **F** |
 | 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Open** — Keychain exonerated by measurement; look at the UI | **G** |
 | 3 | 3 GB file "lands immediately" instead of showing progress | — | **Not a bug** — bad expectation | — |
@@ -63,38 +63,60 @@ is provably the only thing going wrong.
 
 ## Run B — Shelf list rendering (`Perch/UI/`)
 
-### B1 · Open/close janks at ~250 items (#10)
+### ~~B1 · Open/close janks at ~250 items (#10)~~ — **fixed in code, needs a feel-test**
 
-**Symptom.** Scrolling and hover stay smooth at ~250 staged items, but the
-expand/collapse animation stutters.
+**Root cause, as diagnosed.** `ShelfPanelView.itemStrip` was an **eager**
+`HStack`, so every expand built all 250 `FileTile`s — and each tile is not
+cheap: a `FilePreview` with a QuickLook `.task`, a live `FileDragSourceView`
+(an `NSViewRepresentable`, i.e. a real `NSView`), and a synchronous
+`NSWorkspace.icon(forFile:)` **inside `body`**. `@State thumbnail` starts `nil`
+on every rebuild, so that LaunchServices round trip ran for *all* 250 tiles on
+every expand, thumbnailed ones included, until each `.task` resolved.
 
-**Root cause (high confidence).** `ShelfPanelView.swift:324-326` is
-`ScrollView(.horizontal) { HStack { ForEach(store.items) … } }` — an **eager**
-`HStack`. Every expand builds all 250 `FileTile`s, and each one:
-- starts a `.task` in `FilePreview` (`Perch/UI/FilePreview.swift`), and
-- calls `NSWorkspace.shared.icon(forFile:)` **synchronously in `body`**
-  (`FilePreview.swift:30-32`, `fileIcon`) — a LaunchServices round trip per
-  tile, on the main thread, during the animation.
+Measured, so the second half isn't taken on faith: 250 `icon(forFile:)` calls
+cost **27 ms** for plain text files and **103 ms** for a mix of real `.app`
+bundles (31 ms warm) — six dropped frames of main-thread work, spent during
+the animation, on top of building 250 tiles and 250 `NSView`s.
 
-That second cost is worse than "only files without a content preview": `@State
-thumbnail` starts `nil` on every rebuild, so `fileIcon` renders — and hits
-LaunchServices — for **all 250 tiles on every expand**, thumbnailed ones
-included, until each `.task` resolves.
+**What landed.**
+- `LazyHStack` for the strip, so an expand builds the tiles actually on screen.
+- `IconCache`, an `NSCache` keyed **by path** (not content type — `.app`
+  bundles, Finder custom icons and alias badges are per-file), and the icon
+  lookup moved out of `body` into the same `.task` the thumbnail uses. It stays
+  on the main actor — `NSWorkspace`'s lookup isn't documented thread-safe — but
+  now lands after the layout pass instead of inside it.
+- Both caches are read back **synchronously** while the view builds
+  (`ThumbnailCache.cached(for:)`, `IconCache.cached(for:)`). A lazy strip
+  rebuilds a tile every time it scrolls back into view, so without that seed
+  the fix would have traded one stutter for a placeholder flash on every
+  scroll.
+- A tile with a *cached* thumbnail asks LaunchServices for nothing at all.
+  A cold one still fetches its icon **first**, before awaiting QuickLook —
+  skipping it would leave a generic `doc` glyph on every image tile for the
+  length of the render, which is worse than what it replaced.
 
-**Fix sketch.** `LazyHStack` for both `ForEach`es, and hoist the workspace icon
-behind the same async/cached path the thumbnail uses. Key that cache **by path**
-in an `NSCache`, exactly as `ThumbnailCache` already does — *not* by content
-type: `icon(forFile:)` is per-file for `.app` bundles, Finder custom icons and
-alias badges.
+**Still to feel-test** (needs a screen; no unit test can see it):
+1. Stage ~250 items, open/close ten times — smooth?
+2. **Scroll a *cold* 250-item shelf end to end.** This is the regression the
+   fix could plausibly introduce: the eager stack paid every icon lookup once
+   at expand and scrolled free thereafter, so "scrolling is fine" was measured
+   against a fully-built strip. A lazy one pays per tile as it mounts.
+3. **The badges.** The pin/remove buttons overhang the tile's top corner by
+   8pt into the strip's `.padding(.top, 11)`. `LazyHStack` computes its bounds
+   from mounted children; confirm nothing is clipped.
+4. **Reflow.** Remove a tile while scrolled away from it, and drag one out —
+   the neighbours must still slide, and nothing may pop.
 
-**Verify.** Stage ~250 items (`for i in $(seq 1 250); do …; done` into a watched
-folder, or `perch add`). Open/close ten times. Then confirm the *reflow*
-animations still work — `.animation(Self.reflow, value: store.items)` on a
-lazy stack behaves differently for off-screen rows; a tile removed while
-scrolled away must not pop.
-
-**Watch out.** The `.padding(.top, 11)` overhang comment at `:352` exists so
-pin/remove badges aren't clipped. Lazy stacks re-clip; re-check the badges.
+Drag-out is unaffected in the ordinary case, but the reason is worth stating
+precisely, because the obvious one is wrong. The dragged tile is *not* under
+the pointer once the drag leaves the notch, and the panel tears its views down
+then anyway — that is pre-existing, and `draggingSession(_:endedAt:)` already
+compensates by reporting inline. What laziness adds is a second unmount vector
+("scrolled out of the lazy window") alongside "panel hid"; in both cases a
+promise verdict arriving after unmount falls through to the 1 s grace timer,
+which is the designed fallback. Drag-*all* doesn't use the tiles' drag sources
+at all — `dragAllHandle` has its own `FileDragSourceView`
+(`ShelfPanelView.swift:240`).
 
 ### B2 · Multi-item drag-out lands in a diagonal line (#9)
 
@@ -334,19 +356,47 @@ is). Don't let the fix make a *second* import wait on the first.
 - It **does** appear under Finder ▸ Services — **twice**.
 - There is no top-level "Add to Perch Shelf" in the context menu.
 
-**Step 0, before touching any plist: rule out two registered copies.**
-The duplicate Services entry is exactly what you get with an installed
-`/Applications/Perch.app` *and* a `DerivedData` dev build both registered with
-LaunchServices. Check:
+**Step 0 — done, and it explains #4.** Run on Julien's Mac, 2026-08-23:
 
 ```sh
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
-  -dump | grep -i -B5 'perch' | grep -i 'path:'
-pluginkit -mAvvv -p com.apple.services | grep -i perch
+pluginkit -mAvvv -p com.apple.services | grep -i -A3 perch
 ```
 
-If two bundles show up, unregister the stale one and re-test before concluding
-anything about #4 or #5. This alone may account for both.
+**Three** Finder Action extensions are registered, all named "Add to Perch
+Shelf", all present on disk:
+
+| bundle id | path |
+|---|---|
+| `com.hausfold.perch.finder-action` (2026.08.20) | `/Applications/Perch.app` |
+| `com.hausfold.perch.finder-action` (dev) | `~/code/workshop/perch/DerivedData/…/Release/Perch.app` |
+| `com.hausfold.perch.dev` (2026.08.14-1-dev) | `~/.cache/bench/perch-dd/…/Debug/Perch.app` |
+
+Two of them share the *same* bundle id and one carries a different one, which
+is exactly the shape that yields **two** Services rows: LaunchServices collapses
+the duplicate id to one path and lists `.dev` separately. `lsregister -dump`
+also shows a dozen-plus `Perch.app`s under `~/.cache/claude-worktrees/*/DerivedData`
+— every agent lane that ever ran `xcodebuild` registered its build.
+
+So **#4's duplicate is this Mac, not the plist**, and the Quick Actions absence
+plausibly is too: the tick in Customize… is stored per extension identity, so
+it can easily be set on a bundle Finder isn't resolving.
+
+**Next step is Julien's, and it needs a Finder menu** (an agent must not drive
+the screen):
+
+```sh
+# unregister the two dev copies, keep /Applications
+lsr=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$lsr" -u ~/code/workshop/perch/DerivedData/Build/Products/Release/Perch.app
+"$lsr" -u ~/.cache/bench/perch-dd/Build/Products/Debug/Perch.app
+pluginkit -mAvvv -p com.apple.services | grep -c com.hausfold   # expect 1
+```
+
+Then select 3 files in Finder and look at Quick Actions and Services. If both
+show one entry, #4 is closed as an environment artifact — and the durable fix
+is a repo one: dev builds shouldn't register at all, or should carry a distinct
+display name so this is visible instead of confusing. That is worth its own
+issue either way, because every agent worktree adds another registration.
 
 **#4 · Quick Actions.** `PerchFinderAction/Info.plist` declares
 `NSExtensionPointIdentifier = com.apple.services` with

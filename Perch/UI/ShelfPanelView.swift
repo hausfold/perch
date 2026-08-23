@@ -331,8 +331,12 @@ struct ShelfPanelView: View {
         // padding so it can collapse to zero along with the tile's width when
         // that tile is dragged out — otherwise the fixed HStack spacing would
         // leave a stranded gap where the exiting tile used to be.
+        // LazyHStack, not HStack: an eager stack builds all N tiles on every
+        // expand — N QuickLook tasks, N LaunchServices icon lookups and N live
+        // FileDragSourceView NSViews — which is what janks the open/close
+        // animation once a shelf has a couple of hundred items on it.
         ScrollView(.horizontal) {
-            HStack(alignment: .top, spacing: 0) {
+            LazyHStack(alignment: .top, spacing: 0) {
                 ForEach(store.items) { item in
                     FileTile(
                         item: item,
