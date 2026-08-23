@@ -33,8 +33,8 @@ is provably the only thing going wrong.
 | 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | **Fixed in tests** — dedupe gone, FSEvents sees the rewrite; not yet feel-tested | **D** |
 | 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | **Addressed, still unreproduced** — the stream now resumes from a persisted position | **D** |
 | 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | **Fixed in code** — wait is off the queue and now says how long; not yet feel-tested | **E** |
-| 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | **Cause found** — `bench try` gives the appex the app's bundle id | **F** |
-| 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | Blocked on #4 — the extension isn't live in a dev build | **F** |
+| 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | **Duplicate explained** — two doors, one submenu; Quick Actions still open | **F** |
+| 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | **Premise dead** — measured: a classic Service does not reach the top level | **F** |
 | 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Open** — Keychain exonerated by measurement; look at the UI | **G** |
 | 3 | 3 GB file "lands immediately" instead of showing progress | — | **Not a bug** — bad expectation | — |
 | 11 | Phone Wi-Fi off, Mac still receives | — | **Not a bug** — bad expectation | — |
@@ -474,7 +474,66 @@ depends on the extension being live. After they do, the check is: `bench try`,
 then select 3 files in Finder — the Quick Action should appear, and Login Items
 & Extensions ▸ System Services Extensions should have a Perch row to switch.
 
-**Two doors with one name is deliberate, so don't "fix" it.** The app declares
+### Feel-tested 2026-08-23 — twice. What each pass ruled out.
+
+The bundle-id fix landed and is live: `/Applications/Perch.app` is
+`com.hausfold.perch.dev`, its `PerchFinderAction.appex` is
+`com.hausfold.perch.dev.finder-action`, properly nested, and the extension now
+appears — enabled — in both Login Items & Extensions ▸ System Services
+Extensions and Quick Actions ▸ Customize….
+
+**Pass one blamed stale registrations, and was wrong.** `pluginkit` did show two
+providers (a stale record for the old release at `/Applications`, plus the bench
+DerivedData copy). Clearing them with `pluginkit -r` + `lsregister -f` +
+`killall Finder` left **exactly one** plug-in — and the menu was unchanged. Both
+symptoms survived a clean machine, so neither is a registration artifact.
+
+**What that proves, by elimination.** With one registered appex and two
+`Add to Perch Shelf (Perch.app)` rows under **Services**, the two rows are the
+appex *and* the app's classic `NSServices` entry. macOS only appends the app
+name when it has two providers with one title to tell apart. So:
+
+- **#4's duplicate is self-inflicted**, not a build or registration fault. Perch
+  ships two doors and they land in the same submenu.
+- **#5's premise is dead.** A classic `NSServices` entry does *not* reach the
+  context menu's top level on macOS 26 — it is in Services, next to the
+  extension. The comment at the head of `Perch/Config/Info.plist` and the
+  matching paragraph in `ARCHITECTURE.md` said otherwise; both are corrected in
+  this change, which is the fix #5 was always most likely to need.
+
+**Also ruled out for the Quick Actions half**, so nobody re-checks them:
+- *The activation rule.* It cannot be the reason. The extension **does** appear
+  under Services for the same selection, so the rule matched — a rule that
+  failed to match would hide it from both submenus, not one.
+  `NSExtensionActivationSupportsFileWithMaxCount = 1000` is exonerated.
+- *A missing preview icon.* `NSExtensionServiceFinderPreviewIconName` names
+  `ActionIcon`, and `assetutil --info` on the shipped
+  `PerchFinderAction.appex/Contents/Resources/Assets.car` finds it
+  (`RenditionName: ActionIcon.svg`). It is there.
+
+**What is left, and it needs one more measurement.** Every Quick Action that
+*does* render on this Mac — Rotate Left, Markup, Create PDF, Convert Image,
+Remove Background — is a Finder built-in: `pluginkit -mAvvv -p
+com.apple.services` reports **one** plug-in on the whole system, perch's. There
+are no Automator `.workflow` Quick Actions in `~/Library/Services` or
+`/Library/Services` either. So this machine has no working third-party example
+to diff against, and the open question is whether macOS 26 renders third-party
+Action extensions under Quick Actions **at all**, or only built-ins and
+Automator workflows.
+
+The cheap experiment: drop a minimal Automator Quick Action into
+`~/Library/Services` and look. If the workflow appears and perch's extension
+still does not, #4's first half is macOS's placement and the fix is
+documentation — the same answer #5 just got. If the workflow does not appear
+either, the Quick Actions submenu on this Mac only ever shows built-ins and
+there is nothing here for perch to fix.
+
+**Which door to keep is a product call, and it needs one click first.** The two
+rows are indistinguishable in the menu, so before deleting either, click each
+and see which one shelves the file — if the extension is the broken one, the
+classic Service is the door that works and deleting it would close the last one.
+
+**Two doors with one name was deliberate, and the reason it was given no longer holds.** The app declares
 a legacy `NSServices` entry titled "Add to Perch Shelf" *and* ships an appex
 Services extension with the same display name — the decision is stated at the
 head of `Perch/Config/Info.plist` and in `ARCHITECTURE.md`: the extension runs
