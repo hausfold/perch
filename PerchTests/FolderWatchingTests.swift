@@ -433,6 +433,62 @@ final class FolderWatcherTests: XCTestCase {
         )
     }
 
+    /// Field-test, 2026-08-23: two `curl -o` downloads running at once looked
+    /// like only one file ever landed. On *separate* paths that must not
+    /// happen — each file gets its own probe chain, and one still growing must
+    /// never hold up another that has settled.
+    ///
+    /// Two curls onto the *same* path are a different story and not a bug: one
+    /// path is one file, it never holds still until the last writer stops, so
+    /// one tile at the end is the only answer available. See the note under
+    /// "Not bugs" in the 2026-08-22 field-test file.
+    ///
+    /// The writers here append *continuously* — faster than
+    /// `probeInterval × requiredStableProbes`. Growing in slower bursts leaves
+    /// a quiet window between them, and the probe promotes on each one, which
+    /// is D2's intended "replaced contents are a new arrival" and not what this
+    /// test is about.
+    func testTwoFilesGrowingAtOnceBothLand() throws {
+        let directory = try makeTemporaryDirectory()
+        let log = ImportLog()
+        let watcher = makeWatcher(over: directory, log: log)
+        watcher.start(seedExisting: false)
+
+        let first = directory.appending(path: "first.bin")
+        let second = directory.appending(path: "second.bin")
+
+        /// Appends `chunks` × 500 B at 15 ms intervals, like a download that
+        /// never pauses. Returns once the file is complete.
+        func download(to url: URL, chunks: Int) throws {
+            try Data(repeating: 7, count: 500).write(to: url)
+            let handle = try FileHandle(forWritingTo: url)
+            defer { try? handle.close() }
+            for _ in 1..<chunks {
+                Thread.sleep(forTimeInterval: 0.015)
+                try handle.seekToEnd()
+                try handle.write(contentsOf: Data(repeating: 7, count: 500))
+            }
+        }
+
+        // `second` starts first and finishes while `first` is still going, so
+        // one file settles with the other mid-flight — the shape of the
+        // field-test report. Neither is ever rewritten, so neither is a second
+        // arrival.
+        let secondFinished = expectation(description: "second written")
+        DispatchQueue.global().async {
+            try? download(to: second, chunks: 10)
+            secondFinished.fulfill()
+        }
+        Thread.sleep(forTimeInterval: 0.05)
+        try download(to: first, chunks: 24)
+        wait(for: [secondFinished], timeout: 10)
+
+        waitUntil("both files land", timeout: 10) {
+            Set(log.importedNames) == ["first.bin", "second.bin"]
+        }
+        XCTAssertEqual(log.importedNames.sorted(), ["first.bin", "second.bin"])
+    }
+
     /// A pure rename must still not re-import — the property the token exists
     /// for, and the one the content half must not cost.
     func testARenameStillDoesNotReimport() throws {
