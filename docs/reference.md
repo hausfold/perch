@@ -203,8 +203,9 @@ That link is **peer-to-peer**, so it works with no network at all: every wire
 path sets `includePeerToPeer`, which lets delivery run over AWDL — the same
 direct radio link AirDrop uses. Turning Wi-Fi off in Control Center leaves AWDL
 up on purpose, so your phone still finds your Mac; Airplane Mode, or
-Settings ▸ Wi-Fi ▸ Off, is what actually takes the link down. If your phone
-delivers to a Mac that looks offline, that is the feature working.
+Settings ▸ Wi-Fi ▸ Off, is what actually takes the link down. All it needs is
+the Wi-Fi radio switched on at both ends — no router, and not the same one. If
+your phone delivers to a Mac that looks offline, that is the feature working.
 
 ## Updating
 

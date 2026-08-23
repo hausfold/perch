@@ -279,6 +279,14 @@ dot-directory on the shelf's volume, are digest-verified, and enter the shelf
 through the same admission-first, atomic-commit path as a drag. Pairing lives
 in the Keychain; revoking a device deletes its row.
 
+Every wire path — listener, browser and connection alike — sets
+`includePeerToPeer = true`, so a phone that cannot see the Mac over Wi-Fi finds
+it over AWDL, the same peer-to-peer link AirDrop uses. Delivery therefore works
+with no network at all, and turning Wi-Fi off in Control Center does **not**
+take the link down: that toggle leaves AWDL up by design. Airplane Mode, or
+Settings ▸ Wi-Fi ▸ off, is the only way to actually stop it — which is what a
+test asserting "off means no delivery" has to use.
+
 **No account, no relay, and TLS-PSK was considered and declined.** A hausfold
 sync server would spend, for a v1 nobody asked to be cloudy, exactly the trust
 that "your files never leave your network" buys. `sec_protocol_options_add_pre_shared_key`

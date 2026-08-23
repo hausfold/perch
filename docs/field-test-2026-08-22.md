@@ -47,6 +47,23 @@ too (E3).
 | 3 | 3 GB file "lands immediately" instead of showing progress | — | **Not a bug** — bad expectation | — |
 | ~~11~~ | ~~Phone Wi-Fi off, Mac still receives~~ | — | **Not a bug** — documented in `docs/reference.md` | — |
 
+### Where it stands — 2026-08-23
+
+**Every codeable item on this board has landed.** What is left is five things
+that need Julien's hands, not a session's:
+
+| owed | which | needs |
+|---|---|---|
+| Feel-test | B1 (#10), B2 (#9), D2 (#6), E (#2) | the screen — each Run's own **Verify** block says what to do |
+| Experiment | F (#4) | an Automator Quick Action in `~/Library/Services`, made in Automator — a hand-authored `.workflow` is not a valid control, since one that fails to register looks exactly like the bug |
+| One click | F (#4/#5) | click each of the two **Services** rows and see which one shelves the file, before either door is deleted |
+| Measurement | G (#12) | the phone + `log stream … category == "PairedDevices"`; the store is exonerated, the UI wiring reads correct (one `AppRuntime` instance, `@Published`, `@ObservedObject`), so the count line is what splits "stored but not shown" from "never stored" |
+| Nothing | D3 (#8) | unreproduced; the resumed stream is in and there is nothing further to write until it recurs |
+
+Two loose ends from this board are being carried in **other lanes**, not here:
+E's unbounded cloud waiters (`worktree-silly-pika`) and the export-ledger /
+drag-out-into-a-watched-folder pair (`worktree-btw-pretty-sure-im`).
+
 ---
 
 ## ~~Run A — Notch geometry (`Perch/Platform/`)~~
@@ -716,7 +733,9 @@ actually take the link down. **Stated in `docs/reference.md` ▸ Permissions** �
 which also had to be corrected while it was open: it claimed perch "makes
 exactly one kind of network call" (the update check) and did not mention the
 Bonjour listener the phone connects to, which ships **on**. Both halves are
-there now, with the peer-to-peer note beside them.
+there now, with the peer-to-peer note beside them, and the mechanism
+(`includePeerToPeer` on all three wire paths) is stated once in
+`ARCHITECTURE.md` beside the wire.
 
 ---
 
