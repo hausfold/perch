@@ -17,3 +17,45 @@ session** (where `xcodebuild` works), signs it with a stable identity under the
 
 The package then packages *that* app instead of the release. Nothing here needs
 committing per build — the override is transient, per `bench try` invocation.
+
+## Renaming the bundle: use `PERCH_BUNDLE_ID`, never `PRODUCT_BUNDLE_IDENTIFIER`
+
+All six targets derive their identifier from one project-level setting —
+`$(PERCH_BUNDLE_ID)`, `.finder-action`, `.cli`, `.tests`, `.ios`, `.ios.share`
+— precisely so the dev build can rename the whole family with a single
+override:
+
+```sh
+xcodebuild -scheme Perch … PERCH_BUNDLE_ID=com.hausfold.perch.dev
+```
+
+A `PRODUCT_BUNDLE_IDENTIFIER=` on the xcodebuild command line applies to **every
+target in the scheme**, which collapses the app, the Finder Action and the CLI
+onto one identifier. An app extension that shares its container's bundle id is
+malformed: PluginKit registers it (`defaults read pbs` even shows
+`APPEXTENSION-… = 1`) but Finder never offers the Quick Action and Login Items &
+Extensions has nothing to switch on — the best current explanation for
+field-test #4, after two passes of looking for it in the plist. Still to be
+confirmed against a real notarized release.
+
+### What the rename deliberately does *not* change
+
+Three things stay pinned to the release identity, so a `…dev` build is not a
+fully separate app and never was:
+
+- **The App Group** is `88M28542LQ.com.hausfold.perch`, hardcoded in the
+  entitlements and compiled into three binaries as a Swift constant
+  (`PerchFinderBridge/FinderActionProtocol.swift`). It is portal-registered, so
+  a derived `…dev` group would be unprovisioned and the Finder/CLI mailbox
+  would not open at all. Consequence: a dev build and an installed release
+  share one mailbox, and both poll it.
+- **The single-instance guard** matches on `Bundle.main.bundleIdentifier`
+  (`Perch/App/PerchApp.swift`), so a renamed dev build does *not* stand down
+  for an installed release. Two panels, one notch — quit the installed app
+  first, as `AGENTS.md` says.
+- **`perch add` from the CLI** resolves the app by the literal
+  `com.hausfold.perch` (`PerchCLI/PerchTool.swift`), so it reaches the
+  *installed* app rather than the dev one whenever a release is installed.
+
+None of this is new — the old `PRODUCT_BUNDLE_IDENTIFIER` rename produced all
+three — but it is what to expect when feel-testing the Finder doors.
