@@ -72,15 +72,16 @@ final class ShelfWindowSystem {
 
     func openShelfOnPointerScreen() {
         let point = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { $0.frame.contains(point) }
-            ?? ShelfWindowSystem.primaryScreen()
-        guard let screen, let panel = panels[screen.perchIdentifier] else {
-            // The pointer is on a display with no panel (the setting is off, or
-            // the arrangement changed under us) — open whatever shelf exists.
-            panels.values.first?.expand()
-            return
-        }
-        panel.expand()
+        let onPointerScreen = NSScreen.screens
+            .first { $0.frame.contains(point) }
+            .flatMap { panels[$0.perchIdentifier] }
+        // The pointer may be on a display with no panel of its own — with the
+        // setting off that is every display but one. Fall back to the primary
+        // display's shelf rather than doing nothing; never to an arbitrary
+        // dictionary entry, whose order is undefined.
+        let fallback = ShelfWindowSystem.primaryScreen()
+            .flatMap { panels[$0.perchIdentifier] }
+        (onPointerScreen ?? fallback)?.expand()
     }
 
     /// The display the single-panel case belongs on.

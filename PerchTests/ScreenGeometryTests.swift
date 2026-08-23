@@ -63,11 +63,12 @@ final class ScreenGeometryTests: XCTestCase {
         XCTAssertEqual(geometry.collapsedFrame.maxY, screen.frame.maxY)
     }
 
-    /// #13: the frames a secondary display's panel is built from are in
-    /// *global* coordinates, not relative to that screen's origin. That is what
-    /// makes `screen: nil` the correct argument at the `NSPanel` initializer in
-    /// `ShelfPanelController` — passing the screen too would apply this origin
-    /// a second time and throw the panel a full screen-width off.
+    /// #13, characterization: the frames a secondary display's panel is built
+    /// from are in *global* coordinates, not relative to that screen's origin.
+    /// That is the premise `screen: nil` at the `NSPanel` initializer in
+    /// `ShelfPanelController` rests on — passing the screen too applies this
+    /// origin a second time. This pins the premise, not the initializer
+    /// argument: nothing here fails if someone puts `screen: screen` back.
     func testSecondaryDisplayFramesAreGlobalNotScreenRelative() {
         let origin = CGPoint(x: 1512, y: 240)
         let screen = ScreenDescriptor(

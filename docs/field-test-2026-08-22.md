@@ -46,10 +46,13 @@ is provably the only thing going wrong.
 **Landed.**
 
 - **A1 (#1)** — the hover trigger no longer trusts *which* tracking area fired.
-  `ShelfHostingView` hit-tests the pointer against `ShelfHoverRegion` on enter,
-  exit and move, and reports each transition once. The wide drag-catch band is
-  untouched. Covered by `ShelfHoverRegionTests`, which needs no window server —
-  the reason #55 and #78 could only be judged by sweeping a real menu bar.
+  `ShelfHostingView` hit-tests the pointer against `ShelfHoverRegion`, and
+  `ShelfHoverGate` turns those samples into edges: opening is edge-triggered on
+  the hit test, while `mouseExited` is always forwarded, because it is the only
+  signal that the pointer left the panel and `scheduleCollapse` is the only
+  passive way back to a collapsed shelf. The wide drag-catch band is untouched.
+  Covered by `ShelfHoverRegionTests`, which needs no window server — the reason
+  #55 and #78 could only be judged by sweeping a real menu bar.
 - **A2 (#13)** — the panel is created with `screen: nil`; `ShelfGeometry`'s
   frames were already global, so passing the screen applied its origin twice.
   Also: the single-panel case now uses the zero-origin display rather than

@@ -342,39 +342,39 @@ final class ShelfHostingView<Content: View>: NSHostingView<Content> {
         )
     }
 
-    /// Whether the pointer was last seen inside `hoverRect`. The enter/exit
-    /// callbacks are driven off *this*, not off the raw AppKit events, so each
-    /// transition is reported exactly once no matter how many tracking areas
-    /// fired.
-    private var pointerIsInHoverBand = false
-
-    /// Single gate for the passive-hover trigger.
+    /// Enter/exit edges for the passive-hover trigger. See `ShelfHoverGate`.
     ///
-    /// It cannot key off which tracking area fired: `NSHostingView` installs
-    /// its own full-bounds area (options `mouseEnteredAndExited | mouseMoved |
-    /// activeAlways | inVisibleRect`) with *this* view as owner as soon as the
-    /// SwiftUI tree uses `.onHover`, so our overrides run for the entire wide
-    /// drag-catch band as well as for the narrow band installed above. That is
-    /// why narrowing `hoverTriggerWidth` twice (#55, #78) changed nothing:
-    /// the geometry was already right and the trigger was not reading it.
-    /// Hit-test the pointer instead.
-    private func updateHoverBand(at locationInWindow: NSPoint) {
-        let inside = hoverRect.contains(convert(locationInWindow, from: nil))
-        guard inside != pointerIsInHoverBand else { return }
-        pointerIsInHoverBand = inside
-        if inside {
-            onPointerEntered?()
-        } else {
-            onPointerExited?()
+    /// The trigger cannot key off which tracking area fired: `NSHostingView`
+    /// installs its own full-bounds area (options `mouseEnteredAndExited |
+    /// mouseMoved | activeAlways | inVisibleRect`) with *this* view as owner as
+    /// soon as the SwiftUI tree uses `.onHover`, so these overrides run for the
+    /// entire wide drag-catch band as well as for the narrow band installed
+    /// above. That is why narrowing `hoverTriggerWidth` twice (#55, #78)
+    /// changed nothing: the geometry was already right and the trigger was not
+    /// reading it. Hit-test the pointer instead.
+    private var hoverGate = ShelfHoverGate()
+
+    private func reportHover(_ signal: ShelfHoverGate.Signal, for event: NSEvent) {
+        let inside = hoverRect.contains(convert(event.locationInWindow, from: nil))
+        switch hoverGate.update(signal, isInBand: inside) {
+        case .entered: onPointerEntered?()
+        case .exited: onPointerExited?()
+        case .none: break
         }
     }
 
     override func mouseEntered(with event: NSEvent) {
-        updateHoverBand(at: event.locationInWindow)
+        reportHover(.sample, for: event)
     }
 
     override func mouseExited(with event: NSEvent) {
-        updateHoverBand(at: event.locationInWindow)
+        // Always forwarded, never edge-gated: this is the only signal that the
+        // pointer left the panel, and `scheduleCollapse` is the only passive
+        // path back to a collapsed shelf. Gating it on "was in the band" leaves
+        // a shelf the user hovered open, then moved down into, expanded
+        // forever. The collapse it schedules re-checks the live pointer
+        // location, so an exit reported early is harmless.
+        reportHover(.left, for: event)
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -384,7 +384,7 @@ final class ShelfHostingView<Content: View>: NSHostingView<Content> {
         // point or two outside it. Moves keep the gate honest whenever the
         // hosting view's own `mouseMoved` area exists; without it, enter/exit
         // alone are already exact, because then ours is the only area.
-        updateHoverBand(at: event.locationInWindow)
+        reportHover(.sample, for: event)
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
