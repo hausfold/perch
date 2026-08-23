@@ -345,6 +345,12 @@ final class ShelfStore: ObservableObject {
         }
     }
 
+    /// A drag-out began. Clears any verdict left over from a previous one so a
+    /// stale refusal can't suppress this drag's lift — see `returnToShelf`.
+    func beginExport(of ids: Set<UUID>) {
+        refusedBeforeLift.subtract(ids)
+    }
+
     /// A drop was accepted: take unpinned items off the shelf now, before
     /// anything has read them. Pinned items deliberately stay available for
     /// another drag and never enter the lifted/deletion transaction.
@@ -355,12 +361,6 @@ final class ShelfStore: ObservableObject {
     /// still read them and `returnToShelf` can put a refused item back exactly
     /// where it was. What finally happens to those bytes is settled by
     /// `confirmCopied` (deleted) or `handOff` (detached).
-    /// A drag-out began. Clears any verdict left over from a previous one so a
-    /// stale refusal can't suppress this drag's lift — see `returnToShelf`.
-    func beginExport(of ids: Set<UUID>) {
-        refusedBeforeLift.subtract(ids)
-    }
-
     func liftForExport(_ ids: Set<UUID>) {
         var liftedNow: Set<UUID> = []
         for id in ids {
