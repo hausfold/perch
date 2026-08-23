@@ -113,9 +113,9 @@ final class TransferPipeline: @unchecked Sendable {
         }
     }
 
-    /// Moves a complete representation prepared by another Perch process into
-    /// the shelf. Finder Action bytes reach here only after `ShelfStore`
-    /// reserved their slots, and the App Group source is already complete.
+    /// Moves a complete representation prepared by another process into the
+    /// shelf. Mailbox bytes reach here only after `ShelfStore` reserved their
+    /// slots, and the App Group source is already complete.
     func adoptPreparedFile(
         at preparedURL: URL,
         suggestedName: String,

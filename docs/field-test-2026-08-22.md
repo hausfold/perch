@@ -35,32 +35,30 @@ too (E3).
 |---|---|---|---|---|
 | ~~1~~ | ~~Shelf hover-opens ~1 notch-width either side of the notch~~ | Platform | **Fixed** — hit-test the pointer, don't trust the tracking area | ~~**A**~~ |
 | ~~13~~ | ~~Secondary display never shows a drop target~~ | Platform | **Fixed** — `screen: nil`; the frames were already global | ~~**A**~~ |
-| 10 | Open/close animation janks at ~250 items (scrolling is fine) | UI | **Fixed in code** — lazy strip + cached icons; not yet feel-tested | **B** |
-| 9 | 50 folders dropped into Finder land in a diagonal line | UI | **Fixed in code** — the frames were the pile Finder untangled; not yet feel-tested | **B** |
+| ~~10~~ | ~~Open/close animation janks at ~250 items (scrolling is fine)~~ | UI | **Fixed** — lazy strip + cached icons; feel-tested 2026-08-23 | ~~**B**~~ |
+| ~~9~~ | ~~50 folders dropped into Finder land in a diagonal line~~ | UI | **Fixed** — the frames were the pile Finder untangled; feel-tested 2026-08-23 | ~~**B**~~ |
 | ~~7~~ | ~~Rename a staged file in Finder → tile can never be dragged out, and vanishes~~ | Store | **Fixed** — re-resolve; decision in `ARCHITECTURE.md` | ~~**C**~~ |
-| 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | **Fixed in tests** — dedupe gone, FSEvents sees the rewrite; not yet feel-tested | **D** |
+| ~~6~~ | ~~`curl -o ~/Downloads/slow.bin` never lands~~ | Watch | **Fixed** — dedupe gone, FSEvents sees the rewrite; feel-tested 2026-08-23 | ~~**D**~~ |
 | 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | **Addressed, still unreproduced** — the stream now resumes from a persisted position | **D** |
-| 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | **Cause found by feel-test** — the poll read a cached status; fixed, needs a re-test | **E** |
-| 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | **Duplicate explained** — two doors, one submenu; Quick Actions still open | **F** |
-| 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | **Premise dead** — measured: a classic Service does not reach the top level | **F** |
+| ~~2~~ | ~~Non-downloaded iCloud file sticks on "Downloading" forever~~ | Import | **Fixed** — the poll read a cached status; re-tested 2026-08-23 | ~~**E**~~ |
+| ~~4~~ | ~~Quick Action absent from Quick Actions; Service listed twice~~ | Finder | **Fixed** — the extension was the dead door; removed | ~~**F**~~ |
+| ~~5~~ | ~~No top-level "Add to Perch Shelf" in the Finder context menu~~ | Finder | **Premise dead** — a classic Service does not reach the top level; docs corrected | ~~**F**~~ |
 | 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Open** — Keychain exonerated by measurement; look at the UI | **G** |
 | 3 | 3 GB file "lands immediately" instead of showing progress | — | **Not a bug** — bad expectation | — |
 | ~~11~~ | ~~Phone Wi-Fi off, Mac still receives~~ | — | **Not a bug** — documented in `docs/reference.md` | — |
 
 ### Where it stands — 2026-08-23
 
-**Nothing left on this board can be advanced from a checkout alone.** Every
-item that could be fixed by reading and writing code has landed; #12 is still
-open, but its next step is a measurement, not a diff. Four things need Julien's
-hands, and one needs nothing at all:
+**Feel-tested on the dev build (`2026.08.23-dev`) and all four passed:** #10
+(open/close at 250 items, and a cold scroll end to end), #9 (50 folders land in
+a grid), #6 (`curl -o` twice over one path gives two tiles), #2 (an evicted
+iCloud file lands instead of counting to 120). Run F is answered and closed by
+the deletion below. **#12 is the only thing left on this board.**
 
 | owed | which | needs |
 |---|---|---|
-| Feel-test | B1 (#10), B2 (#9), D2 (#6), E (#2) | the screen — each Run's own **Verify** block says what to do |
-| Experiment | F (#4) | an Automator Quick Action in `~/Library/Services`, made in Automator — a hand-authored `.workflow` is not a valid control, since one that fails to register looks exactly like the bug |
-| One click | F (#4/#5) | click each of the two **Services** rows and see which one shelves the file, before either door is deleted |
-| Measurement | G (#12) | the phone + `log stream … category == "PairedDevices"`; the store is exonerated, the UI wiring reads correct (one `AppRuntime` instance, `@Published`, `@ObservedObject`), so the count line is what splits "stored but not shown" from "never stored" |
-| Nothing | D3 (#8) | unreproduced; the resumed stream is in and there is nothing further to write until it recurs |
+| Measurement | G (#12) | the phone, the **release** build, and `log stream … category == "PairedDevices"`. Not the dev build: a different bundle id is a different Keychain access group, so "No devices paired" is the correct answer there and would reproduce the symptom for the wrong reason |
+| Nothing | D3 (#8) | unreproduced; the resumed stream is in, and there is nothing further to write until it recurs |
 
 Two loose ends from this board are being carried by **other sessions**, not
 here — don't pick them up twice: E's unbounded cloud waiters (Run E's *Watch
@@ -477,7 +475,33 @@ cloud seam (`isUndownloadedCloudItem` / `startDownload` / `probe`) exists to
 make the path testable without an iCloud account; production defaults are the
 real calls.
 
-## Run F — The two Finder doors (#4, #5)
+## ~~Run F — The two Finder doors (#4, #5)~~
+
+**Closed 2026-08-23. The extension was the dead door, and it is gone.**
+
+The click test the section below asks for was run: of the two identical
+"Add to Perch Shelf" rows under Services, **only the top one shelved the file**.
+Which door that was is settled by a durable artifact rather than by timing —
+`PerchFinderAction` had exactly one delivery path (`ActionRequestHandler` →
+`HandoffClient` → the App Group mailbox), and
+`~/Library/Group Containers/88M28542LQ.com.hausfold.perch/FinderActionRequests`
+was untouched across the whole session. One group container, both the app and
+the appex entitled to it, so there was nowhere else the write could have gone.
+The tile landed without the mailbox being written, which only the in-process
+`ShelfDropHandler` path does. **The working row was the classic `NSServices`
+entry; the extension delivered nothing.**
+
+So the extension was 0-for-3 — never rendered under Quick Actions, never
+delivered when clicked from Services, and was the sole cause of the duplicate
+row — and the `PerchFinderAction` target was deleted. `PerchFinderBridge/`
+stays: the `perch` CLI is still a sender on that mailbox. The decisions now
+live where they bind (`Perch/Config/Info.plist`, `ARCHITECTURE.md`,
+`AGENTS.md`, `PRD.md`, `README.md`, `nix/dev-app/README.md`), not here.
+
+The investigation that got there is kept below, unedited, because it is the
+record of what was ruled out.
+
+### Original notes
 
 **Symptoms.**
 - "Add to Perch Shelf" does **not** appear under Finder ▸ Quick Actions, even

@@ -1,8 +1,10 @@
 import Foundation
 
-/// The *sender's* half of the App Group mailbox, shared by everything that
-/// hands bytes to a running Perch: the Finder Action and the `perch` command
-/// line tool. `FinderActionMailbox` is the filesystem mechanics; this is the
+/// The *sender's* half of the App Group mailbox — the way anything that isn't
+/// the app hands it bytes. The `perch` command line tool is the only sender
+/// left; a Finder Action extension spoke it too until 2026-08-23, which is
+/// where these `FinderAction*` names come from.
+/// `FinderActionMailbox` is the filesystem mechanics; this is the
 /// protocol played out in order — publish names, wait for Perch's admission
 /// receipt, copy only what it reserved, then publish the relative paths.
 ///
@@ -17,8 +19,9 @@ struct HandoffClient: Sendable {
         self.mailbox = mailbox
     }
 
-    /// Sandboxed senders (the Finder Action) reach the group container through
-    /// their entitlement.
+    /// A sandboxed sender reaches the group container through its entitlement.
+    /// The CLI is not sandboxed and addresses the same directory by path — see
+    /// `FinderActionMailbox`'s `rootURL` override.
     init() throws {
         self.init(mailbox: try FinderActionMailbox())
     }

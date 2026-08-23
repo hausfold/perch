@@ -1,9 +1,14 @@
 import Foundation
 
-/// The containing-app half of the Finder Action mailbox. Polling is deliberate:
-/// Apple provides no supported extension-to-containing-app call, Perch is
-/// already a long-running menu-bar process, and a private Mach service would be
-/// a larger permission surface than checking one App Group directory.
+/// The app's half of the App Group mailbox — today the `perch` CLI is its only
+/// sender, and the name predates that: a `PerchFinderAction` extension spoke it
+/// too until 2026-08-23. The name stays because `FinderActionRequests` is an
+/// on-disk path an *installed* copy of the tool writes to.
+///
+/// Polling is deliberate: Perch is already a long-running menu-bar process, and
+/// a private Mach service would be a larger permission surface than checking
+/// one App Group directory. (It was also the only option while an extension was
+/// a sender — Apple provides no supported extension-to-containing-app call.)
 @MainActor
 final class FinderActionReceiver {
     private let store: ShelfStore

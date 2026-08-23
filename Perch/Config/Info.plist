@@ -5,22 +5,18 @@
   is still YES; Xcode merges its keys into this file). This partial exists for
   one key that has no INFOPLIST_KEY_ build setting: NSServices.
 
-  Perch declares two doors into the Finder context menu. MEASURED on macOS 26
-  (field-test 2026-08-23), they land in the SAME place: both this NSServices
-  entry and the PerchFinderAction extension appear under "Services", and the
-  menu shows "Add to Perch Shelf (Perch.app)" twice — macOS only appends the
-  app name when it has two providers with one title to tell apart.
+  This is perch's ONLY Finder door, and it is the one that works. Perch used to
+  ship a second — a `PerchFinderAction` Action Extension — on the belief that
+  the two landed in different submenus. MEASURED on macOS 26 (field test
+  2026-08-23), they did not: both drew under "Services", the menu read
+  "Add to Perch Shelf (Perch.app)" twice, the extension never rendered under
+  "Quick Actions" despite being listed and enabled there, and clicking its row
+  shelved nothing — its App Group mailbox was never written. The extension was
+  removed; see the field-test file, #4/#5.
 
-  Neither of the older claims survived the measurement. This entry is NOT at
-  the menu's top level beside "New Terminal Tab Here", and the extension does
-  NOT appear under "Quick Actions" (it is listed and enabled in Quick Actions ▸
-  Customize… and in Login Items & Extensions, and still does not render there).
-  Verified with exactly one registered copy: `pluginkit -mAvvv -p
-  com.apple.services` reports a single plug-in, so the duplicate is these two
-  doors and not two builds fighting.
-
-  So keeping both costs a visible duplicate and buys nothing that was claimed
-  for it. See the 2026-08-22 field-test file, #4/#5.
+  So this entry is NOT at the context menu's top level beside "New Terminal Tab
+  Here" — no classic Service is, on macOS 26. It is under Services, and that is
+  where the Settings pane tells people to look.
 
   NSRequiredContext is deliberately empty — every restricting key you add is
   another reason for macOS to hide the item, and the send types below are

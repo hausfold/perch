@@ -105,42 +105,23 @@ struct GeneralPane: View {
 
             SettingsCard {
                 SettingsRow(
-                    symbol: "puzzlepiece.extension.fill",
-                    title: "Finder Quick Action",
-                    subtitle: "“Add to Perch Shelf” appears whenever files or folders are selected."
-                ) {
-                    Button("Open Login Items…") {
-                        openFinderExtensionSettings()
-                    }
-                }
+                    symbol: "contextualmenu.and.cursorarrow",
+                    title: "Finder’s right-click menu",
+                    subtitle: "“Add to Perch Shelf” is under Services whenever files or folders are selected."
+                ) {}
             }
-            // macOS has no anchor that lands on the Extensions section, so the
-            // button opens the top of a long pane. Name every step of the walk
-            // instead — and name the row it hides behind, which is "System
-            // Services", not "Perch".
+            // No button here on purpose. This is a classic Service, which is on
+            // by default and needs no enabling — and the one place macOS lets a
+            // user turn it off is a pane with no anchor that lands on it, so a
+            // button would open the top of a long list and leave the same walk
+            // to describe. Describe the walk and skip the button.
             SettingsFootnote(
                 """
-                The Quick Action is normally on already. If it goes missing, scroll that \
-                pane to Extensions, click ⓘ next to System Services, and tick \
-                “Add to Perch Shelf” there.
+                It is on by default. If it ever goes missing, it is in System Settings ▸ \
+                Keyboard ▸ Keyboard Shortcuts… ▸ Services, under Files and Folders.
                 """
             )
         }
-    }
-
-    private func openFinderExtensionSettings() {
-        // Tahoe places extensions under General › Login Items & Extensions,
-        // and this is as close as macOS lets an app land: the pane opens at
-        // its top, above Open at Login and the whole background-activity list,
-        // with Extensions far below. Verified on 26.6 that there is no anchor
-        // for that section — com.apple.ExtensionsPreferences (with and without
-        // ?extensionPointIdentifier=com.apple.services) and ?extension-points
-        // all open the same pane at the same top. The footnote above walks the
-        // rest of the way; don't "fix" this URL without re-testing the anchors.
-        guard let url = URL(
-            string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"
-        ) else { return }
-        NSWorkspace.shared.open(url)
     }
 }
 

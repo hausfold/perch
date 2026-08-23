@@ -12,10 +12,11 @@ collect several items and then drag the group to one destination.
 - Notch-derived geometry and a clear notchless-display fallback.
 - One public-API overlay per selected display.
 - Finder files and folders, file promises, images, URLs, and text.
-- A Finder Action extension that adds selected files and folders from Finder's
-  Quick Actions menu, on by default, with a Settings shortcut to the pane that
-  holds its checkbox — and a classic Service that puts the same command at the
-  context menu's top level, and in any app's Services menu for text and links.
+- A Finder door: "Add to Perch Shelf" under Services for any selection of files
+  and folders, on by default and needing no setup, and in any app's Services
+  menu for text and links. (An Action Extension shipped alongside it through
+  2026-08-23 and was removed — measured on macOS 26, it drew in the same
+  submenu rather than under Quick Actions, and shelved nothing when clicked.)
 - A `perch add` command line tool, shipped inside the app bundle and put on
   `PATH` by whatever installed it, so a script or an agent can stage files
   without a human present — same admission, same staging, same untouched
