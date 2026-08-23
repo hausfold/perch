@@ -50,14 +50,29 @@ final class ExportLedger: @unchecked Sendable {
     }
 
     private struct Entry {
-        /// Nil while the copy is still running: the identity of a half-written
-        /// file is not the identity it will settle at.
+        /// The identity the file settled at. Nil while the copy is still
+        /// running — a half-written file has neither its final bytes nor its
+        /// final identity — and also for a copy that finished but could not be
+        /// stat'ed, which is held as `.inFlight` until it expires rather than
+        /// released into the scan that would shelve it straight back.
         var token: String?
+        /// Set by `didWrite`/`cancelWrite`. Only a settled entry expires: a
+        /// copy still running is bounded by the copy, not by a clock, and a
+        /// multi-gigabyte write onto a slow volume must not have its
+        /// reservation pulled out from under it halfway. Nothing here outlives
+        /// the process, so a crash mid-copy cleans up by exiting.
+        var settled: Bool
         var stamp: DispatchTime
     }
 
     private let lock = NSLock()
+    /// Keyed by destination path — what a watcher scanning its folder has.
     private var pending: [String: Entry] = [:]
+    /// Keyed by settled identity, for the receiver that writes into a scratch
+    /// directory and *moves* the finished file into place. A move on one
+    /// volume carries the inode, the birth date, the size and the modification
+    /// date, so the token still matches at a path this never saw.
+    private var settledTokens: [String: DispatchTime] = [:]
     private var storedOnWritten: (@Sendable (URL) -> Void)?
     private let lifetime: TimeInterval
 
@@ -70,7 +85,7 @@ final class ExportLedger: @unchecked Sendable {
         let key = Self.key(for: url)
         lock.withLock {
             prune()
-            pending[key] = Entry(token: nil, stamp: .now())
+            pending[key] = Entry(token: nil, settled: false, stamp: .now())
         }
     }
 
@@ -83,13 +98,15 @@ final class ExportLedger: @unchecked Sendable {
         let key = Self.key(for: url)
         let notify: (@Sendable (URL) -> Void)? = lock.withLock {
             prune()
-            guard let token else {
-                // Nothing to match on later; a file we cannot stat is one no
-                // watcher will ledger either, so stop pretending we wrote it.
-                pending.removeValue(forKey: key)
-                return storedOnWritten
+            let now = DispatchTime.now()
+            // A nil token keeps the reservation rather than dropping it. The
+            // file is perch's either way, and releasing it here would wake the
+            // scan — `onWritten` fires below — onto the very file the reserve
+            // exists to protect. It expires like any other settled entry.
+            pending[key] = Entry(token: token, settled: true, stamp: now)
+            if let token {
+                settledTokens[token] = now
             }
-            pending[key] = Entry(token: token, stamp: .now())
             return storedOnWritten
         }
         notify?(url)
@@ -102,7 +119,9 @@ final class ExportLedger: @unchecked Sendable {
         let key = Self.key(for: url)
         lock.withLock {
             prune()
-            pending.removeValue(forKey: key)
+            if let token = pending.removeValue(forKey: key)?.token {
+                settledTokens.removeValue(forKey: token)
+            }
         }
     }
 
@@ -112,23 +131,36 @@ final class ExportLedger: @unchecked Sendable {
         let key = Self.key(for: url)
         return lock.withLock {
             prune()
-            guard let entry = pending[key] else { return .unrelated }
+            guard let entry = pending[key] else {
+                // No reservation at this path, but the identity may still be
+                // one perch wrote and a receiver then moved here.
+                guard settledTokens.removeValue(forKey: token) != nil else {
+                    return .unrelated
+                }
+                return .ours
+            }
             guard let written = entry.token else { return .inFlight }
             // The path is ours but the identity is not: something replaced the
-            // file after our copy landed. That is a genuine new arrival.
+            // file after our copy landed. That is a genuine new arrival — the
+            // same "rewritten in place" rule every other watched file follows.
             guard written == token else { return .unrelated }
             pending.removeValue(forKey: key)
+            settledTokens.removeValue(forKey: token)
             return .ours
         }
     }
 
-    /// Called with the lock held.
+    /// Called with the lock held. Only settled entries age out; see `Entry`.
     private func prune() {
         let now = DispatchTime.now()
         pending = pending.filter { _, entry in
-            let age = Double(now.uptimeNanoseconds - entry.stamp.uptimeNanoseconds) / 1_000_000_000
-            return age < lifetime
+            !entry.settled || Self.age(of: entry.stamp, at: now) < lifetime
         }
+        settledTokens = settledTokens.filter { Self.age(of: $0.value, at: now) < lifetime }
+    }
+
+    private static func age(of stamp: DispatchTime, at now: DispatchTime) -> TimeInterval {
+        Double(now.uptimeNanoseconds - stamp.uptimeNanoseconds) / 1_000_000_000
     }
 
     /// One spelling of a path, for both sides of the match.

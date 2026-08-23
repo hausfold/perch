@@ -640,6 +640,42 @@ final class FolderWatcherTests: XCTestCase {
         XCTAssertEqual(log.importedNames, ["other.txt"])
     }
 
+    /// A probe can already be running at the path an export lands on — a file
+    /// deleted a moment before the copy claimed its name. The scan has to ask
+    /// the export ledger *before* it skips past on "already probing", or the
+    /// verdict is never read and the probe hands the item back.
+    func testAnExportIsAdoptedEvenWhenAProbeWasAlreadyRunningAtThatPath() throws {
+        let directory = try makeTemporaryDirectory()
+        let exportLedger = ExportLedger()
+        let log = ImportLog()
+        let adopted = expectation(description: "export adopted")
+        let watcher = makeWatcher(
+            over: directory,
+            // Long enough that the probe started below is still running when
+            // the export announces itself, without the test racing a clock.
+            requiredStableProbes: 100,
+            exportLedger: exportLedger,
+            log: log,
+            onAdopt: adopted
+        )
+        exportLedger.onWritten = { [weak watcher] _ in watcher?.rescan() }
+        watcher.start(seedExisting: false)
+
+        let contested = directory.appending(path: "contested.txt")
+        try Data("somebody else's file".utf8).write(to: contested)
+        waitUntil("a probe is running") { log.importedNames.isEmpty }
+        Thread.sleep(forTimeInterval: 0.3)
+
+        // Now perch writes its own export onto that same name.
+        exportLedger.willWrite(to: contested)
+        try Data("perch's export".utf8).write(to: contested)
+        exportLedger.didWrite(to: contested)
+
+        wait(for: [adopted], timeout: 5)
+        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertEqual(log.importedNames, [], "the running probe must not promote perch's own write")
+    }
+
     /// A promise whose copy threw leaves nothing of ours at that path, so the
     /// reservation must not swallow whatever genuinely arrives there next.
     func testACancelledExportDoesNotSwallowARealArrival() throws {
@@ -737,6 +773,42 @@ final class ExportLedgerTests: XCTestCase {
         )
     }
 
+    func testAnInFlightReservationIsBoundedByTheCopyNotByTheClock() throws {
+        let directory = try makeTemporaryDirectory()
+        let file = directory.appending(path: "huge.bin")
+
+        let ledger = ExportLedger(lifetime: 0.05)
+        ledger.willWrite(to: file)
+        try Data("still going".utf8).write(to: file)
+        Thread.sleep(forTimeInterval: 0.2)
+        XCTAssertEqual(
+            ledger.claim(file, token: try FolderWatchRules.identityToken(forFileAt: file)),
+            .inFlight,
+            "a multi-gigabyte copy onto a slow volume must not have its reservation expire mid-write"
+        )
+    }
+
+    func testAFileWrittenToScratchAndMovedIntoPlaceIsMatchedByIdentity() throws {
+        let scratch = try makeTemporaryDirectory()
+        let folder = try makeTemporaryDirectory()
+        let written = scratch.appending(path: "report.pdf")
+
+        // What a receiver that stages its own copy does: perch is handed the
+        // scratch path, and the file only reaches the watched folder after.
+        let ledger = ExportLedger()
+        ledger.willWrite(to: written)
+        try Data("exported".utf8).write(to: written)
+        ledger.didWrite(to: written)
+
+        let landed = folder.appending(path: "report.pdf")
+        try FileManager.default.moveItem(at: written, to: landed)
+        XCTAssertEqual(
+            ledger.claim(landed, token: try FolderWatchRules.identityToken(forFileAt: landed)),
+            .ours,
+            "a move on one volume carries the identity the token is built from"
+        )
+    }
+
     func testAReservationExpires() throws {
         let directory = try makeTemporaryDirectory()
         let file = directory.appending(path: "abandoned.txt")
@@ -744,6 +816,7 @@ final class ExportLedgerTests: XCTestCase {
         let ledger = ExportLedger(lifetime: 0.05)
         ledger.willWrite(to: file)
         try Data("nobody claimed me".utf8).write(to: file)
+        ledger.didWrite(to: file)
         Thread.sleep(forTimeInterval: 0.2)
         XCTAssertEqual(
             ledger.claim(file, token: try FolderWatchRules.identityToken(forFileAt: file)),

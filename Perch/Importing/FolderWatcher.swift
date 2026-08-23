@@ -379,27 +379,32 @@ final class FolderWatcher: @unchecked Sendable {
         for url in regularFiles() {
             let name = url.lastPathComponent
             guard FolderWatchRules.isCandidateName(name),
-                  probes[url.path] == nil,
                   let token = try? FolderWatchRules.identityToken(forFileAt: url),
                   !ledger.contains(token)
             else {
                 continue
             }
-            // Something perch is writing out of the shelf, or has just
-            // finished writing. Adopting it costs one ledger entry and stops
-            // a drag-out into a watched folder handing the item straight
-            // back; `.inFlight` waits, because a half-written copy has
-            // neither its final bytes nor its final identity.
+            // Asked before the probe guard below, and that order is the whole
+            // point: a probe can already be running at this path when perch
+            // announces a write to it — a file deleted a moment before the
+            // export landed on its name — and a scan that skipped straight
+            // past on "already probing" would never read the verdict, promote
+            // the export, and hand the item back after all.
             switch exportLedger.claim(url, token: token) {
             case .unrelated:
                 break
             case .inFlight:
+                // Perch is mid-copy here. Abandon any probe that beat the
+                // announcement; `rescan()` settles it once the copy lands.
+                probes.removeValue(forKey: url.path)
                 continue
             case .ours:
+                probes.removeValue(forKey: url.path)
                 ledger.insert(token)
                 onAdopt(token)
                 continue
             }
+            guard probes[url.path] == nil else { continue }
             probes[url.path] = ProbeSample(size: -1, modified: .distantPast)
             probe(url)
         }
@@ -447,6 +452,18 @@ final class FolderWatcher: @unchecked Sendable {
         guard let token = try? FolderWatchRules.identityToken(forFileAt: url),
               !ledger.contains(token)
         else {
+            return
+        }
+        // The last gate before staging. `scan()` asks too, but a probe started
+        // before perch announced its write is only ever re-examined here.
+        switch exportLedger.claim(url, token: token) {
+        case .unrelated:
+            break
+        case .inFlight:
+            return
+        case .ours:
+            ledger.insert(token)
+            onAdopt(token)
             return
         }
         // Held in memory from here so a second event for the same file cannot
