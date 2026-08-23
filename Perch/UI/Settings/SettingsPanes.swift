@@ -91,7 +91,7 @@ struct GeneralPane: View {
                 SettingsRow(
                     symbol: "menubar.dock.rectangle",
                     title: "Show a drop target on every display",
-                    subtitle: "Each screen gets its own shelf at the notch. Off keeps it to one."
+                    subtitle: "Each screen gets its own shelf at the notch. Off keeps it to your main display."
                 ) {
                     Toggle("Show a drop target on every display", isOn: $settings.showOnAllDisplays)
                         .labelsHidden()
