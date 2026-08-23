@@ -123,6 +123,51 @@ final class TransferPipelineTests: XCTestCase {
         }
     }
 
+    /// The loose end #2's fix left behind: leaving the operation queue also
+    /// removed the cap on how many *blocking* probes run at once. Twelve evicted
+    /// files dropped together used to mean twelve synchronous syscalls on the
+    /// cooperative pool, which has one thread per core. The waits still overlap —
+    /// asserted here, because serialising them would put ordinary drops back
+    /// behind cloud ones — but the syscalls are single-file.
+    func testConcurrentCloudWaitsOverlapButTheirProbesDoNot() async throws {
+        let probes = OSAllocatedUnfairLock(initialState: (inFlight: 0, peak: 0))
+        let waitersStarted = OSAllocatedUnfairLock(initialState: 0)
+        let waiterCount = 12
+        let waiter = CloudDownloadWaiter(
+            timeout: .seconds(5),
+            pollInterval: .milliseconds(5),
+            probe: { _ in
+                probes.withLock { state in
+                    state.inFlight += 1
+                    state.peak = max(state.peak, state.inFlight)
+                }
+                // Long enough that overlapping probes would be caught, and
+                // twenty times shorter than the timeout above.
+                Thread.sleep(forTimeInterval: 0.002)
+                let started = waitersStarted.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                probes.withLock { $0.inFlight -= 1 }
+                // Nobody finishes until every waiter has probed at least once,
+                // so all twelve are genuinely outstanding together.
+                return started > waiterCount ? .downloaded : .downloading
+            }
+        )
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for index in 0..<waiterCount {
+                group.addTask {
+                    try await waiter.wait(for: URL(fileURLWithPath: "/dev/null/\(index)")) { _ in }
+                }
+            }
+            try await group.waitForAll()
+        }
+
+        XCTAssertEqual(probes.withLock { $0.peak }, 1, "Cloud probes must not run concurrently")
+        XCTAssertGreaterThan(waitersStarted.withLock { $0 }, waiterCount)
+    }
+
     /// The half of #2 that is not about the spinner: a cloud wait must not
     /// occupy one of the pipeline's two slots. Two files waiting on iCloud used
     /// to hold both, so every ordinary drop behind them stalled for up to two

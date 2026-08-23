@@ -12,6 +12,44 @@ enum CloudDownloadProgress: Equatable, Sendable {
     case notStarted
 }
 
+/// The one thread every cloud probe runs on.
+///
+/// A probe is a *synchronous* file syscall, and `CloudDownloadWaiter.wait` makes
+/// one every 250 ms for up to two minutes. Called inline from an async function,
+/// N evicted files dropped at once put N blocking calls on the cooperative
+/// pool — which has one thread per core and cannot grow — so a big drop could
+/// starve every other async task in the app, the imports queued behind it
+/// included. That is the loose end #2's fix left: leaving the operation queue
+/// removed the two-slot cap on concurrent waiters along with the stall it was
+/// causing.
+///
+/// **Bounding the waits instead would be the wrong fix.** iCloud fetches in
+/// parallel, so a queued-up waiter would not ask for its download until an
+/// earlier one finished, and its 120 s deadline would start late — putting
+/// ordinary drops back behind cloud ones is exactly the bug #2's fix removed.
+/// What has to be bounded is the *blocking work*, not the waiting: every waiter
+/// still runs its own clock, its own deadline and its own download, and only the
+/// syscalls are single-file.
+///
+/// The cost is stated plainly: one wedged probe delays the others' polls. It
+/// cannot make them miss a timeout — the deadline is wall-clock and is checked
+/// after the probe returns — only report elapsed seconds late.
+enum CloudProbeQueue {
+    private static let queue = DispatchQueue(
+        label: "com.hausfold.perch.cloud-probe",
+        qos: .utility
+    )
+
+    /// Runs one blocking probe off the cooperative pool, one at a time.
+    static func run<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                continuation.resume(with: Result(catching: work))
+            }
+        }
+    }
+}
+
 /// Waits for iCloud to bring an evicted file down.
 ///
 /// Deliberately `async` and poll-based rather than a blocking loop: this is the
@@ -67,7 +105,8 @@ struct CloudDownloadWaiter: Sendable {
         var lastElapsed = -1
 
         while true {
-            switch try probe(url) {
+            // Off the cooperative pool and one at a time — see `CloudProbeQueue`.
+            switch try await CloudProbeQueue.run({ [probe] in try probe(url) }) {
             case .downloaded:
                 return
             case .downloading:

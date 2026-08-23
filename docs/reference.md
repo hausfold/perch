@@ -179,11 +179,28 @@ dropped the moment you stop watching it.
 
 There is no telemetry. Nothing about your files is written to a log.
 
-Perch makes exactly one kind of network call: an hourly unauthenticated GET to
-`api.github.com` for perch's own latest release tag, so the shelf can tell you a
-new version is out. It carries nothing but an IP and a user-agent, downloads no
-file, and Settings ▸ Updates switches it off. That is what
+Perch touches the network in exactly two ways, and only one of them leaves your
+home.
+
+**Out to the internet:** an hourly unauthenticated GET to `api.github.com` for
+perch's own latest release tag, so the shelf can tell you a new version is out.
+It carries nothing but an IP and a user-agent, downloads no file, and
+Settings ▸ Updates switches it off. That is what
 `com.apple.security.network.client` is for.
+
+**On your own network:** with Settings ▸ Devices on — it ships on — perch
+advertises `_perch._tcp` over Bonjour and listens for a paired iPhone or iPad
+(`com.apple.security.network.server`). Only a device you paired by scanning the
+QR code can connect, the transfer is end-to-end encrypted, and nothing about it
+goes through a server of ours — there isn't one. Settings ▸ Devices switches
+the listener off entirely.
+
+That link is **peer-to-peer**, so it works with no network at all: every wire
+path sets `includePeerToPeer`, which lets delivery run over AWDL — the same
+direct radio link AirDrop uses. Turning Wi-Fi off in Control Center leaves AWDL
+up on purpose, so your phone still finds your Mac; Airplane Mode, or
+Settings ▸ Wi-Fi ▸ Off, is what actually takes the link down. If your phone
+delivers to a Mac that looks offline, that is the feature working.
 
 ## Updating
 

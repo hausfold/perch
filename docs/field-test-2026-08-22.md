@@ -19,6 +19,14 @@ debugger. Confidence is stated per item. **Reproduce before you fix** — a
 "confirmed" here means the code path provably does the wrong thing, not that it
 is provably the only thing going wrong.
 
+**Where this stands (2026-08-23).** Every run has landed its code: A and C are
+closed outright; B, D, E and F's bundle-id half are merged and owe only a
+feel-test; G's Keychain half is closed by measurement. **Nothing on this board
+is blocked on more reading.** What is left is three feel-tests (B, D, E), two
+measurements that need a screen or a phone (F, G). The one deliberate
+follow-up Run E left open — bounding concurrent cloud waiters — is now closed
+too (E3).
+
 ---
 
 ## The board
@@ -37,7 +45,7 @@ is provably the only thing going wrong.
 | 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | **Premise dead** — measured: a classic Service does not reach the top level | **F** |
 | 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Open** — Keychain exonerated by measurement; look at the UI | **G** |
 | 3 | 3 GB file "lands immediately" instead of showing progress | — | **Not a bug** — bad expectation | — |
-| 11 | Phone Wi-Fi off, Mac still receives | — | **Not a bug** — bad expectation | — |
+| ~~11~~ | ~~Phone Wi-Fi off, Mac still receives~~ | — | **Not a bug** — documented in `docs/reference.md` | — |
 
 ---
 
@@ -410,6 +418,25 @@ original path and `ShelfStore.report` logs `localizedDescription` as `.public`.
 All three surface through `report(_:)` as before.
 `testCloudWaitDistinguishesNeverStartedFromTimedOut`.
 
+### ~~E3 · The unbounded wait that leaving the queue left behind~~ — **fixed**
+
+Leaving the operation queue removed the stall it was causing *and* the two-slot
+cap on concurrent waiters. N evicted files dropped at once were N waiters each
+making a synchronous `resourceValues` syscall every 250 ms **on the cooperative
+pool**, which has one thread per core and cannot grow — a big drop could starve
+every other async task in the app, the imports queued behind it included.
+
+The fix bounds the *blocking work*, not the waiting: probes go through
+`CloudProbeQueue`, one serial dispatch queue off the cooperative pool, while
+every waiter keeps its own clock, its own deadline and its own download.
+Bounding the waits was the obvious fix and the wrong one — iCloud fetches in
+parallel, so a queued waiter would not ask for its download until an earlier one
+finished and its 120 s deadline would start late, which is the bug E1 removed.
+`testConcurrentCloudWaitsOverlapButTheirProbesDoNot` pins both halves: twelve
+waiters outstanding at once, peak probe concurrency of one. Cost, stated: a
+wedged probe delays the others' *elapsed* reporting, never their timeout — the
+deadline is wall-clock and is checked after the probe returns.
+
 **Still owed: the feel-test.** Evict a file (right-click ▸ Remove Download),
 drag it to the shelf, and watch. Expect the counter to climb, the tile to land
 when iCloud delivers, and — for a file iCloud will not fetch — a named error at
@@ -418,11 +445,7 @@ one together: the ordinary one must land immediately.
 
 **Watch out.** Blocking coordination is still off the main actor, and the
 `NSFileCoordinator` read in `stageFile` is unchanged — only the wait moved.
-Leaving the queue also left the wait *unbounded*: N evicted files dropped at
-once are N concurrent waiters, each doing a synchronous `resourceValues` read
-every 250 ms on the cooperative pool. The two-slot queue used to cap that. Not
-addressed here — bounding it must not put ordinary drops back behind cloud ones,
-which is the bug this run fixed. The
+The
 cloud seam (`isUndownloadedCloudItem` / `startDownload` / `probe`) exists to
 make the path testable without an iCloud account; production defaults are the
 real calls.
@@ -682,9 +705,11 @@ AWDL — the same peer-to-peer link AirDrop uses. Turning Wi-Fi off in **Control
 Center** disconnects from the network but deliberately leaves AWDL up, so the
 phone finds the Mac anyway. **Rewrite the line** to use Airplane Mode, or
 Settings ▸ Wi-Fi ▸ off (not the Control Center toggle), which is the only way to
-actually take the link down. Worth a sentence in `docs/reference.md`: perch
-reaches your Mac peer-to-peer, so it works with no network at all — that is a
-feature, and the test was asserting the opposite.
+actually take the link down. **Stated in `docs/reference.md` ▸ Permissions** —
+which also had to be corrected while it was open: it claimed perch "makes
+exactly one kind of network call" (the update check) and did not mention the
+Bonjour listener the phone connects to, which ships **on**. Both halves are
+there now, with the peer-to-peer note beside them.
 
 ---
 
