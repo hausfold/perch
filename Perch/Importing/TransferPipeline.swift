@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 enum TransferPipelineError: LocalizedError {
     case cloudDownloadTimedOut
     case cloudDownloadNeverStarted
+    case cloudDownloadFailed
     case imageEncodingFailed
 
     var errorDescription: String? {
@@ -12,7 +13,9 @@ enum TransferPipelineError: LocalizedError {
         case .cloudDownloadTimedOut:
             "The iCloud item did not finish downloading in time. Try the drop again after it is available locally."
         case .cloudDownloadNeverStarted:
-            "iCloud never started downloading that item. Open it in Finder to download it, then drop it again."
+            "iCloud did not start fetching that item. Open it in Finder to download it, then drop it again."
+        case .cloudDownloadFailed:
+            "iCloud could not download that item. Try the drop again once it is available locally."
         case .imageEncodingFailed:
             "The dropped image could not be encoded."
         }
@@ -234,13 +237,16 @@ final class TransferPipeline: @unchecked Sendable {
         _ sourceURL: URL,
         phaseChanged: @escaping @Sendable (PendingTransfer.Phase) -> Void
     ) async throws {
-        guard try cloudWaiter.isUndownloadedCloudItem(sourceURL) else { return }
+        // Inside the scope, not before it: this guard is on the path of every
+        // import, and reading resource values from a security-scoped URL
+        // (a Shortcuts `IntentFile`, say) throws without the grant held.
         let scoped = sourceURL.startAccessingSecurityScopedResource()
         defer {
             if scoped {
                 sourceURL.stopAccessingSecurityScopedResource()
             }
         }
+        guard try cloudWaiter.isUndownloadedCloudItem(sourceURL) else { return }
         phaseChanged(.downloadingFromCloud(elapsedSeconds: 0))
         try cloudWaiter.startDownload(sourceURL)
         try await cloudWaiter.wait(for: sourceURL) { elapsed in

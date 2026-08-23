@@ -344,9 +344,13 @@ What the tile shows instead is **elapsed seconds** — "Downloading 7s" — agai
 a stated 120 s deadline, so the phase is bounded on screen rather than
 open-ended. And the two ways it can end are now different errors, because they
 have different answers: `.cloudDownloadTimedOut` (a download ran and did not
-finish) and `.cloudDownloadNeverStarted` (nothing was ever fetching it — "open
-it in Finder to download it, then drop it again"). Both surface through
-`report(_:)` as before. `testCloudWaitDistinguishesNeverStartedFromTimedOut`.
+finish — including one that started and then paused) and
+`.cloudDownloadNeverStarted` (no probe ever saw one running — "open it in Finder
+to download it, then drop it again"). A third, `.cloudDownloadFailed`, stands in
+for iCloud's own error, which is deliberately **not** rethrown: it embeds the
+original path and `ShelfStore.report` logs `localizedDescription` as `.public`.
+All three surface through `report(_:)` as before.
+`testCloudWaitDistinguishesNeverStartedFromTimedOut`.
 
 **Still owed: the feel-test.** Evict a file (right-click ▸ Remove Download),
 drag it to the shelf, and watch. Expect the counter to climb, the tile to land
@@ -355,7 +359,12 @@ when iCloud delivers, and — for a file iCloud will not fetch — a named error
 one together: the ordinary one must land immediately.
 
 **Watch out.** Blocking coordination is still off the main actor, and the
-`NSFileCoordinator` read in `stageFile` is unchanged — only the wait moved. The
+`NSFileCoordinator` read in `stageFile` is unchanged — only the wait moved.
+Leaving the queue also left the wait *unbounded*: N evicted files dropped at
+once are N concurrent waiters, each doing a synchronous `resourceValues` read
+every 250 ms on the cooperative pool. The two-slot queue used to cap that. Not
+addressed here — bounding it must not put ordinary drops back behind cloud ones,
+which is the bug this run fixed. The
 cloud seam (`isUndownloadedCloudItem` / `startDownload` / `probe`) exists to
 make the path testable without an iCloud account; production defaults are the
 real calls.

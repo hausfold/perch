@@ -420,13 +420,16 @@ final class FolderWatcherTests: XCTestCase {
         waitUntil("the trailing position", timeout: 15) {
             log.reportedEventIDs.count >= 2
         }
+        // One snapshot, asserted twice — reading the watcher's log again here
+        // could pick up a report that landed between the two reads.
+        let reported = log.reportedEventIDs
         XCTAssertLessThanOrEqual(
-            log.reportedEventIDs.count, 3,
+            reported.count, 3,
             "eight arrivals over ~0.8 s must not cost eight config writes"
         )
         XCTAssertEqual(
-            log.reportedEventIDs, log.reportedEventIDs.sorted(),
-            "each report must carry a newer position than the one before"
+            reported, reported.sorted(),
+            "positions only ever move forward"
         )
     }
 

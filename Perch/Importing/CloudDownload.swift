@@ -35,7 +35,7 @@ struct CloudDownloadWaiter: Sendable {
 
     /// Whether this URL is an iCloud item whose bytes are not local yet — the
     /// only kind of drop that waits at all.
-    var isUndownloadedCloudItem: @Sendable (URL) throws -> Bool = isUndownloadedUbiquitousItem
+    var isUndownloadedCloudItem: @Sendable (URL) throws -> Bool = Self.isUndownloadedUbiquitousItem
 
     /// Asks iCloud to fetch the item.
     var startDownload: @Sendable (URL) throws -> Void = {
@@ -44,15 +44,18 @@ struct CloudDownloadWaiter: Sendable {
 
     /// Reads the item's current state. Injected, with the two above, so the
     /// whole cloud path is testable without an iCloud account.
-    var probe: @Sendable (URL) throws -> CloudDownloadProgress = probeUbiquitousItem
+    var probe: @Sendable (URL) throws -> CloudDownloadProgress = Self.probeUbiquitousItem
 
     /// - Parameter elapsedChanged: called with whole seconds waited so far,
     ///   once per second, starting at `0`. It is what turns an unbounded
     ///   spinner into something a user can judge.
-    /// - Throws: the iCloud download error if one is published,
-    ///   `TransferPipelineError.cloudDownloadNeverStarted` if no download was
-    ///   ever running, or `.cloudDownloadTimedOut` if one was and did not
-    ///   finish within `timeout`.
+    /// - Throws: `TransferPipelineError.cloudDownloadFailed` if iCloud
+    ///   publishes a download error, `.cloudDownloadNeverStarted` if no probe
+    ///   ever saw a download running — iCloud never picked the request up, and
+    ///   opening the file in Finder is the way out — or `.cloudDownloadTimedOut`
+    ///   if one did run and did not finish within `timeout`. A download that
+    ///   starts and then pauses for the rest of the window is a timeout, not a
+    ///   never-started: `everRan` latches on the first `.downloading` seen.
     func wait(
         for url: URL,
         elapsedChanged: @Sendable (Int) -> Void
@@ -87,33 +90,36 @@ struct CloudDownloadWaiter: Sendable {
             ? TransferPipelineError.cloudDownloadTimedOut
             : TransferPipelineError.cloudDownloadNeverStarted
     }
-}
 
-/// The production probe. Reads only the download keys — never the path, which
-/// must not be logged or persisted.
-let probeUbiquitousItem: @Sendable (URL) throws -> CloudDownloadProgress = { url in
-    let values = try url.resourceValues(forKeys: [
-        .ubiquitousItemDownloadingStatusKey,
-        .ubiquitousItemIsDownloadingKey,
-        .ubiquitousItemDownloadingErrorKey,
-    ])
-    if let error = values.ubiquitousItemDownloadingError {
-        throw error
+    /// The production probe. Reads only the download keys — never the path, which
+    /// must not be logged or persisted.
+    static let probeUbiquitousItem: @Sendable (URL) throws -> CloudDownloadProgress = { url in
+        let values = try url.resourceValues(forKeys: [
+            .ubiquitousItemDownloadingStatusKey,
+            .ubiquitousItemIsDownloadingKey,
+            .ubiquitousItemDownloadingErrorKey,
+        ])
+        if values.ubiquitousItemDownloadingError != nil {
+            // Deliberately *not* rethrown. iCloud's own NSError embeds the item's
+            // name and path, and `ShelfStore.report` logs `localizedDescription`
+            // as `.public` — which would put an original path in the system log.
+            throw TransferPipelineError.cloudDownloadFailed
+        }
+        let status = values.ubiquitousItemDownloadingStatus
+        if status == .current || status == .downloaded {
+            return .downloaded
+        }
+        return values.ubiquitousItemIsDownloading == true ? .downloading : .notStarted
     }
-    let status = values.ubiquitousItemDownloadingStatus
-    if status == .current || status == .downloaded {
-        return .downloaded
-    }
-    return values.ubiquitousItemIsDownloading == true ? .downloading : .notStarted
-}
 
-/// The production check. `.current` means "local and up to date"; anything else
-/// — evicted, stale, mid-download — has to be fetched before it can be copied.
-let isUndownloadedUbiquitousItem: @Sendable (URL) throws -> Bool = { url in
-    let values = try url.resourceValues(forKeys: [
-        .isUbiquitousItemKey,
-        .ubiquitousItemDownloadingStatusKey,
-    ])
-    return values.isUbiquitousItem == true
-        && values.ubiquitousItemDownloadingStatus != .current
+    /// The production check. `.current` means "local and up to date"; anything else
+    /// — evicted, stale, mid-download — has to be fetched before it can be copied.
+    static let isUndownloadedUbiquitousItem: @Sendable (URL) throws -> Bool = { url in
+        let values = try url.resourceValues(forKeys: [
+            .isUbiquitousItemKey,
+            .ubiquitousItemDownloadingStatusKey,
+        ])
+        return values.isUbiquitousItem == true
+            && values.ubiquitousItemDownloadingStatus != .current
+    }
 }
