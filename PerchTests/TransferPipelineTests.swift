@@ -63,6 +63,38 @@ final class TransferPipelineTests: XCTestCase {
         XCTAssertEqual(elapsed, Array(Set(elapsed)).sorted(), "one update per second, not per poll")
     }
 
+    /// Field-test, 2026-08-23: the tile still sat on "Downloading" while Finder
+    /// showed the file had arrived. A `URL` caches resource values on its
+    /// `NSURL` box, so every poll of the same URL returned the status read the
+    /// *first* time — the wait could only ever end at its deadline. Pinned with
+    /// file size, which needs no iCloud account and moves the same way.
+    func testTheProbeSeesValuesChangeRatherThanTheFirstReadForever() throws {
+        let file = FileManager.default.temporaryDirectory
+            .appending(path: "perch-rvcache-\(UUID().uuidString).bin")
+        try Data(repeating: 0, count: 100).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        XCTAssertEqual(
+            try CloudDownloadWaiter.uncachedResourceValues(of: file, forKeys: [.fileSizeKey])
+                .fileSize,
+            100
+        )
+        try Data(repeating: 0, count: 5_000).write(to: file)
+        XCTAssertEqual(
+            try CloudDownloadWaiter.uncachedResourceValues(of: file, forKeys: [.fileSizeKey])
+                .fileSize,
+            5_000,
+            "a second read must see the new size, not the cached one"
+        )
+
+        // And the cache this exists to defeat is real, so the guard is not
+        // decoration: the plain call still answers with the first read.
+        let cached = file
+        _ = try cached.resourceValues(forKeys: [.fileSizeKey])
+        try Data(repeating: 0, count: 9_000).write(to: file)
+        XCTAssertEqual(try cached.resourceValues(forKeys: [.fileSizeKey]).fileSize, 5_000)
+    }
+
     /// "Never started" and "did not finish in time" look identical on screen and
     /// have different answers, so they are different errors.
     func testCloudWaitDistinguishesNeverStartedFromTimedOut() async throws {

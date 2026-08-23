@@ -32,7 +32,7 @@ is provably the only thing going wrong.
 | ~~7~~ | ~~Rename a staged file in Finder → tile can never be dragged out, and vanishes~~ | Store | **Fixed** — re-resolve; decision in `ARCHITECTURE.md` | ~~**C**~~ |
 | 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | **Fixed in tests** — dedupe gone, FSEvents sees the rewrite; not yet feel-tested | **D** |
 | 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | **Addressed, still unreproduced** — the stream now resumes from a persisted position | **D** |
-| 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | **Fixed in code** — wait is off the queue and now says how long; not yet feel-tested | **E** |
+| 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | **Cause found by feel-test** — the poll read a cached status; fixed, needs a re-test | **E** |
 | 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | **Duplicate explained** — two doors, one submenu; Quick Actions still open | **F** |
 | 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | **Premise dead** — measured: a classic Service does not reach the top level | **F** |
 | 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Open** — Keychain exonerated by measurement; look at the UI | **G** |
@@ -344,9 +344,31 @@ in a test. Replay is the stream covering the same gap itself, not a second detec
 If #8 reproduces after this, the suspicion still falls on the bookmark resolving at
 launch rather than on the scan.
 
-## ~~Run E — Non-downloaded iCloud file sticks on "Downloading" (#2)~~
+## Run E — Non-downloaded iCloud file sticks on "Downloading" (#2)
 
-**Fixed in code, still owed a feel-test with a real evicted iCloud file.**
+**Feel-tested 2026-08-23, and it found the actual cause — which was neither of
+the two candidates below.** The tile counted up to 44 s and beyond while Finder
+showed the file had long since arrived. Both candidates were real and both are
+fixed; neither was what made it stick.
+
+**The poll was reading a cached value.** `URL` caches resource values on its
+underlying `NSURL` box, so `resourceValues(forKeys:)` on the *same* URL returns
+what it read the **first** time, for the life of that URL. The wait therefore
+sampled `.notDownloaded` once and re-read that same answer 480 times over two
+minutes, whatever iCloud did in between. It could only ever end at its deadline.
+
+The codebase already knew this trap — `FolderWatcher.probe` carries a comment
+about it and samples through `FileManager` precisely to dodge it. The cloud path
+did not, and the old `Thread.sleep` loop had the same bug, so this predates the
+queue fix rather than being caused by it. `CloudDownloadWaiter`'s reads now go
+through `uncachedResourceValues(of:forKeys:)`, and
+`testTheProbeSeesValuesChangeRatherThanTheFirstReadForever` pins both halves:
+that the helper sees a size change, and that the plain call really does not.
+
+**Re-test owed:** evict a file, drag it, and confirm the tile lands rather than
+counting to 120.
+
+Below: the two queue/percentage findings, which stand.
 
 **Symptom.** Right-click ▸ Remove Download on an iCloud file, then drag it to
 the shelf. The tile appears and stays on "Downloading" with a spinner
@@ -635,6 +657,23 @@ Measured, to save the next person the doubt: a 2 GB `FileManager.copyItem` on
 one APFS volume finishes in **0.001 s** and consumes **zero** extra disk. `cp`
 of the same file takes 1.34 s and the full 2 GB — so `cp` is **not** a valid
 stand-in when writing the replacement test.
+
+**#14 · "Overlapping `curl -o` downloads only add one tile."** Reported in the
+2026-08-23 feel-test: run `curl -o ~/Downloads/slow.bin <url>` twice
+sequentially and two tiles land; start the second before the first finishes and
+only one lands, when the last one stops. That is the only answer available.
+**Both curls write the same path, so there is one file**, and it does not hold
+still until the last writer lets go — the stability probe promotes once, at the
+end, with whatever bytes won. N overlapping writers to one path cannot produce N
+files for perch to shelve.
+
+Two *different* paths downloading at once is the case that would be a bug, and
+it works: `testTwoFilesGrowingAtOnceBothLand` runs two continuous writers that
+overlap in both directions and asserts each lands exactly once. Worth knowing
+while writing that kind of test: growing a file in bursts slower than
+`probeInterval × requiredStableProbes` leaves a quiet window in the middle, and
+the probe promotes on each one — that is D2's "replaced contents are a new
+arrival" doing its job, not a double import.
 
 **#11 · "Wi-Fi off on the phone, Mac still received it."** Also correct.
 Every wire path sets `includePeerToPeer = true` (`PerchWire/Wire/WireServer.swift:94`,

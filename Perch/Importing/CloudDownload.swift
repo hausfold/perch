@@ -91,10 +91,28 @@ struct CloudDownloadWaiter: Sendable {
             : TransferPipelineError.cloudDownloadNeverStarted
     }
 
+    /// Resource values read *without* the cache a `URL` keeps on its underlying
+    /// `NSURL` box.
+    ///
+    /// This is the whole of why #2 looked like "stuck forever". Polling the
+    /// same `URL` returns the values it had at the **first** read, however long
+    /// you wait and whatever iCloud does — so a file that finished downloading
+    /// seconds later still read as `.notDownloaded` until the deadline expired.
+    /// `FolderWatcher.probe` documents the identical trap and samples through
+    /// `FileManager` to dodge it; this path did not.
+    static func uncachedResourceValues(
+        of url: URL,
+        forKeys keys: Set<URLResourceKey>
+    ) throws -> URLResourceValues {
+        var url = url
+        url.removeAllCachedResourceValues()
+        return try url.resourceValues(forKeys: keys)
+    }
+
     /// The production probe. Reads only the download keys — never the path, which
     /// must not be logged or persisted.
     static let probeUbiquitousItem: @Sendable (URL) throws -> CloudDownloadProgress = { url in
-        let values = try url.resourceValues(forKeys: [
+        let values = try uncachedResourceValues(of: url, forKeys: [
             .ubiquitousItemDownloadingStatusKey,
             .ubiquitousItemIsDownloadingKey,
             .ubiquitousItemDownloadingErrorKey,
@@ -115,7 +133,7 @@ struct CloudDownloadWaiter: Sendable {
     /// The production check. `.current` means "local and up to date"; anything else
     /// — evicted, stale, mid-download — has to be fetched before it can be copied.
     static let isUndownloadedUbiquitousItem: @Sendable (URL) throws -> Bool = { url in
-        let values = try url.resourceValues(forKeys: [
+        let values = try uncachedResourceValues(of: url, forKeys: [
             .isUbiquitousItemKey,
             .ubiquitousItemDownloadingStatusKey,
         ])
