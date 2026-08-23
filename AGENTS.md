@@ -53,8 +53,10 @@ to a plain `build` too — not just to `test` — so every binary we shipped
 carried `__llvm_prf` sections and dumped a `default.profraw` into the caller's
 working directory on exit. `perch` is on PATH everywhere, so that file landed
 in whatever repo the shell happened to be sitting in and read as untracked
-work to `holt` and `bench status`. Coverage still works when you ask for it:
-add `-enableCodeCoverage YES` to the `test` invocation.
+work to `holt` and `bench status`. To collect coverage you now have to ask for
+it twice — `ENABLE_CODE_COVERAGE=YES -enableCodeCoverage YES … test`. The flag
+alone is not enough: the project-level `NO` wins, `xcodebuild` still exits 0,
+and you get a green run with an empty report.
 
 Targets: `Perch` (macOS) · `PerchFinderAction` (Finder Quick Action) ·
 `PerchCLI` (the `perch` tool, embedded in the app bundle) · `PerchIOS`
