@@ -5,12 +5,22 @@
   is still YES; Xcode merges its keys into this file). This partial exists for
   one key that has no INFOPLIST_KEY_ build setting: NSServices.
 
-  macOS has two doors into the Finder context menu and they land in different
-  places. A modern `com.apple.services` app extension — PerchFinderAction —
-  shows up nested inside the "Quick Actions" submenu. A classic NSServices
-  declaration in the app's own Info.plist is eligible for the menu's TOP level,
-  beside "New Terminal Tab Here". Perch keeps both: the extension runs without
-  waking the app, this one is two clicks shorter.
+  Perch declares two doors into the Finder context menu. MEASURED on macOS 26
+  (field-test 2026-08-23), they land in the SAME place: both this NSServices
+  entry and the PerchFinderAction extension appear under "Services", and the
+  menu shows "Add to Perch Shelf (Perch.app)" twice — macOS only appends the
+  app name when it has two providers with one title to tell apart.
+
+  Neither of the older claims survived the measurement. This entry is NOT at
+  the menu's top level beside "New Terminal Tab Here", and the extension does
+  NOT appear under "Quick Actions" (it is listed and enabled in Quick Actions ▸
+  Customize… and in Login Items & Extensions, and still does not render there).
+  Verified with exactly one registered copy: `pluginkit -mAvvv -p
+  com.apple.services` reports a single plug-in, so the duplicate is these two
+  doors and not two builds fighting.
+
+  So keeping both costs a visible duplicate and buys nothing that was claimed
+  for it. See the 2026-08-22 field-test file, #4/#5.
 
   NSRequiredContext is deliberately empty — every restricting key you add is
   another reason for macOS to hide the item, and the send types below are

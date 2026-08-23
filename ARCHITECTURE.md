@@ -88,13 +88,17 @@ The shared group is `88M28542LQ.com.hausfold.perch`, the Team-ID-prefixed form
 for a directly distributed macOS app. It is deliberately separate from the iOS
 companion's App Store group.
 
-A **classic Service** is the fifth door, and it exists because of where macOS
-draws the fourth one: an Action Extension is always nested inside the Finder
-menu's "Quick Actions" submenu, while an `NSServices` entry in the app's own
-Info.plist is eligible for the menu's top level, beside "New Terminal Tab
-Here". `Perch/Config/Info.plist` declares it — the one key with no
+A **classic Service** is the fifth door. It was added on the understanding that
+an Action Extension is always nested inside the Finder menu's "Quick Actions"
+submenu while an `NSServices` entry reaches the menu's top level — and on
+macOS 26 **neither half of that is true**. Measured 2026-08-23 with a single
+registered copy of the extension: both doors land under "Services", the
+extension does not render under "Quick Actions" at all, and the Service is not
+at the top level. The visible result is "Add to Perch Shelf (Perch.app)" listed
+twice. `Perch/Config/Info.plist` declares it — the one key with no
 `INFOPLIST_KEY_` build setting, so that partial plist exists solely to carry it
-and Xcode merges the generated keys into it.
+and Xcode merges the generated keys into it. Which door to keep is open; see
+the 2026-08-22 field-test file, #4/#5.
 
 The handler is trivial by design. A Service is delivered to the *running* app,
 not to an extension, so `ShelfServicesProvider`
