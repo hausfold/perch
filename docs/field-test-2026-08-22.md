@@ -19,14 +19,6 @@ debugger. Confidence is stated per item. **Reproduce before you fix** — a
 "confirmed" here means the code path provably does the wrong thing, not that it
 is provably the only thing going wrong.
 
-**Where this stands (2026-08-23).** Every run has landed its code: A and C are
-closed outright; B, D, E and F's bundle-id half are merged and owe only a
-feel-test; G's Keychain half is closed by measurement. **Nothing on this board
-is blocked on more reading.** What is left is three feel-tests (B, D, E), two
-measurements that need a screen or a phone (F, G). The one deliberate
-follow-up Run E left open — bounding concurrent cloud waiters — is now closed
-too (E3).
-
 ---
 
 ## The board
@@ -60,10 +52,10 @@ the deletion below. **#12 is the only thing left on this board.**
 | Measurement | G (#12) | the phone, the **release** build, and `log stream … category == "PairedDevices"`. Not the dev build: a different bundle id is a different Keychain access group, so "No devices paired" is the correct answer there and would reproduce the symptom for the wrong reason |
 | Nothing | D3 (#8) | unreproduced; the resumed stream is in, and there is nothing further to write until it recurs |
 
-Two loose ends from this board are being carried by **other sessions**, not
-here — don't pick them up twice: E's unbounded cloud waiters (Run E's *Watch
-out*), and the export-ledger probe race plus drag-out into a *watched*
-destination, which shelves the item straight back.
+The two loose ends this board handed to other sessions have both landed:
+bounding concurrent cloud waiters (E3, #95) and drag-out into a *watched*
+destination shelving the item straight back, with the export-ledger probe race
+it uncovered (#96).
 
 ---
 
