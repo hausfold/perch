@@ -47,6 +47,15 @@ Don't pass `CODE_SIGNING_ALLOWED=NO` to the **iOS** build you intend to run:
 it strips the App Group entitlement and the app aborts at launch. Simulator
 ad-hoc signing needs no team or provisioning.
 
+`ENABLE_CODE_COVERAGE = NO` is set project-wide, in **both** configurations,
+on purpose. Xcode's default is YES, and the Xcode 26 build service applies it
+to a plain `build` too — not just to `test` — so every binary we shipped
+carried `__llvm_prf` sections and dumped a `default.profraw` into the caller's
+working directory on exit. `perch` is on PATH everywhere, so that file landed
+in whatever repo the shell happened to be sitting in and read as untracked
+work to `holt` and `bench status`. Coverage still works when you ask for it:
+add `-enableCodeCoverage YES` to the `test` invocation.
+
 Targets: `Perch` (macOS) · `PerchFinderAction` (Finder Quick Action) ·
 `PerchCLI` (the `perch` tool, embedded in the app bundle) · `PerchIOS`
 (iPhone/iPad app) · `PerchShare` (Share extension) · `PerchTests`.
