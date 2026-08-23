@@ -122,7 +122,11 @@ struct ShelfItem: Codable, Identifiable, Hashable, Sendable {
 struct PendingTransfer: Identifiable, Equatable, Sendable {
     enum Phase: Equatable, Sendable {
         case waitingForSource
-        case downloadingFromCloud
+        /// Waiting on iCloud to bring an evicted file down. iCloud publishes no
+        /// percentage an unentitled app can read (see `CloudDownloadWaiter`),
+        /// so the honest signal is how long the wait has run — a phase that can
+        /// last two minutes must not look like a spinner that will never stop.
+        case downloadingFromCloud(elapsedSeconds: Int)
         case copying
     }
 

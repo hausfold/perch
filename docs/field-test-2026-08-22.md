@@ -32,7 +32,7 @@ is provably the only thing going wrong.
 | ~~7~~ | ~~Rename a staged file in Finder → tile can never be dragged out, and vanishes~~ | Store | **Fixed** — re-resolve; decision in `ARCHITECTURE.md` | ~~**C**~~ |
 | 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | **Fixed in tests** — dedupe gone, FSEvents sees the rewrite; not yet feel-tested | **D** |
 | 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | **Addressed, still unreproduced** — the stream now resumes from a persisted position | **D** |
-| 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | Two candidates | **E** |
+| 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | **Fixed in code** — wait is off the queue and now says how long; not yet feel-tested | **E** |
 | 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | **Cause found** — `bench try` gives the appex the app's bundle id | **F** |
 | 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | Blocked on #4 — the extension isn't live in a dev build | **F** |
 | 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Open** — Keychain exonerated by measurement; look at the UI | **G** |
@@ -308,45 +308,57 @@ in a test. Replay is the stream covering the same gap itself, not a second detec
 If #8 reproduces after this, the suspicion still falls on the bookmark resolving at
 launch rather than on the scan.
 
-## Run E — Non-downloaded iCloud file sticks on "Downloading" (#2)
+## ~~Run E — Non-downloaded iCloud file sticks on "Downloading" (#2)~~
+
+**Fixed in code, still owed a feel-test with a real evicted iCloud file.**
 
 **Symptom.** Right-click ▸ Remove Download on an iCloud file, then drag it to
 the shelf. The tile appears and stays on "Downloading" with a spinner
 indefinitely. The shelf itself stays responsive.
 
-**Two candidates — establish which before fixing.**
+**Both candidates were real, and the second one is what made "forever" the
+honest description.**
 
-1. **It is not stuck, it is queued.** `TransferPipeline`'s queue is
-   `maxConcurrentOperationCount = 2` (`Perch/Importing/TransferPipeline.swift:28`)
-   and `waitForCloudDownload` (`:234`) blocks its slot with `Thread.sleep` for up
-   to **120 seconds**. Two cloud files in flight stall every other import behind
-   them. The 120 s ceiling then throws `.cloudDownloadTimedOut`, which
-   `finishTransfer` reports as an error and drops the tile — so "forever" and
-   "two minutes then gone" look the same to a tester who walked away.
-2. **The download was never actually started.** `startDownloadingUbiquitousItem`
-   is called on the URL Finder handed over. If the drag delivered a
-   `.icloud` placeholder or a file-promise URL rather than the real ubiquitous
-   item, the status polled at `:234` never reaches `.current` and the loop runs
-   its full deadline for nothing.
+**(1) It was also blocking every other drop.** `waitForCloudDownload` ran
+*inside* a `TransferPipeline` operation and slept up to 120 s on
+`maxConcurrentOperationCount = 2`, so two cloud files held the whole queue and
+ordinary drops queued behind them. The wait is now an `async` pre-step that runs
+before any slot is taken — `CloudDownloadWaiter`, polled with `Task.sleep`, on
+the cooperative pool and never the main actor.
+`testACloudWaitDoesNotBlockOrdinaryImports` stages three ordinary files through
+a pipeline with two cloud waits outstanding; before the change that deadlocked
+until the timeout fired.
 
-**Diagnose.** Drag one evicted iCloud file and watch for exactly 120 s. If the
-tile dies at ~2 min with an error, it is (1) plus a missing progress signal. If
-it truly never resolves, look at what URL arrives — log the
-`ubiquitousItemDownloadingStatus` transitions (never the path).
+**(2) There was no way to tell a slow download from a wedged one, and no
+percentage exists to fix that with.** The fix sketch here said to use
+`ubiquitousItemPercentDownloadedKey`. That is not available:
+`URLResourceKey.ubiquitousItemPercentDownloadedKey` is **unavailable in Swift**
+(deprecated since 10.8 — `swiftc` refuses it outright), and its replacement,
+`NSMetadataQuery` with `NSMetadataUbiquitousItemPercentDownloadedKey`, only
+reports on the *querying app's own* ubiquity container. The dragged file lives
+in the user's, and perch ships with no iCloud entitlement at all. So there is no
+percentage for perch to read, and the pinned decision is in the type comment on
+`CloudDownloadWaiter`.
 
-**Fix sketch.** Regardless of which: get the blocking poll off the import queue.
-Use `NSMetadataQuery` (or an `NSFileCoordinator` read with
-`.withoutChanges` on the ubiquitous item, which triggers and waits for the
-download natively) rather than a sleep loop holding one of two slots, and give
-the tile a real percentage from
-`ubiquitousItemPercentDownloadedKey` instead of an unbounded spinner. A phase
-that can last two minutes needs to be honest about progress and needs a
-user-visible failure when it gives up.
+What the tile shows instead is **elapsed seconds** — "Downloading 7s" — against
+a stated 120 s deadline, so the phase is bounded on screen rather than
+open-ended. And the two ways it can end are now different errors, because they
+have different answers: `.cloudDownloadTimedOut` (a download ran and did not
+finish) and `.cloudDownloadNeverStarted` (nothing was ever fetching it — "open
+it in Finder to download it, then drop it again"). Both surface through
+`report(_:)` as before. `testCloudWaitDistinguishesNeverStartedFromTimedOut`.
 
-**Watch out.** Blocking coordination must stay off the main actor (it already
-is). Don't let the fix make a *second* import wait on the first.
+**Still owed: the feel-test.** Evict a file (right-click ▸ Remove Download),
+drag it to the shelf, and watch. Expect the counter to climb, the tile to land
+when iCloud delivers, and — for a file iCloud will not fetch — a named error at
+2 minutes rather than a spinner. Then drop two evicted files *and* an ordinary
+one together: the ordinary one must land immediately.
 
----
+**Watch out.** Blocking coordination is still off the main actor, and the
+`NSFileCoordinator` read in `stageFile` is unchanged — only the wait moved. The
+cloud seam (`isUndownloadedCloudItem` / `startDownload` / `probe`) exists to
+make the path testable without an iCloud account; production defaults are the
+real calls.
 
 ## Run F — The two Finder doors (#4, #5)
 

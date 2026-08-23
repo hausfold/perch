@@ -4,12 +4,15 @@ import UniformTypeIdentifiers
 
 enum TransferPipelineError: LocalizedError {
     case cloudDownloadTimedOut
+    case cloudDownloadNeverStarted
     case imageEncodingFailed
 
     var errorDescription: String? {
         switch self {
         case .cloudDownloadTimedOut:
             "The iCloud item did not finish downloading in time. Try the drop again after it is available locally."
+        case .cloudDownloadNeverStarted:
+            "iCloud never started downloading that item. Open it in Finder to download it, then drop it again."
         case .imageEncodingFailed:
             "The dropped image could not be encoded."
         }
@@ -19,9 +22,11 @@ enum TransferPipelineError: LocalizedError {
 final class TransferPipeline: @unchecked Sendable {
     private let repository: StagingRepository
     private let queue: OperationQueue
+    private let cloudWaiter: CloudDownloadWaiter
 
-    init(repository: StagingRepository) {
+    init(repository: StagingRepository, cloudWaiter: CloudDownloadWaiter = CloudDownloadWaiter()) {
         self.repository = repository
+        self.cloudWaiter = cloudWaiter
         queue = OperationQueue()
         queue.name = "com.hausfold.perch.transfer"
         queue.qualityOfService = .userInitiated
@@ -33,7 +38,12 @@ final class TransferPipeline: @unchecked Sendable {
         itemID: UUID,
         phaseChanged: @escaping @Sendable (PendingTransfer.Phase) -> Void
     ) async throws -> ShelfItem {
-        try await withCheckedThrowingContinuation { continuation in
+        // Before the queue, not on it. A cloud download can last two minutes
+        // and the queue has two slots, so waiting inside an operation stalls
+        // every other drop behind a file nobody is copying yet (#2).
+        try await downloadFromCloudIfNeeded(sourceURL, phaseChanged: phaseChanged)
+
+        return try await withCheckedThrowingContinuation { continuation in
             queue.addOperation { [repository] in
                 let fileManager = FileManager()
                 let scoped = sourceURL.startAccessingSecurityScopedResource()
@@ -45,11 +55,6 @@ final class TransferPipeline: @unchecked Sendable {
 
                 var container: URL?
                 do {
-                    if try Self.isUndownloadedCloudItem(sourceURL) {
-                        phaseChanged(.downloadingFromCloud)
-                        try fileManager.startDownloadingUbiquitousItem(at: sourceURL)
-                        try Self.waitForCloudDownload(sourceURL)
-                    }
                     phaseChanged(.copying)
 
                     let allocatedContainer = try repository.allocateImportDirectory(id: itemID)
@@ -222,32 +227,24 @@ final class TransferPipeline: @unchecked Sendable {
         }
     }
 
-    private static func isUndownloadedCloudItem(_ url: URL) throws -> Bool {
-        let values = try url.resourceValues(forKeys: [
-            .isUbiquitousItemKey,
-            .ubiquitousItemDownloadingStatusKey,
-        ])
-        return values.isUbiquitousItem == true
-            && values.ubiquitousItemDownloadingStatus != .current
-    }
-
-    private static func waitForCloudDownload(_ url: URL) throws {
-        let deadline = Date().addingTimeInterval(120)
-        while Date() < deadline {
-            let values = try url.resourceValues(forKeys: [
-                .ubiquitousItemDownloadingStatusKey,
-                .ubiquitousItemIsDownloadingKey,
-                .ubiquitousItemDownloadingErrorKey,
-            ])
-            if let error = values.ubiquitousItemDownloadingError {
-                throw error
+    /// Asks iCloud for an evicted file and waits for it, reporting the wait to
+    /// the tile. A no-op for everything already local, which is every drop that
+    /// is not an evicted iCloud item.
+    private func downloadFromCloudIfNeeded(
+        _ sourceURL: URL,
+        phaseChanged: @escaping @Sendable (PendingTransfer.Phase) -> Void
+    ) async throws {
+        guard try cloudWaiter.isUndownloadedCloudItem(sourceURL) else { return }
+        let scoped = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if scoped {
+                sourceURL.stopAccessingSecurityScopedResource()
             }
-            if values.ubiquitousItemDownloadingStatus == .current
-                || values.ubiquitousItemDownloadingStatus == .downloaded {
-                return
-            }
-            Thread.sleep(forTimeInterval: 0.15)
         }
-        throw TransferPipelineError.cloudDownloadTimedOut
+        phaseChanged(.downloadingFromCloud(elapsedSeconds: 0))
+        try cloudWaiter.startDownload(sourceURL)
+        try await cloudWaiter.wait(for: sourceURL) { elapsed in
+            phaseChanged(.downloadingFromCloud(elapsedSeconds: elapsed))
+        }
     }
 }
