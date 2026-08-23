@@ -168,6 +168,7 @@ final class FolderWatchCenter: ObservableObject {
             folderID: folderID,
             folderURL: url,
             ledger: folder.importedTokens,
+            sinceEventID: folder.lastEventID,
             onImport: { [weak self] fileURL, token in
                 Task { @MainActor in
                     guard let self, self.watchers[folderID] != nil else { return }
@@ -189,6 +190,15 @@ final class FolderWatchCenter: ObservableObject {
             onLedgerReplaced: { [weak self] tokens in
                 Task { @MainActor in
                     self?.folderStore.setTokens(tokens, for: folderID)
+                }
+            },
+            onEventID: { [weak self] eventID in
+                Task { @MainActor in
+                    // Only while this watcher is still the folder's watcher:
+                    // a stopped one must not push its last position over a
+                    // successor's, which would rewind the replay window.
+                    guard let self, self.watchers[folderID] != nil else { return }
+                    self.folderStore.setLastEventID(eventID, for: folderID)
                 }
             },
             onUnavailable: { [weak self] in

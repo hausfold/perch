@@ -56,19 +56,34 @@ final class WatchedFolderStoreTests: XCTestCase {
 
         let store = WatchedFolderStore(fileURL: configURL, bookmarking: .plain)
         let folder = try store.add(folderAt: watched)
+        XCTAssertNil(folder.lastEventID, "a folder perch has never caught up on has no position")
         store.markImported("token-1", for: folder.id)
         store.setTokens(["token-2", "token-3"], for: folder.id)
+        store.setLastEventID(4_815_162_342, for: folder.id)
         store.flushPendingWrites()
 
         let reloaded = WatchedFolderStore(fileURL: configURL, bookmarking: .plain)
         XCTAssertEqual(reloaded.folders.count, 1)
         XCTAssertEqual(reloaded.folders.first?.id, folder.id)
         XCTAssertEqual(reloaded.folders.first?.importedTokens, ["token-2", "token-3"])
+        // The stream position is what makes a relaunch resume rather than
+        // start blind at `kFSEventStreamEventIdSinceNow`.
+        XCTAssertEqual(reloaded.folders.first?.lastEventID, 4_815_162_342)
         let resolved = try reloaded.bookmarking.resolve(try XCTUnwrap(reloaded.folders.first).bookmark)
         XCTAssertEqual(
             resolved.url.standardizedFileURL.resolvingSymlinksInPath().path,
             watched.standardizedFileURL.resolvingSymlinksInPath().path
         )
+
+        // A config written before positions were persisted still decodes, and
+        // reads as "no position" rather than failing the whole file.
+        let legacy = directory.appending(path: "legacy.json")
+        try Data("""
+        [{"id":"\(folder.id.uuidString)","bookmark":"","importedTokens":["token-2"]}]
+        """.utf8).write(to: legacy)
+        let upgraded = WatchedFolderStore(fileURL: legacy, bookmarking: .plain)
+        XCTAssertEqual(upgraded.folders.count, 1)
+        XCTAssertNil(upgraded.folders.first?.lastEventID)
 
         store.remove(folder.id)
         store.flushPendingWrites()
@@ -83,6 +98,7 @@ final class FolderWatcherTests: XCTestCase {
         private let lock = NSLock()
         private var imported: [(name: String, sizeAtImport: Int, token: String)] = []
         private var ledgers: [Set<String>] = []
+        private var eventIDs: [UInt64] = []
 
         func recordImport(of url: URL, token: String = "") {
             let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? -1
@@ -97,11 +113,18 @@ final class FolderWatcherTests: XCTestCase {
         var importedSizes: [Int] { lock.withLock { imported.map(\.sizeAtImport) } }
         var importedTokens: [String] { lock.withLock { imported.map(\.token) } }
         var replacedLedgers: [Set<String>] { lock.withLock { ledgers } }
+
+        func recordEventID(_ eventID: UInt64) {
+            lock.withLock { eventIDs.append(eventID) }
+        }
+
+        var reportedEventIDs: [UInt64] { lock.withLock { eventIDs } }
     }
 
     private func makeWatcher(
         over directory: URL,
         ledger: Set<String> = [],
+        sinceEventID: UInt64? = nil,
         requiredStableProbes: Int = 2,
         log: ImportLog,
         onImport: XCTestExpectation? = nil
@@ -110,15 +133,23 @@ final class FolderWatcherTests: XCTestCase {
             folderID: UUID(),
             folderURL: directory,
             ledger: ledger,
+            sinceEventID: sinceEventID,
             holdsSecurityScope: false,
             probeInterval: 0.05,
             requiredStableProbes: requiredStableProbes,
+            // FSEvents coalesces; the production 0.5 s window would make every
+            // multi-step test below wait on the batcher rather than on the
+            // behaviour it is asserting.
+            eventLatency: 0.05,
             onImport: { url, token in
                 log.recordImport(of: url, token: token)
                 onImport?.fulfill()
             },
             onLedgerReplaced: { tokens in
                 log.recordLedger(tokens)
+            },
+            onEventID: { eventID in
+                log.recordEventID(eventID)
             }
         )
         addTeardownBlock {
@@ -237,17 +268,17 @@ final class FolderWatcherTests: XCTestCase {
         XCTAssertEqual(log.replacedLedgers, [[stayedToken]])
     }
 
-    /// #6, the half that is fixed here: a rewritten file is no longer deduped
-    /// against its own earlier contents. `curl -o ~/Downloads/x.bin` truncates
-    /// and rewrites an existing path, keeping its inode and birth date, so an
-    /// identity built from those alone matched the first download forever.
+    /// #6, end to end: `curl -o ~/Downloads/slow.bin` over an existing path
+    /// truncates and rewrites it — same inode, same birth date, same directory
+    /// entry — and that has to land as a second arrival.
     ///
-    /// Note what this test has to do to make it land: create a *second* file to
-    /// fire a directory event. A directory kqueue reports entries appearing,
-    /// disappearing and being renamed — never a write into a file that is
-    /// already there. So the rewrite alone still produces no event and no scan;
-    /// see the Run D notes in `docs/field-test-2026-08-22.md`.
-    func testARewrittenFileIsNoLongerDedupedAgainstItsOwnEarlierContents() throws {
+    /// Both halves are exercised here. The identity has to differ (fixed in
+    /// #88, by hashing size and mtime), and *something has to notice the write
+    /// at all*: nothing else in this folder changes, which is precisely what a
+    /// directory kqueue could not see and what FSEvents reports as
+    /// `ItemModified`. The crutch this test used to need — a second file
+    /// created purely to fire an event — is gone.
+    func testAFileRewrittenInPlaceLandsAgainWithNoOtherChangeInTheFolder() throws {
         let directory = try makeTemporaryDirectory()
         let target = directory.appending(path: "slow.bin")
         try Data("first".utf8).write(to: target)
@@ -259,21 +290,96 @@ final class FolderWatcherTests: XCTestCase {
         watcher.start(seedExisting: false)
         waitUntil("the first download lands") { log.importedNames == ["slow.bin"] }
 
-        // Same path, same inode, new contents — what `curl -o` does.
+        // Same path, same inode, new contents — what `curl -o` does. And the
+        // only thing that happens: no create, no rename, no second file.
         let handle = try FileHandle(forWritingTo: target)
         try handle.truncate(atOffset: 0)
         try handle.write(contentsOf: Data("a second, longer download".utf8))
         try handle.close()
-        // Any directory event at all is enough to make the watcher look again.
-        try Data("nudge".utf8).write(to: directory.appending(path: "other.txt"))
 
-        waitUntil("the rewritten file lands again") {
+        // FSEvents is latency-delayed and coalescing, so this is generous on
+        // purpose — a slow batch must read as slow, never as a lost event.
+        waitUntil("the rewritten file lands again", timeout: 15) {
             log.importedNames.filter { $0 == "slow.bin" }.count == 2
         }
-        let slowImports = log.importedTokens.enumerated()
-            .filter { log.importedNames[$0.offset] == "slow.bin" }
-            .map(\.element)
+        XCTAssertEqual(log.importedNames, ["slow.bin", "slow.bin"])
+        let slowImports = log.importedTokens
         XCTAssertNotEqual(slowImports.first, slowImports.last)
+    }
+
+    /// The stream position perch persists: real, monotonic, and only ever
+    /// advanced by a scan that already ran. It is what `WatchedFolderStore`
+    /// stores per folder so the next launch resumes there instead of at
+    /// `kFSEventStreamEventIdSinceNow` (#8).
+    func testTheWatcherReportsAStreamPositionToResumeFrom() throws {
+        let directory = try makeTemporaryDirectory()
+        let log = ImportLog()
+        let watcher = makeWatcher(over: directory, log: log)
+        watcher.start(seedExisting: false)
+
+        try Data("one".utf8).write(to: directory.appending(path: "a.txt"))
+        waitUntil("a stream position is reported", timeout: 15) { !log.reportedEventIDs.isEmpty }
+
+        try Data("two".utf8).write(to: directory.appending(path: "b.txt"))
+        waitUntil("a second, later position", timeout: 15) { log.reportedEventIDs.count >= 2 }
+
+        let reported = log.reportedEventIDs
+        // The end-of-history marker carries id 0 and must never be persisted
+        // as a position, and positions only ever move forward.
+        XCTAssertTrue(reported.allSatisfy { $0 > 0 })
+        XCTAssertEqual(reported, reported.sorted())
+        XCTAssertEqual(Set(reported).count, reported.count)
+    }
+
+    /// Resuming from a persisted position replays what happened while perch
+    /// was down — the mechanism behind #8. Isolated deliberately: the folder
+    /// is quiet from the moment the second watcher starts, and its ledger
+    /// already holds everything on disk, so the launch catch-up scan has
+    /// nothing to say. Any event it reports came out of FSEvents' history.
+    ///
+    /// The launch rescan is still perch's primary catch-up, and it would find
+    /// a missed *arrival* on its own. What replay adds is that the stream
+    /// itself covers the downtime rather than the rescan being the only thing
+    /// that does — so this asserts the replay happens, not that it is the only
+    /// path to a file.
+    func testAResumedStreamReplaysHistoryAQuietFolderWouldNotProduce() throws {
+        let directory = try makeTemporaryDirectory()
+
+        let first = ImportLog()
+        let watcher = makeWatcher(over: directory, log: first)
+        watcher.start(seedExisting: false)
+        try Data("one".utf8).write(to: directory.appending(path: "a.txt"))
+        waitUntil("a stream position to resume from", timeout: 15) { !first.reportedEventIDs.isEmpty }
+        let resumeFrom = try XCTUnwrap(first.reportedEventIDs.first)
+
+        // Everything that happens while perch is "not running".
+        watcher.stop()
+        try Data("two".utf8).write(to: directory.appending(path: "b.txt"))
+        try Data("three".utf8).write(to: directory.appending(path: "c.txt"))
+
+        // A ledger holding the whole folder: the catch-up scan imports nothing
+        // and reports nothing, so only replay can make this watcher speak.
+        let ledger = Set(
+            try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+                .map { try FolderWatchRules.identityToken(forFileAt: $0) }
+        )
+
+        let replayed = ImportLog()
+        let resumed = makeWatcher(over: directory, ledger: ledger, sinceEventID: resumeFrom, log: replayed)
+        resumed.start(seedExisting: false)
+        waitUntil("the missed writes are replayed", timeout: 15) { !replayed.reportedEventIDs.isEmpty }
+        XCTAssertGreaterThan(try XCTUnwrap(replayed.reportedEventIDs.last), resumeFrom)
+        XCTAssertEqual(replayed.importedNames, [], "a fully ledgered folder imports nothing on replay")
+        resumed.stop()
+
+        // The control: the same quiet folder, started with no position, hears
+        // nothing at all — which is what a folder perch just added does, and
+        // what every launch did before positions were persisted.
+        let blind = ImportLog()
+        let fresh = makeWatcher(over: directory, ledger: ledger, log: blind)
+        fresh.start(seedExisting: false)
+        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertEqual(blind.reportedEventIDs, [], "starting at since-now must replay nothing")
     }
 
     /// A pure rename must still not re-import — the property the token exists
