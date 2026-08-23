@@ -44,8 +44,10 @@ is provably the only thing going wrong.
 **Feel-tested on the dev build (`2026.08.23-dev`) and all four passed:** #10
 (open/close at 250 items, and a cold scroll end to end), #9 (50 folders land in
 a grid), #6 (`curl -o` twice over one path gives two tiles), #2 (an evicted
-iCloud file lands instead of counting to 120). Run F is answered and closed by
-the deletion below. **#12 is the only thing left on this board.**
+iCloud file lands instead of counting to 120). Run F is closed by the deletion
+below — **by decision, not by the measurement it cites**; the caveat is stated
+in Run F and changes nothing that shipped. **#12 is the only thing left on this
+board.**
 
 | owed | which | needs |
 |---|---|---|
@@ -492,6 +494,59 @@ live where they bind (`Perch/Config/Info.plist`, `ARCHITECTURE.md`,
 
 The investigation that got there is kept below, unedited, because it is the
 record of what was ruled out.
+
+### The proof above does not discriminate — read this before reinstating anything
+
+Measured after the deletion landed, from a checkout, with nothing cleaned first:
+
+| what | count |
+|---|---|
+| registered `Perch.app` records in `lsregister -dump` | **40** |
+| of those, still on disk | 12 |
+| live bundles declaring the `addToShelf` Service | **6** |
+| distinct bundle ids among those six | **2** — `com.hausfold.perch` ×3, `com.hausfold.perch.dev` ×3 |
+| registered appex providers (`pluginkit -mAvvv -p com.apple.services`) | 1, whose parent bundle is `~/.cache/bench/perch-dd/…/Debug/Perch.app` — **not** `/Applications/Perch.app` |
+
+Two consequences, and they land on the reasoning above rather than on the
+outcome:
+
+- **"The mailbox was untouched" does not identify the dead row.** It proves the
+  row that did nothing did not go through `HandoffClient`. It does not prove
+  that row *was* the appex. Six live providers under two bundle ids produce two
+  disambiguated `(Perch.app)` rows on their own — one being `/Applications`, the
+  other a lane build whose Service would launch a second Perch that stands down
+  at the single-instance guard (`AGENTS.md` ▸ Build). That predicts exactly what
+  was seen: one row shelves, the other does nothing, no mailbox write. Both
+  hypotheses fit the observation, so the observation cannot choose between them.
+- **"Never rendered under Quick Actions" was measured on the wrong copy.** The
+  only appex PluginKit had was the bench build cache's — same nested id as
+  `/Applications`', so PluginKit keeps one record and the cache won it. A Quick
+  Action whose container sits in a build cache is the unrepresentative case this
+  file warned about in step 0.
+
+**This does not reopen the deletion.** The extension bought one thing — running
+without waking the app — which is worth little for an app that owns the notch,
+and the classic Service demonstrably works. Removing it is defensible as a
+product call and it is made. What is corrected here is the *record*: Run F is
+closed by a decision, not by a measurement that could have gone the other way.
+
+**If anyone ever wants the extension back**, the clean-machine test was never
+run and `git revert` of #98's target deletion is the cheap half. The test is:
+
+```sh
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+  -kill -r -domain local -domain system -domain user
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+  -f /Applications/Perch.app
+killall Finder
+```
+
+…then right-click a selection **before any lane builds again**. One Services row
+means the duplicate was lane pollution; two means both doors really render.
+`pluginkit -r` is not a substitute — it only unregisters appex providers, which
+is why the "clean machine" in the first feel-test pass was never clean.
+
+
 
 ### Original notes
 
