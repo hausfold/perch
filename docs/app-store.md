@@ -257,14 +257,16 @@ correct.) If you add a device to the list, boot it first.
 > anyone else — no feed, no upload, no server, no other user — so there is no
 > reporting or blocking mechanism.
 
-Also fill in: no demo account needed, contact = `hi@hausfold.co`. (Not
-`support@…` on either domain. A review contact that bounces is the one field
-you cannot afford to get wrong, and `hi@hausfold.co` is live, routes today, and
-is what every page of the site already says. **This is no longer a stopgap** —
-`hi@` was settled as *the* address 2026-08-09, so there is nothing to switch
-to later. If `support@`
-ever gets added it will be an alias onto `hi@`, which doesn't change this
-field.)
+Also fill in: no demo account needed, contact = `julien@hausfold.co`. (Not
+`support@…` on either domain, and not the old `hi@` — the address moved
+2026-08-22; the record of why is the workshop's `notes/go-to-market.md` §6,
+which is the one place that owns it. **Send yourself a test message before you
+type it in.** A review contact that bounces is the one field you cannot afford
+to get wrong, and this doc cannot assert deliverability on your behalf —
+verify, don't assume. ⚠️ App Store Connect is the one surface a commit cannot
+move. The first submission (`v2026.08.07`) predates the address decision
+entirely, so it never carried `hi@` — but if App Review Information has been
+filled in at any point since, open it and check the field by hand.)
 
 ## The screen recording Apple asks for
 
