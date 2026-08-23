@@ -400,16 +400,22 @@ shipped perch** — which also explains why they resisted a plist-shaped
 diagnosis. Confirm by testing a real notarized release, and fix the dev path so
 `bench try` can feel-test the Finder doors at all:
 
-- **perch** — derive the three ids from one setting, so a single override still
-  produces three distinct ids: project-level `PERCH_BUNDLE_ID = com.hausfold.perch`,
-  then `$(PERCH_BUNDLE_ID)`, `$(PERCH_BUNDLE_ID).finder-action`,
-  `$(PERCH_BUNDLE_ID).cli` on the three targets. Release output must be
-  byte-identical — that is the acceptance test.
-- **bench** — `ensure_perch_dev_app` (`bench:590`) passes `PERCH_BUNDLE_ID=…dev`
-  instead of `PRODUCT_BUNDLE_IDENTIFIER=…dev`.
+- **perch — done in this PR.** All five targets derive from a project-level
+  `PERCH_BUNDLE_ID = com.hausfold.perch`: `$(PERCH_BUNDLE_ID)`,
+  `.finder-action`, `.cli`, `.ios`, `.ios.share`. Verified both directions —
+  a normal build's ids are unchanged (`com.hausfold.perch` /
+  `com.hausfold.perch.finder-action` / `com.hausfold.perch.ios` /
+  `com.hausfold.perch.ios.share`, diffed against a pre-change build), and
+  `PERCH_BUNDLE_ID=com.hausfold.perch.dev` now yields a properly nested
+  `com.hausfold.perch.dev` / `com.hausfold.perch.dev.finder-action`.
+- **bench — the matching one-line change.** `ensure_perch_dev_app`
+  (`bench:590`) passes `PERCH_BUNDLE_ID=…dev` instead of
+  `PRODUCT_BUNDLE_IDENTIFIER=…dev`.
 
-Until that lands, `bench try` cannot feel-test #4, #5 or anything else that
-depends on the extension being live.
+Until *both* land, `bench try` cannot feel-test #4, #5 or anything else that
+depends on the extension being live. After they do, the check is: `bench try`,
+then select 3 files in Finder — the Quick Action should appear, and Login Items
+& Extensions ▸ System Services Extensions should have a Perch row to switch.
 
 **One thing that is a real perch bug regardless**, and the better explanation
 for "Services listed twice" than duplicate installs: the app declares a legacy

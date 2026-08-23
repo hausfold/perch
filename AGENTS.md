@@ -56,6 +56,15 @@ protocol + crypto + the staging layer both platforms use), `PerchMobileCore/`
 (Mac App Group mailbox shared by the macOS app, the Finder Action, and the CLI —
 `HandoffClient` is the sender half both of them run).
 
+Every target's bundle id derives from one project-level `PERCH_BUNDLE_ID`
+(`$(PERCH_BUNDLE_ID)`, `.finder-action`, `.cli`, `.ios`, `.ios.share`). Rename
+the family with **that** override, never with `PRODUCT_BUNDLE_IDENTIFIER=` on
+the xcodebuild command line — a command-line `PRODUCT_BUNDLE_IDENTIFIER`
+applies to every target in the scheme and collapses the app, the Finder Action
+and the CLI onto one id. An extension sharing its container's id is malformed,
+so Finder silently stops offering the Quick Action.
+[`nix/dev-app/README.md`](./nix/dev-app/README.md)
+
 The CLI product is `perch-cli`, not `perch`, and that is load-bearing: macOS
 filesystems are case-insensitive, so `Contents/MacOS/perch` *is*
 `Contents/MacOS/Perch` and silently replaces the app's own executable — the app

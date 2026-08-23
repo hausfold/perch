@@ -17,3 +17,22 @@ session** (where `xcodebuild` works), signs it with a stable identity under the
 
 The package then packages *that* app instead of the release. Nothing here needs
 committing per build — the override is transient, per `bench try` invocation.
+
+## Renaming the bundle: use `PERCH_BUNDLE_ID`, never `PRODUCT_BUNDLE_IDENTIFIER`
+
+Every target derives its identifier from one project-level setting —
+`$(PERCH_BUNDLE_ID)`, `$(PERCH_BUNDLE_ID).finder-action`,
+`$(PERCH_BUNDLE_ID).cli`, and the two iOS ones — precisely so the dev build can
+rename the whole family with a single override:
+
+```sh
+xcodebuild -scheme Perch … PERCH_BUNDLE_ID=com.hausfold.perch.dev
+```
+
+A `PRODUCT_BUNDLE_IDENTIFIER=` on the xcodebuild command line applies to **every
+target in the scheme**, which collapses the app, the Finder Action and the CLI
+onto one identifier. An app extension that shares its container's bundle id is
+malformed: PluginKit registers it (`defaults read pbs` even shows
+`APPEXTENSION-… = 1`) but Finder never offers the Quick Action and Login Items &
+Extensions has nothing to switch on — which is what field-test #4 turned out to
+be, after two passes of looking for it in the plist.
