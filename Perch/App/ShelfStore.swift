@@ -313,9 +313,17 @@ final class ShelfStore: ObservableObject {
         pendingTransfers.removeAll { $0.id == itemID }
     }
 
+    /// Every item whose staged bytes the shelf still owns — what is on it plus
+    /// what a drag has lifted but not yet settled. This is what disambiguates a
+    /// container shared by a promised batch; see
+    /// `StagingRepository.resolvedURL(for:alongside:)`.
+    private var itemsHoldingStagedBytes: [ShelfItem] {
+        items + lifted.values.map(\.item)
+    }
+
     func remove(_ item: ShelfItem) {
         do {
-            try repository.remove(item)
+            try repository.remove(item, alongside: itemsHoldingStagedBytes)
             items.removeAll { $0.id == item.id }
             try repository.persist(items)
         } catch {
@@ -371,7 +379,10 @@ final class ShelfStore: ObservableObject {
             // Never lift an item whose bytes we cannot find. A staged file
             // renamed out from under the shelf resolves; one that was deleted
             // does not, and no destination can have taken a copy of it.
-            guard repository.resolvedURL(for: items[index]) != nil else {
+            guard repository.resolvedURL(
+                for: items[index],
+                alongside: itemsHoldingStagedBytes
+            ) != nil else {
                 report(ShelfExportError.stagedFileMissing(items[index].displayName))
                 continue
             }
@@ -413,7 +424,7 @@ final class ShelfStore: ObservableObject {
     func confirmCopied(_ id: UUID) {
         guard let entry = lifted.removeValue(forKey: id) else { return }
         do {
-            try repository.remove(entry.item)
+            try repository.remove(entry.item, alongside: itemsHoldingStagedBytes)
         } catch {
             report(error)
         }
@@ -449,7 +460,10 @@ final class ShelfStore: ObservableObject {
     }
 
     func reveal(_ item: ShelfItem) {
-        guard let url = repository.resolvedURL(for: item) else { return }
+        guard let url = repository.resolvedURL(
+            for: item,
+            alongside: itemsHoldingStagedBytes
+        ) else { return }
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
@@ -465,7 +479,10 @@ final class ShelfStore: ObservableObject {
         var updated = items
         var changed = false
         for index in updated.indices {
-            guard let url = repository.resolvedURL(for: updated[index]),
+            guard let url = repository.resolvedURL(
+                for: updated[index],
+                alongside: itemsHoldingStagedBytes
+            ),
                   let renamed = updated[index].restaged(at: url, inside: repository.rootURL)
             else {
                 // A tile whose bytes are unreachable stays put: the shelf must
@@ -510,7 +527,10 @@ final class ShelfStore: ObservableObject {
     /// raised without activating lands behind the frontmost app and reads as a
     /// hang with no visible cause.
     func save(_ item: ShelfItem) {
-        guard let source = repository.resolvedURL(for: item) else { return }
+        guard let source = repository.resolvedURL(
+            for: item,
+            alongside: itemsHoldingStagedBytes
+        ) else { return }
 
         let panel = NSSavePanel()
         // `displayName` is the staged file's own name — sanitized at import and
@@ -556,7 +576,10 @@ final class ShelfStore: ObservableObject {
     /// window + responder-chain controller) can't be driven without breaking
     /// that design. The out-of-process previewer sidesteps all of it.
     func open(_ item: ShelfItem) {
-        guard let url = repository.resolvedURL(for: item) else { return }
+        guard let url = repository.resolvedURL(
+            for: item,
+            alongside: itemsHoldingStagedBytes
+        ) else { return }
         if shouldQuickLook(item) {
             quickLook(url)
         } else {

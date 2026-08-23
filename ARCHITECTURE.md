@@ -304,11 +304,21 @@ is unambiguously the same item. The shelf follows the rename — same id, same
 pin, same slot, new `displayName` — at the moment the panel next opens
 (`ShelfPanelController.expand`) and again on the next launch.
 
-Two answers are deliberately refused rather than guessed: a container holding
-more than one visible child (handing a destination the wrong file is worse
-than refusing the drag) and a *detached* container, whose bytes belong to
-whatever took an earlier drop and must never be re-resolved back onto the
-shelf. Both return nil, and nil is a real answer every caller honours.
+Three answers are deliberately refused rather than guessed, and all return
+nil — a real answer every caller honours, because handing a destination the
+wrong file is worse than refusing the drag:
+
+- a container holding more than one visible child;
+- a container another live item still claims. A promised **batch** shares one
+  container between several items, so the single child left after a sibling's
+  file is deleted is as likely to be the sibling. Callers pass their
+  neighbours (`alongside:`) — the shelf's items plus anything lifted mid-drag
+  — so this case is answerable at all;
+- a *detached* container, whose bytes belong to whatever took an earlier drop
+  and must never be re-resolved back onto the shelf.
+
+`StagingRepository.remove` resolves the same way and for the same reason:
+deleting is the one place where guessing wrong destroys something.
 
 ### Termination and recovery
 

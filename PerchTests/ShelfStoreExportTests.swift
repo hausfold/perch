@@ -189,6 +189,37 @@ final class ShelfStoreExportTests: XCTestCase {
         XCTAssertNil(repository.resolvedURL(for: item))
     }
 
+    /// A promised *batch* shares one container between several items
+    /// (`beginPromisedImports`), so the one child left after a sibling's file
+    /// is deleted is as likely to be the sibling as this item renamed.
+    /// Vending the wrong file is worse than refusing the drag.
+    func testASharedBatchContainerIsNeverResolvedToASibling() throws {
+        try makeShelf()
+        let container = try repository.allocateImportDirectory()
+        let mine = container.appending(path: "mine.txt")
+        let theirs = container.appending(path: "theirs.txt")
+        try Data("mine".utf8).write(to: mine)
+        try Data("theirs".utf8).write(to: theirs)
+        let mineItem = try repository.item(forStagedURL: mine)
+        let theirsItem = try repository.item(forStagedURL: theirs)
+        try repository.persist([mineItem, theirsItem])
+        store.restore()
+
+        // The user deletes one of the two in Finder.
+        try FileManager.default.removeItem(at: mine)
+
+        XCTAssertNil(
+            repository.resolvedURL(for: mineItem, alongside: [mineItem, theirsItem]),
+            "the surviving child belongs to the sibling, not to this item"
+        )
+        store.liftForExport([mineItem.id])
+        XCTAssertEqual(store.items.map(\.id), [mineItem.id, theirsItem.id], "neither tile moves")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: theirs.path),
+            "and the sibling's bytes are untouched"
+        )
+    }
+
     /// Detached bytes belong to whatever took an earlier drop — re-resolution
     /// must never be the thing that hands them back out.
     func testResolutionNeverReachesIntoADetachedContainer() throws {

@@ -261,6 +261,14 @@ struct ShelfPanelView: View {
 
     /// Resolves a shelf item to something the drag source can vend by promise,
     /// or nil when its staged copy can't be located.
+    ///
+    /// Deliberately the recorded path rather than
+    /// `StagingRepository.resolvedURL(for:)`: this runs for every item on every
+    /// body evaluation, and the item it reads was already made current by
+    /// `ShelfStore.refreshStagedNames()` when the panel opened. A staged file
+    /// that goes missing *between* opening and the drop is caught by
+    /// `liftForExport`, which is the authoritative check and the one that
+    /// decides whether the tile leaves.
     private func exportItem(for item: ShelfItem) -> ExportItem? {
         guard let url = item.fileURL(inside: store.repository.rootURL) else { return nil }
         let fileType = item.contentTypeIdentifier
