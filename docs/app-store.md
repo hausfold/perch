@@ -124,10 +124,10 @@ a companion, not a standalone.
 > • Sharing always works. Delivery happens when it can, and Perch tells you the
 >   truth about which state you're in — nothing is ever marked "sent" when it
 >   isn't.
-> • Your network, nobody else's. Perch finds your Mac over Bonjour on the local
->   network and talks to it directly, end-to-end encrypted with a key the two
->   devices agreed on when you paired them. There is no relay, no server, and no
->   account.
+> • Your network, nobody else's. Perch finds your Mac over Bonjour and talks to
+>   it directly — across your local network, or peer-to-peer when there isn't
+>   one — end-to-end encrypted with a key the two devices agreed on when you
+>   paired them. There is no relay, no server, and no account.
 > • Pairing is deliberate. Scan the QR your Mac shows, check that the same six
 >   digits appear on both screens, and approve it on the Mac. Unpairing is one
 >   tap, and it deletes the key.
@@ -227,7 +227,8 @@ correct.) If you add a device to the list, boot it first.
 > shelf. Each row reads "waiting" while no Mac is paired — nothing is ever
 > labelled sent when it hasn't been. Swipe a row to remove it. Nothing is gated
 > or paywalled. Pairing is optional, and the only part needing hardware we can't
-> ship you: a Mac on the same Wi-Fi running Perch shows a QR code, the phone
+> ship you: a Mac running Perch — on the same Wi-Fi, or simply nearby with Wi-Fi
+> on, since the two can also talk peer-to-peer — shows a QR code, the phone
 > scans it (or accepts the perch-pair:… string pasted as text), and both screens
 > then display the same six digits, which you compare before approving on the
 > Mac. Unpairing is one tap and deletes the key. We will gladly arrange a Mac
@@ -237,11 +238,13 @@ correct.) If you add a device to the list, boot it first.
 > analytics, no crash reporter, no ads, no authentication service, no payment
 > processor, no AI service, no data provider, and no backend of ours. The only
 > network peer is a Mac the user paired by hand, found over Bonjour
-> (_perch._tcp) on the local network and connected directly over TCP. Everything
+> (_perch._tcp) and connected directly over TCP — across the local network, or
+> over Apple's peer-to-peer link when there is no network. Everything
 > else is Apple's frameworks: SwiftUI, UIKit, PhotosUI, VisionKit for the QR
 > scanner, Network.framework, and CryptoKit for the end-to-end encryption
 > (X25519, HKDF, ChaCha20-Poly1305 — OS-provided standard algorithms, the basis
-> of our export-compliance answer). No data leaves the local network.
+> of our export-compliance answer). No data leaves the two devices the user
+> paired.
 >
 > 6. REGIONAL DIFFERENCES. None — the app behaves identically in every region
 > and storefront. No geo-gating, no region-specific content or pricing, no

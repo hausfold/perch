@@ -280,12 +280,12 @@ through the same admission-first, atomic-commit path as a drag. Pairing lives
 in the Keychain; revoking a device deletes its row.
 
 Every wire path — listener, browser and connection alike — sets
-`includePeerToPeer = true`, so a phone that cannot see the Mac over Wi-Fi finds
-it over AWDL, the same peer-to-peer link AirDrop uses. Delivery therefore works
-with no network at all, and turning Wi-Fi off in Control Center does **not**
-take the link down: that toggle leaves AWDL up by design. Airplane Mode, or
-Settings ▸ Wi-Fi ▸ off, is the only way to actually stop it — which is what a
-test asserting "off means no delivery" has to use.
+`includePeerToPeer = true`, so a phone that cannot reach the Mac over Wi-Fi
+finds it over AWDL, the same peer-to-peer link AirDrop uses. Delivery needs the
+Wi-Fi radio up at both ends and nothing else: no router, no DHCP lease, no
+shared SSID. What that costs a test is stated where users read it,
+`docs/reference.md` ▸ Permissions — Control Center's Wi-Fi toggle deliberately
+leaves AWDL up, so "Wi-Fi off" is not how you take the link down.
 
 **No account, no relay, and TLS-PSK was considered and declined.** A hausfold
 sync server would spend, for a v1 nobody asked to be cloudy, exactly the trust

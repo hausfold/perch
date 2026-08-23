@@ -49,8 +49,10 @@ too (E3).
 
 ### Where it stands — 2026-08-23
 
-**Every codeable item on this board has landed.** What is left is five things
-that need Julien's hands, not a session's:
+**Nothing left on this board can be advanced from a checkout alone.** Every
+item that could be fixed by reading and writing code has landed; #12 is still
+open, but its next step is a measurement, not a diff. Four things need Julien's
+hands, and one needs nothing at all:
 
 | owed | which | needs |
 |---|---|---|
@@ -60,9 +62,10 @@ that need Julien's hands, not a session's:
 | Measurement | G (#12) | the phone + `log stream … category == "PairedDevices"`; the store is exonerated, the UI wiring reads correct (one `AppRuntime` instance, `@Published`, `@ObservedObject`), so the count line is what splits "stored but not shown" from "never stored" |
 | Nothing | D3 (#8) | unreproduced; the resumed stream is in and there is nothing further to write until it recurs |
 
-Two loose ends from this board are being carried in **other lanes**, not here:
-E's unbounded cloud waiters (`worktree-silly-pika`) and the export-ledger /
-drag-out-into-a-watched-folder pair (`worktree-btw-pretty-sure-im`).
+Two loose ends from this board are being carried by **other sessions**, not
+here — don't pick them up twice: E's unbounded cloud waiters (Run E's *Watch
+out*), and the export-ledger probe race plus drag-out into a *watched*
+destination, which shelves the item straight back.
 
 ---
 
