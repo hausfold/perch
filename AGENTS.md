@@ -43,6 +43,20 @@ instead and stands down anyway. The test host is this same app, so a test run
 starts no shelf at all — `xcodebuild test` never puts a panel on the notch or
 restores/prunes the live staging repository.
 
+Every `xcodebuild` here registers the app it built with LaunchServices, from
+wherever `DerivedData` sits — and nothing ever unregisters it. Measured
+2026-08-23: 40 `Perch.app` records — lanes, bench, scratchpads, plain Xcode
+builds — of which 6 were live bundles declaring the `addToShelf` Service, under
+two different bundle ids. It costs nothing at runtime, but it makes this Mac a
+**bad instrument for any Finder-menu question**: duplicated Service rows and a
+Quick Action whose registered provider is some lane's build cache are both
+artifacts of it, and both were misread as perch bugs once already. `pluginkit
+-r` does **not** clear them — it only knows appex providers. Before measuring a
+Finder door, run the full-path `lsregister -kill -r -domain local -domain system
+-domain user` (it is not on `PATH`; see `docs/field-test-2026-08-22.md` ▸ Run F
+for the invocation), re-register `/Applications/Perch.app`, `killall Finder` —
+and take the reading before the next lane builds.
+
 Don't pass `CODE_SIGNING_ALLOWED=NO` to the **iOS** build you intend to run:
 it strips the App Group entitlement and the app aborts at launch. Simulator
 ad-hoc signing needs no team or provisioning.
