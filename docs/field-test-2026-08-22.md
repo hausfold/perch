@@ -30,8 +30,8 @@ is provably the only thing going wrong.
 | 10 | Open/close animation janks at ~250 items (scrolling is fine) | UI | Confirmed cause | **B** |
 | 9 | 50 folders dropped into Finder land in a diagonal line | UI | **Open** — first theory disproved | **B** |
 | ~~7~~ | ~~Rename a staged file in Finder → tile can never be dragged out, and vanishes~~ | Store | **Fixed** — re-resolve; decision in `ARCHITECTURE.md` | ~~**C**~~ |
-| 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | **Half fixed** — dedupe gone; a directory kqueue never sees the rewrite | **D** |
-| 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | Unresolved by reading | **D** |
+| 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | **Fixed in tests** — dedupe gone, FSEvents sees the rewrite; not yet feel-tested | **D** |
+| 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | **Addressed, still unreproduced** — the stream now resumes from a persisted position | **D** |
 | 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | Two candidates | **E** |
 | 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | Needs a clean-machine check first | **F** |
 | 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | Probably an obsolete claim | **F** |
@@ -215,51 +215,76 @@ bytes belong to whatever took an earlier drop.
 `ShelfStore.importFileURLs` now takes a per-URL completion, and
 `FolderWatchCenter` ledgers on success instead of on attempt; a failure calls
 `FolderWatcher.forgetImport(_:)`, which takes the token back out so the next
-directory event probes the file again — *the next event*, which inherits D2's
-open half below: nothing re-probes on its own. It also self-heals at relaunch,
+event batch probes the file again — *the next event*, which since D2 includes a
+write into the file itself. It also self-heals at relaunch,
 since the persisted ledger never got the token. The token still goes into the *in-memory*
 ledger at promote time, so a second event can't start a second import mid-flight.
 `testAFailedImportIsRetriedOnTheNextEvent`.
 
-### D2 · `curl -o` arrivals never land (#6) — **half fixed, and the other half is bigger than the hypothesis**
+### ~~D2 · `curl -o` arrivals never land (#6)~~ — **fixed, both halves**
 
-The dedupe half was exactly as diagnosed and is fixed: `identityToken` now hashes
-**size and modification date** alongside inode and birth date, so truncating and
-rewriting a path is a new arrival rather than a match against the first download
-forever. A pure rename still does not re-import (`testARenameStillDoesNotReimport`),
-which is the property the token exists for. Tokens carry a `v2:` format tag, and a
-ledger in an older format is *adopted* on the next launch rather than pruned to
-nothing — without that, upgrading would have re-imported everything in
-`~/Downloads` at once. The product decision (replaced contents = new arrival) is
-in `docs/reference.md`.
+Two independent faults wearing one symptom.
 
-**But that alone does not make `curl -o` land, and this is the real finding of
-Run D.** A directory kqueue fires on entries appearing, disappearing and being
-renamed. It does **not** fire when something writes into a file that is already
-in the directory — which is precisely what `curl -o` does to an existing path
-(`O_TRUNC`, same inode, same entry). So no event arrives, `scan()` never runs,
-and the fixed token never gets a chance to differ. `FolderWatcher`'s own class
-comment states this kqueue property; what nobody had joined up is that it makes
-in-place rewrites invisible end to end. `testARewrittenFileIsNoLongerDedupedAgainstItsOwnEarlierContents`
-has to create a second file purely to fire an event, and says so.
+**The dedupe half** (fixed in #88): `identityToken` now hashes **size and
+modification date** alongside inode and birth date, so truncating and rewriting a
+path is a new arrival rather than a match against the first download forever. A
+pure rename still does not re-import (`testARenameStillDoesNotReimport`), which is
+the property the token exists for. Tokens carry a `v2:` format tag, and a ledger in
+an older format is *adopted* on the next launch rather than pruned to nothing —
+without that, upgrading would have re-imported everything in `~/Downloads` at once.
+The product decision (replaced contents = new arrival) is in `docs/reference.md`.
 
-**What is left, and it is a design call, not a patch.** Something has to notice a
-write into an existing file:
-- **FSEvents instead of a directory kqueue.** Reports `ItemModified` per path,
-  coalesced and cheap, and its stored event ID replays what happened while the
-  app was not running — which is #8 (D3) as well. This is the one to pick if
-  either bug matters; it is a rewrite of `FolderWatcher`'s event source, not of
-  its probe or its ledger.
-- **A low-frequency rescan tick.** Ten lines, no design change, and it burns a
-  `contentsOfDirectory` plus a `stat` per file forever, on battery.
+**The event half, which was the real finding of Run D.** A directory kqueue fires on
+entries appearing, disappearing and being renamed. It does **not** fire when
+something writes into a file that is already in the directory — which is precisely
+what `curl -o` does to an existing path (`O_TRUNC`, same inode, same entry). So no
+event arrived, `scan()` never ran, and the fixed token never got a chance to differ.
 
-### D3 · No catch-up on relaunch (#8) — **untouched, and probably the same door**
+`FolderWatcher` now runs an **FSEvents** stream instead
+(`kFSEventStreamCreateFlagFileEvents | …NoDefer`), which reports the rewrite as
+`ItemModified`. Only the event source changed: the stability probe, the ledger,
+`forgetImport` and the `v2` re-seed are untouched, and every event batch still
+answers with one full `scan()`, so a coalesced or dropped batch costs a rescan and
+never a missed file. `testAFileRewrittenInPlaceLandsAgainWithNoOtherChangeInTheFolder`
+is the old test with its crutch removed — it used to have to create a second file
+purely to fire a directory event, and now nothing else in the folder changes.
 
-Not reproduced; nothing changed here. Note that FSEvents' historical replay would
-address it directly, and that the launch path (`initialScan` → prune → `scan`) is
-covered by `testLaunchScanPrunesGoneFilesAndCatchesUpOnUnledgeredOnes` and does
-work in a test, so the suspicion falls on the bookmark resolving or the kqueue
-arming rather than on the scan.
+**Still owed: the feel-test.** #6 has only ever been verified in the suite. Run
+`curl -o ~/Downloads/slow.bin` twice over the same path with `~/Downloads` watched
+and confirm two tiles.
+
+**What this makes visible, and it is a probe question, not an event-source one.**
+The probe promotes a file whose size and mtime hold still for `probeInterval ×
+requiredStableProbes` ≈ 1 s. A single download that stalls longer than that and
+then resumes was *already* being shelved early and truncated — the probe has
+always been a net under the naming convention, not a proof of doneness. What the
+kqueue did was hide the second half: no event for the resumed write, so the
+truncated copy was the only thing you ever got and the finished file never landed.
+FSEvents sees the resume, so you now get the truncated tile **and** the complete
+one. Measured, not theorised: a 1000 B file promoted during a stall, then grown to
+6000 B, lands as `["stall.bin", "stall.bin"]` at sizes `[1000, 6000]`.
+
+Strictly more of the right bytes than before, and one extra tile to clear. Noted
+in `docs/reference.md`. The lever, if the tile bothers more than the truncation
+did, is `requiredStableProbes` — raising it widens the quiet window a stall has to
+beat, at the cost of delaying every ordinary arrival by the same amount. Left
+alone here on purpose: this run changed the event source and nothing else.
+
+### D3 · No catch-up on relaunch (#8) — **addressed, still unreproduced**
+
+Never reproduced, and nothing here claims it is closed. What changed is that the
+stream no longer starts blind: `WatchedFolder.lastEventID` persists the FSEvents
+position each folder has been scanned up to (an opaque volume counter — no path, no
+time), and the next launch resumes there, replaying what happened while perch was
+down. `testAResumedStreamReplaysHistoryAQuietFolderWouldNotProduce` isolates that
+against a control started at `kFSEventStreamEventIdSinceNow`, which hears nothing.
+
+Be honest about what that is worth: the launch path (`initialScan` → prune →
+`scan`) is a full rescan and would find a missed *arrival* on its own — it is
+covered by `testLaunchScanPrunesGoneFilesAndCatchesUpOnUnledgeredOnes` and does work
+in a test. Replay is the stream covering the same gap itself, not a second detector.
+If #8 reproduces after this, the suspicion still falls on the bookmark resolving at
+launch rather than on the scan.
 
 ## Run E — Non-downloaded iCloud file sticks on "Downloading" (#2)
 

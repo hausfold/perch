@@ -8,6 +8,13 @@ struct WatchedFolder: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     var bookmark: Data
     var importedTokens: Set<String>
+    /// The FSEvents stream position this folder has been scanned up to. The
+    /// next launch resumes there, so writes that happened while perch was
+    /// down are replayed instead of lost. Nil for a folder that has never
+    /// reported one — a fresh add, or a config written before this existed —
+    /// and the watcher starts at `kFSEventStreamEventIdSinceNow` then. It is
+    /// an opaque volume-wide counter, not a name, a path or a time.
+    var lastEventID: UInt64?
 }
 
 /// How folder grants are minted and resolved. Injected so tests can use plain
@@ -80,7 +87,8 @@ final class WatchedFolderStore: ObservableObject {
         let folder = WatchedFolder(
             id: UUID(),
             bookmark: try bookmarking.make(url),
-            importedTokens: []
+            importedTokens: [],
+            lastEventID: nil
         )
         folders.append(folder)
         persist()
@@ -108,6 +116,19 @@ final class WatchedFolderStore: ObservableObject {
             return
         }
         folders[index].importedTokens = tokens
+        persist()
+    }
+
+    /// The watcher has scanned this folder up to that stream position.
+    /// Written per coalesced event batch, so it costs at most one config
+    /// write per folder per FSEvents latency window.
+    func setLastEventID(_ eventID: UInt64, for id: UUID) {
+        guard let index = folders.firstIndex(where: { $0.id == id }),
+              folders[index].lastEventID != eventID
+        else {
+            return
+        }
+        folders[index].lastEventID = eventID
         persist()
     }
 

@@ -127,7 +127,7 @@ A **watched folder** is the seventh door, and the only one that opens without a
 gesture: Settings keeps a list of user-picked folders (each one panel grant,
 persisted as an app-scoped security bookmark), and new files that appear in
 them are copied onto the shelf by `FolderWatchCenter` /
-`Perch/Importing/FolderWatcher.swift`. A kqueue directory source triggers a
+`Perch/Importing/FolderWatcher.swift`. An **FSEvents** stream triggers a
 rescan; a candidate must pass name rules (no hidden files, no in-progress
 browser suffixes), be a regular file, and hold its size still across two
 probes before it is handed to the same `ShelfStore.importFileURLs` path a drop
@@ -136,6 +136,19 @@ never a name or a path — decides what is new, is seeded with the folder's
 existing contents on add, and catches up at launch on arrivals perch missed. Copy only, always: the
 original never leaves the folder, so retention expiry deletes perch's copy and
 nothing of the user's.
+
+FSEvents rather than a kqueue directory source for two reasons. It reports
+`ItemModified`, so a file **rewritten in place** — same inode, same directory
+entry, which is what `curl -o` over an existing path does — is seen at all; a
+directory kqueue fires only on entries appearing, disappearing and being
+renamed, so those downloads never landed (#6). And its event IDs are durable:
+the stream position each folder was last scanned at is persisted alongside its
+ledger (`WatchedFolder.lastEventID` — an opaque volume counter, not a path or a
+time) and the next launch resumes there, replaying what happened while perch
+was down (#8) instead of starting blind at `kFSEventStreamEventIdSinceNow`. The
+launch rescan is still the primary catch-up; replay is the stream covering the
+same gap itself. Every event batch answers with one full `scan()`, which is why
+a coalesced, dropped or replayed batch costs a rescan and never a missed file.
 
 The two Finder doors are complementary, not redundant. The extension runs
 without waking Perch, but only inside the submenu and only while the app is up
@@ -290,10 +303,8 @@ adopted wholesale on the next launch rather than compared and found empty, which
 would re-import the entire folder; that one launch does no catch-up.
 
 Marking is on **success**, not on hand-off: a failed staging takes its token
-back out, so the next directory event tries again rather than the file being
-invisible forever. Directory kqueues do not report writes to a file's contents,
-so a rewrite in place produces no event until something else changes in the
-folder — the open half of #6, in `docs/field-test-2026-08-22.md`.
+back out, so the next FSEvents batch tries again rather than the file being
+invisible forever.
 
 ### Name collisions
 

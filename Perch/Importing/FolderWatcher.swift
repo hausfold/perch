@@ -1,3 +1,4 @@
+import CoreServices
 import CryptoKit
 import Foundation
 import OSLog
@@ -56,16 +57,30 @@ enum FolderWatchRules {
     }
 }
 
-/// One watched folder: a kqueue directory source, a rescan per event, and a
+/// One watched folder: an FSEvents stream, a rescan per event batch, and a
 /// size-stability probe per candidate so a half-written file never reaches
-/// the shelf. Everything runs on one serial queue; callbacks arrive there too
-/// and the center hops them to the main actor.
+/// the shelf. Everything runs on one serial queue — FSEvents delivers there
+/// too — and the center hops results to the main actor.
 ///
-/// kqueue rather than FSEvents on purpose: a directory source fires on entry
-/// changes (create, rename, delete), a rescan is needed anyway for launch
-/// catch-up and ledger pruning, and content writes to a growing file — which
-/// a directory kqueue does not report — are the probe's job, not the event
-/// stream's.
+/// FSEvents rather than a kqueue directory source, and both halves matter.
+/// A directory kqueue fires on entries appearing, disappearing and being
+/// renamed; it says nothing when something writes *into* a file already in
+/// the folder, which is exactly what `curl -o ~/Downloads/x.bin` does to an
+/// existing path (`O_TRUNC`, same inode, same entry). No event, no `scan()`,
+/// and the file never lands (#6). FSEvents reports that as `ItemModified`.
+/// And its event IDs are durable: resuming a stream from the last ID this
+/// folder was scanned at replays what happened while perch was not running
+/// (#8), instead of starting blind at `kFSEventStreamEventIdSinceNow`.
+///
+/// Only the event source changed. The probe, the ledger, `forgetImport` and
+/// the `v2` re-seed are the same, and every event still answers with a full
+/// `scan()` — which is what makes a dropped or coalesced batch harmless.
+///
+/// **A watcher must be `stop()`ped.** A C callback cannot hold a weak
+/// reference, so the stream's context retains the watcher and `stop()`'s
+/// release is what lets it go. One that is simply dropped leaks itself, a
+/// live stream still scanning and importing, and one kernel security-scope
+/// grant. `FolderWatchCenter` stops every watcher it drops.
 final class FolderWatcher: @unchecked Sendable {
     let folderID: UUID
 
@@ -73,16 +88,41 @@ final class FolderWatcher: @unchecked Sendable {
     private let holdsSecurityScope: Bool
     private let probeInterval: TimeInterval
     private let requiredStableProbes: Int
+    /// How long FSEvents may coalesce a burst before delivering it. Paired
+    /// with `kFSEventStreamCreateFlagNoDefer`, so the first event after a
+    /// quiet spell still arrives at once and only a storm gets batched.
+    private let eventLatency: CFTimeInterval
+    /// The floor between two reported stream positions. FSEvents watches a
+    /// path *recursively* and `FileEvents` reports every write underneath it,
+    /// so a build directory or a sync client working somewhere inside a
+    /// watched `~/Desktop` produces a batch every latency window, forever.
+    /// Reporting each one would re-encode and atomically rewrite the whole
+    /// config that often, on battery. Losing the last few seconds of position
+    /// to an abrupt quit costs a slightly wider replay and nothing else.
+    private let positionReportInterval: TimeInterval
     /// An arrival held still — hand it to import. Called on the watcher queue.
     private let onImport: @Sendable (URL, String) -> Void
     /// Seeding or launch pruning rewrote the ledger. Called on the watcher queue.
     private let onLedgerReplaced: @Sendable (Set<String>) -> Void
+    /// This folder is now scanned up to that stream position; persist it so
+    /// the next launch resumes there. Called on the watcher queue.
+    private let onEventID: @Sendable (UInt64) -> Void
     /// The folder could not be opened for watching. Called on the watcher queue.
     private let onUnavailable: @Sendable () -> Void
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "WatchedFolders")
 
     private let queue: DispatchQueue
-    private var source: DispatchSourceFileSystemObject?
+    private var stream: FSEventStreamRef?
+    /// Where the stream resumes, and nil for a folder perch has never caught
+    /// up on — a fresh add, or a config written before stream positions were
+    /// persisted. Nil rather than `kFSEventStreamEventIdSinceNow`, which is
+    /// `UInt64.max` and so can never be beaten by the high-water comparison
+    /// in `handle(eventIDs:count:)`.
+    private var resumeEventID: FSEventStreamEventId?
+    /// Set while a position is known but deliberately unreported, and cleared
+    /// by the trailing report that follows.
+    private var unreportedEventID: FSEventStreamEventId?
+    private var lastReportedAt: DispatchTime?
     private var scopeActive = false
     private var stopped = false
     private var ledger: Set<String>
@@ -98,66 +138,111 @@ final class FolderWatcher: @unchecked Sendable {
         folderID: UUID,
         folderURL: URL,
         ledger: Set<String>,
+        sinceEventID: UInt64? = nil,
         holdsSecurityScope: Bool = true,
         probeInterval: TimeInterval = 0.5,
         requiredStableProbes: Int = 2,
+        eventLatency: TimeInterval = 0.5,
+        positionReportInterval: TimeInterval = 5,
         onImport: @escaping @Sendable (URL, String) -> Void,
         onLedgerReplaced: @escaping @Sendable (Set<String>) -> Void,
+        onEventID: @escaping @Sendable (UInt64) -> Void = { _ in },
         onUnavailable: @escaping @Sendable () -> Void = {}
     ) {
         self.folderID = folderID
         self.folderURL = folderURL
         self.ledger = ledger
+        resumeEventID = sinceEventID
         self.holdsSecurityScope = holdsSecurityScope
         self.probeInterval = probeInterval
         self.requiredStableProbes = requiredStableProbes
+        self.eventLatency = eventLatency
+        self.positionReportInterval = positionReportInterval
         self.onImport = onImport
         self.onLedgerReplaced = onLedgerReplaced
+        self.onEventID = onEventID
         self.onUnavailable = onUnavailable
         queue = DispatchQueue(label: "com.hausfold.perch.folderwatch.\(folderID.uuidString)")
     }
 
     /// Opens the directory and begins watching. `seedExisting` marks
     /// everything already present as imported without shelving it — the
-    /// just-added case; a relaunch instead prunes the ledger and catches up
-    /// on unledgered arrivals. A folder that cannot be opened reports through
-    /// `onUnavailable`.
+    /// just-added case; a relaunch instead prunes the ledger, resumes the
+    /// stream where it left off and catches up on unledgered arrivals. A
+    /// folder that cannot be opened reports through `onUnavailable`.
     ///
     /// All of it happens on the watcher queue: `open` on an unreachable
     /// network volume can block, and the caller may be the main actor.
     func start(seedExisting: Bool) {
         queue.async { [self] in
-            guard !stopped, source == nil else { return }
+            guard !stopped, stream == nil else { return }
             if holdsSecurityScope {
                 scopeActive = folderURL.startAccessingSecurityScopedResource()
             }
+            // `FSEventStreamCreate` happily accepts a path that isn't there —
+            // it just waits for one to appear — so reachability is still
+            // checked by opening the directory, the way the kqueue source
+            // used to check it as a side effect of needing a descriptor.
             let descriptor = open(folderURL.path, O_EVTONLY)
             guard descriptor >= 0 else {
                 releaseScope()
                 onUnavailable()
                 return
             }
-            let source = DispatchSource.makeFileSystemObjectSource(
-                fileDescriptor: descriptor,
-                eventMask: [.write, .rename, .delete],
-                queue: queue
+            close(descriptor)
+            // A newly added folder is seeded from what is on disk right now,
+            // so replaying its history would be noise; every other start
+            // resumes from the position the last session persisted.
+            let since = seedExisting
+                ? FSEventStreamEventId(kFSEventStreamEventIdSinceNow)
+                : resumeEventID ?? FSEventStreamEventId(kFSEventStreamEventIdSinceNow)
+            // The context retains the watcher for exactly as long as the
+            // stream lives, and `stop()`'s release is what lets it go. A
+            // C callback cannot hold a weak reference, and an unretained one
+            // would be a dangling pointer the moment the center dropped its
+            // last reference without stopping first.
+            var context = FSEventStreamContext(
+                version: 0,
+                info: Unmanaged.passUnretained(self).toOpaque(),
+                retain: { pointer in
+                    guard let pointer else { return nil }
+                    return UnsafeRawPointer(Unmanaged<FolderWatcher>.fromOpaque(pointer).retain().toOpaque())
+                },
+                release: { pointer in
+                    guard let pointer else { return }
+                    Unmanaged<FolderWatcher>.fromOpaque(pointer).release()
+                },
+                copyDescription: nil
             )
-            source.setEventHandler { [weak self] in
-                self?.scan()
+            // `FileEvents` is what makes a write into an existing file
+            // visible at all; `NoDefer` spends the latency window *after* the
+            // first event rather than before it, so a lone arrival is not
+            // held back by the coalescing budget a burst needs.
+            let flags = UInt32(
+                kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer
+            )
+            guard let stream = FSEventStreamCreate(
+                kCFAllocatorDefault,
+                folderWatchEventCallback,
+                &context,
+                [folderURL.path] as CFArray,
+                since,
+                eventLatency,
+                flags
+            ) else {
+                releaseScope()
+                onUnavailable()
+                return
             }
-            // The cancel handler captures the URL and scope flag by value,
-            // never `self` — by the time it runs, the last strong reference
-            // to a stopped watcher is usually gone, and a weakly-captured
-            // `self` would silently skip releasing the scope, leaking one
-            // kernel security-scope grant per stop.
-            let scopedURL = scopeActive ? folderURL : nil
-            source.setCancelHandler {
-                close(descriptor)
-                scopedURL?.stopAccessingSecurityScopedResource()
+            FSEventStreamSetDispatchQueue(stream, queue)
+            guard FSEventStreamStart(stream) else {
+                FSEventStreamInvalidate(stream)
+                FSEventStreamRelease(stream)
+                releaseScope()
+                onUnavailable()
+                return
             }
-            scopeActive = false
-            self.source = source
-            source.resume()
+            self.stream = stream
             initialScan(seedExisting: seedExisting)
         }
     }
@@ -166,9 +251,81 @@ final class FolderWatcher: @unchecked Sendable {
         queue.async { [self] in
             stopped = true
             probes.removeAll()
-            source?.cancel()
-            source = nil
+            // Whatever the throttle was still holding: better a position a
+            // few seconds old than none. Harmless for a folder being removed
+            // — the store no longer has a row to write it to.
+            if let unreportedEventID {
+                self.unreportedEventID = nil
+                onEventID(unreportedEventID)
+            }
+            if let stream {
+                FSEventStreamStop(stream)
+                FSEventStreamInvalidate(stream)
+                // Drops the context's retain on `self`; the strong capture in
+                // this closure is what keeps the rest of the block valid.
+                FSEventStreamRelease(stream)
+            }
+            stream = nil
+            // The scope is held for the watcher's whole life now, not handed
+            // to a dispatch source's cancel handler: FSEvents keeps no
+            // descriptor of ours, so nothing else would ever give it back.
+            releaseScope()
         }
+    }
+
+    /// One coalesced FSEvents batch. Every batch answers the same way a
+    /// directory event used to — a full `scan()` — so a dropped, coalesced or
+    /// replayed batch costs a rescan and never a missed file.
+    fileprivate func handle(eventIDs: UnsafePointer<FSEventStreamEventId>, count: Int) {
+        guard !stopped, count > 0 else { return }
+        scan()
+        // The end-of-history marker carries id 0, and IDs are only meaningful
+        // going forward — so advance on the high-water mark, never blindly on
+        // the last entry. Recorded *after* the scan that answered for it: a
+        // crash in between replays the batch instead of skipping it.
+        var highest: FSEventStreamEventId = 0
+        for index in 0..<count where eventIDs[index] > highest {
+            highest = eventIDs[index]
+        }
+        // Any id the stream actually delivered is authoritative, so this moves
+        // to it rather than only ever upward. A stored position can be *above*
+        // this machine's counter — a restored backup, a volume carried across
+        // Macs — and an upward-only guard would then freeze it there forever:
+        // every launch resumes from an id with no history and the replay
+        // quietly dies for that folder. `> 0` is the end-of-history marker,
+        // which carries id zero and is not a position.
+        guard highest > 0, highest != resumeEventID else { return }
+        resumeEventID = highest
+        report(highest)
+    }
+
+    /// Hands a stream position out at most every `positionReportInterval`,
+    /// with a trailing report so the last one in a burst is never the one
+    /// that gets dropped.
+    private func report(_ eventID: FSEventStreamEventId) {
+        let now = DispatchTime.now()
+        if let previous = lastReportedAt {
+            let elapsed = Double(now.uptimeNanoseconds - previous.uptimeNanoseconds) / 1_000_000_000
+            guard elapsed >= positionReportInterval else {
+                guard unreportedEventID == nil else {
+                    // A trailing report is already scheduled; it will pick up
+                    // whatever the newest position is when it fires.
+                    unreportedEventID = eventID
+                    return
+                }
+                unreportedEventID = eventID
+                queue.asyncAfter(deadline: .now() + (positionReportInterval - elapsed)) { [weak self] in
+                    guard let self, !stopped, let pending = unreportedEventID else { return }
+                    unreportedEventID = nil
+                    lastReportedAt = .now()
+                    onEventID(pending)
+                }
+                return
+            }
+        }
+        unreportedEventID = nil
+        lastReportedAt = now
+        onEventID(eventID)
     }
 
     // MARK: - Scanning (watcher queue only)
@@ -309,4 +466,14 @@ final class FolderWatcher: @unchecked Sendable {
             scopeActive = false
         }
     }
+}
+
+/// FSEvents' C callback: no context beyond `info`, so the watcher is recovered
+/// from the retained pointer the stream's context holds. Already on the
+/// watcher's serial queue — `FSEventStreamSetDispatchQueue` put it there.
+private let folderWatchEventCallback: FSEventStreamCallback = { _, info, count, _, _, eventIDs in
+    guard let info else { return }
+    Unmanaged<FolderWatcher>.fromOpaque(info)
+        .takeUnretainedValue()
+        .handle(eventIDs: eventIDs, count: count)
 }
