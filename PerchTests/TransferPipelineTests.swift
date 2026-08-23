@@ -1,4 +1,5 @@
 import Foundation
+import os
 import XCTest
 @testable import Perch
 
@@ -29,6 +30,164 @@ final class TransferPipelineTests: XCTestCase {
         XCTAssertNotEqual(stagedURL, source)
         XCTAssertEqual(try Data(contentsOf: stagedURL), sourceData)
         XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+    }
+
+    // MARK: - iCloud (#2)
+
+    /// The field-test symptom was a tile stuck on "Downloading" with no way to
+    /// tell a slow download from a wedged one. Two minutes of `Thread.sleep`
+    /// held one of the queue's two slots, so two cloud files also stalled every
+    /// ordinary drop behind them. The wait now runs before the queue, and says
+    /// out loud how long it has been waiting.
+    func testCloudWaitReportsElapsedSecondsAndThenSucceeds() async throws {
+        let probeCount = OSAllocatedUnfairLock(initialState: 0)
+        let waiter = CloudDownloadWaiter(
+            timeout: .seconds(5),
+            pollInterval: .milliseconds(10),
+            probe: { _ in
+                probeCount.withLock { count in
+                    count += 1
+                    return count > 40 ? .downloaded : .downloading
+                }
+            }
+        )
+
+        let reported = OSAllocatedUnfairLock(initialState: [Int]())
+        try await waiter.wait(for: URL(fileURLWithPath: "/dev/null")) { elapsed in
+            reported.withLock { $0.append(elapsed) }
+        }
+
+        let elapsed = reported.withLock { $0 }
+        XCTAssertEqual(elapsed.first, 0, "the tile must go to 'Downloading' immediately")
+        XCTAssertEqual(elapsed, elapsed.sorted(), "elapsed seconds only ever climb")
+        XCTAssertEqual(elapsed, Array(Set(elapsed)).sorted(), "one update per second, not per poll")
+    }
+
+    /// "Never started" and "did not finish in time" look identical on screen and
+    /// have different answers, so they are different errors.
+    func testCloudWaitDistinguishesNeverStartedFromTimedOut() async throws {
+        let neverStarted = CloudDownloadWaiter(
+            timeout: .milliseconds(60),
+            pollInterval: .milliseconds(10),
+            probe: { _ in .notStarted }
+        )
+        do {
+            try await neverStarted.wait(for: URL(fileURLWithPath: "/dev/null")) { _ in }
+            XCTFail("A download that never starts must fail")
+        } catch {
+            XCTAssertEqual(error as? TransferPipelineError, .cloudDownloadNeverStarted)
+        }
+
+        let tooSlow = CloudDownloadWaiter(
+            timeout: .milliseconds(60),
+            pollInterval: .milliseconds(10),
+            probe: { _ in .downloading }
+        )
+        do {
+            try await tooSlow.wait(for: URL(fileURLWithPath: "/dev/null")) { _ in }
+            XCTFail("A download that never finishes must fail")
+        } catch {
+            XCTAssertEqual(error as? TransferPipelineError, .cloudDownloadTimedOut)
+        }
+    }
+
+    /// The half of #2 that is not about the spinner: a cloud wait must not
+    /// occupy one of the pipeline's two slots. Two files waiting on iCloud used
+    /// to hold both, so every ordinary drop behind them stalled for up to two
+    /// minutes — which is what "sticks forever" looked like from the outside.
+    func testACloudWaitDoesNotBlockOrdinaryImports() async throws {
+        let testRoot = FileManager.default.temporaryDirectory
+            .appending(path: "PerchPipeline-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let sourceRoot = FileManager.default.temporaryDirectory
+            .appending(path: "PerchSource-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: testRoot)
+            try? FileManager.default.removeItem(at: sourceRoot)
+        }
+
+        // Files whose name starts with "cloud-" stand in for evicted iCloud
+        // items: they exist on disk, so the copy that follows the wait is real.
+        let releaseTheCloud = OSAllocatedUnfairLock(initialState: false)
+        let pipeline = TransferPipeline(
+            repository: try StagingRepository(rootURL: testRoot),
+            cloudWaiter: CloudDownloadWaiter(
+                timeout: .seconds(30),
+                pollInterval: .milliseconds(10),
+                isUndownloadedCloudItem: { $0.lastPathComponent.hasPrefix("cloud-") },
+                startDownload: { _ in },
+                probe: { _ in releaseTheCloud.withLock { $0 } ? .downloaded : .downloading }
+            )
+        )
+
+        func write(_ name: String) throws -> URL {
+            let url = sourceRoot.appending(path: name)
+            try name.write(to: url, atomically: true, encoding: .utf8)
+            return url
+        }
+
+        // Two cloud items — the full width of the queue — left waiting.
+        let cloudSources = [try write("cloud-a.txt"), try write("cloud-b.txt")]
+        async let cloudItems = withThrowingTaskGroup(of: ShelfItem.self) { group in
+            for source in cloudSources {
+                group.addTask {
+                    try await pipeline.stageFile(at: source, itemID: UUID(), phaseChanged: { _ in })
+                }
+            }
+            return try await group.reduce(into: [ShelfItem]()) { $0.append($1) }
+        }
+
+        // Three ordinary drops must land while those two are still waiting.
+        // Before the fix this deadlocked until the 120 s timeout fired.
+        for index in 0..<3 {
+            let item = try await pipeline.stageFile(
+                at: try write("ordinary-\(index).txt"),
+                itemID: UUID(),
+                phaseChanged: { _ in }
+            )
+            XCTAssertEqual(item.displayName, "ordinary-\(index).txt")
+        }
+
+        releaseTheCloud.withLock { $0 = true }
+        let landed = try await cloudItems.map(\.displayName).sorted()
+        XCTAssertEqual(landed, ["cloud-a.txt", "cloud-b.txt"])
+    }
+
+    /// A drop that is not an iCloud item never waits and never says
+    /// "Downloading" — the wait is opt-in per file, not a phase every import
+    /// passes through.
+    func testAnOrdinaryFileNeverEntersTheCloudWait() async throws {
+        let testRoot = FileManager.default.temporaryDirectory
+            .appending(path: "PerchPipeline-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let sourceRoot = FileManager.default.temporaryDirectory
+            .appending(path: "PerchSource-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: sourceRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: testRoot)
+            try? FileManager.default.removeItem(at: sourceRoot)
+        }
+
+        let probed = OSAllocatedUnfairLock(initialState: false)
+        let pipeline = TransferPipeline(
+            repository: try StagingRepository(rootURL: testRoot),
+            cloudWaiter: CloudDownloadWaiter(
+                isUndownloadedCloudItem: { _ in false },
+                probe: { _ in
+                    probed.withLock { $0 = true }
+                    return .downloaded
+                }
+            )
+        )
+
+        let source = sourceRoot.appending(path: "local.txt")
+        try "local".write(to: source, atomically: true, encoding: .utf8)
+        let phases = OSAllocatedUnfairLock(initialState: [PendingTransfer.Phase]())
+        _ = try await pipeline.stageFile(at: source, itemID: UUID()) { phase in
+            phases.withLock { $0.append(phase) }
+        }
+
+        XCTAssertFalse(probed.withLock { $0 })
+        XCTAssertEqual(phases.withLock { $0 }, [.copying])
     }
 
     /// Save to… copies out and keeps the shelf's copy: the staged bytes are the

@@ -412,18 +412,25 @@ final class FolderWatcherTests: XCTestCase {
             try Data("x".utf8).write(to: directory.appending(path: "f\(index).txt"))
             Thread.sleep(forTimeInterval: 0.1)
         }
-        waitUntil("the first position") { !log.reportedEventIDs.isEmpty }
+        // The first report goes out immediately; the throttle then swallows the
+        // rest of the burst and owes a trailing one. Count the reports rather
+        // than watching for a *higher* id than one sampled mid-burst: under
+        // parallel test hosts the sample can land after the trailing report has
+        // already fired, and then nothing else in the folder will ever move.
+        waitUntil("the trailing position", timeout: 15) {
+            log.reportedEventIDs.count >= 2
+        }
+        // One snapshot, asserted twice — reading the watcher's log again here
+        // could pick up a report that landed between the two reads.
+        let reported = log.reportedEventIDs
         XCTAssertLessThanOrEqual(
-            log.reportedEventIDs.count, 3,
+            reported.count, 3,
             "eight arrivals over ~0.8 s must not cost eight config writes"
         )
-
-        // The trailing report: whatever the throttle was holding when the
-        // burst stopped still has to come out.
-        let highest = try XCTUnwrap(log.reportedEventIDs.max())
-        waitUntil("the trailing position", timeout: 15) {
-            (log.reportedEventIDs.max() ?? 0) > highest
-        }
+        XCTAssertEqual(
+            reported, reported.sorted(),
+            "positions only ever move forward"
+        )
     }
 
     /// A pure rename must still not re-import — the property the token exists

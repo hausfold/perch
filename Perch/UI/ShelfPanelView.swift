@@ -754,7 +754,8 @@ private struct PendingTile: View {
     private var phaseLabel: String {
         switch transfer.phase {
         case .waitingForSource: "Receiving"
-        case .downloadingFromCloud: "Downloading"
+        case let .downloadingFromCloud(elapsed):
+            elapsed < 3 ? "Downloading" : "Downloading \(elapsed)s"
         case .copying: "Staging"
         }
     }

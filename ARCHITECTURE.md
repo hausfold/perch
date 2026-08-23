@@ -178,15 +178,30 @@ data. The UI shows pending items until each callback produces a real file.
 ### iCloud placeholders and huge files
 
 `TransferPipeline` detects ubiquitous items, explicitly starts their download,
-and waits off-main with a bounded timeout. `NSFileCoordinator` protects the
-subsequent read. A two-operation queue prevents a batch of huge files from
-starving either the UI or storage.
+and waits off-main with a bounded 120-second timeout. `NSFileCoordinator`
+protects the subsequent read. A two-operation queue prevents a batch of huge
+files from starving either the UI or storage.
 
-The current UI intentionally shows indeterminate progress because
-`FileManager.copyItem` does not expose reliable byte progress for directories,
-packages, cloud providers, and coordinated reads under one API. The pending
-model already separates phases, so a later provider-specific progress source
-does not require a model rewrite.
+**The cloud wait runs before that queue, not on it.** It is the one import
+phase that can legitimately last two minutes, and the queue is two operations
+wide — waiting inside an operation let two evicted iCloud files hold both slots
+while every ordinary drop queued behind them. `CloudDownloadWaiter` polls with
+`Task.sleep` on the cooperative pool instead; only the copy is queued.
+
+Copy progress stays indeterminate because `FileManager.copyItem` does not
+expose reliable byte progress for directories, packages, cloud providers, and
+coordinated reads under one API. **The cloud wait shows elapsed seconds rather
+than a percentage, and no percentage is available to show:**
+`URLResourceKey.ubiquitousItemPercentDownloadedKey` is unavailable in Swift,
+and `NSMetadataQuery`'s replacement reports only on the querying app's own
+ubiquity container — the dragged file is in the user's, and perch ships with no
+iCloud entitlement. A wait that can last two minutes must at least be bounded on
+screen, so the tile counts up against the timeout and ends in a named error:
+`.cloudDownloadNeverStarted` (iCloud never picked the request up),
+`.cloudDownloadTimedOut`, or `.cloudDownloadFailed`. iCloud's own error is
+never rethrown — it embeds the original path. The pending model separates
+phases, so a later provider-specific progress source does not require a model
+rewrite.
 
 ### Following the rice theme
 
