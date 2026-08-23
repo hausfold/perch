@@ -191,7 +191,8 @@ Settings ▸ Updates switches it off. That is what
 **On your own network:** with Settings ▸ Devices on — it ships on — perch
 advertises `_perch._tcp` over Bonjour and listens for a paired iPhone or iPad
 (`com.apple.security.network.server`). Only a device you paired by scanning the
-QR code can connect, the transfer is end-to-end encrypted, and nothing about it
+QR code — or pasting the same offer as a line of text — can connect, the
+transfer is end-to-end encrypted, and nothing about it
 goes through a server of ours — there isn't one. Settings ▸ Devices switches
 the listener off entirely.
 

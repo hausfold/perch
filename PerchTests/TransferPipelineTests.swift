@@ -124,34 +124,42 @@ final class TransferPipelineTests: XCTestCase {
     }
 
     /// The loose end #2's fix left behind: leaving the operation queue also
-    /// removed the cap on how many *blocking* probes run at once. Twelve evicted
-    /// files dropped together used to mean twelve synchronous syscalls on the
-    /// cooperative pool, which has one thread per core. The waits still overlap —
-    /// asserted here, because serialising them would put ordinary drops back
-    /// behind cloud ones — but the syscalls are single-file.
+    /// removed the cap on how many *blocking* syscalls run at once. Twelve
+    /// evicted files dropped together used to mean twelve synchronous calls on
+    /// the cooperative pool, which has one thread per core.
+    ///
+    /// Both halves have to be pinned, because the wrong fix passes half of them.
+    /// No waiter is allowed to finish until every one of the twelve has probed
+    /// at least once, so anything that serialises the *waits* — a semaphore, an
+    /// actor, a second operation queue — never reaches that condition and fails
+    /// on the timeout instead of going green. That is the #2 stall itself, and
+    /// it must not be able to come back unnoticed.
     func testConcurrentCloudWaitsOverlapButTheirProbesDoNot() async throws {
-        let probes = OSAllocatedUnfairLock(initialState: (inFlight: 0, peak: 0))
-        let waitersStarted = OSAllocatedUnfairLock(initialState: 0)
+        struct Probes {
+            var inFlight = 0
+            var peakInFlight = 0
+            var everProbed: Set<Int> = []
+        }
         let waiterCount = 12
+        let probes = OSAllocatedUnfairLock(initialState: Probes())
         let waiter = CloudDownloadWaiter(
+            // Generous against the ~200 ms this actually takes: the timeout is
+            // the failure signal for a serialised implementation, not a budget.
             timeout: .seconds(5),
             pollInterval: .milliseconds(5),
-            probe: { _ in
+            probe: { url in
+                let index = Int(url.lastPathComponent) ?? -1
                 probes.withLock { state in
                     state.inFlight += 1
-                    state.peak = max(state.peak, state.inFlight)
+                    state.peakInFlight = max(state.peakInFlight, state.inFlight)
+                    state.everProbed.insert(index)
                 }
-                // Long enough that overlapping probes would be caught, and
-                // twenty times shorter than the timeout above.
+                // Long enough that two overlapping probes would be caught.
                 Thread.sleep(forTimeInterval: 0.002)
-                let started = waitersStarted.withLock { count -> Int in
-                    count += 1
-                    return count
+                return probes.withLock { state in
+                    state.inFlight -= 1
+                    return state.everProbed.count == waiterCount ? .downloaded : .downloading
                 }
-                probes.withLock { $0.inFlight -= 1 }
-                // Nobody finishes until every waiter has probed at least once,
-                // so all twelve are genuinely outstanding together.
-                return started > waiterCount ? .downloaded : .downloading
             }
         )
 
@@ -164,8 +172,9 @@ final class TransferPipelineTests: XCTestCase {
             try await group.waitForAll()
         }
 
-        XCTAssertEqual(probes.withLock { $0.peak }, 1, "Cloud probes must not run concurrently")
-        XCTAssertGreaterThan(waitersStarted.withLock { $0 }, waiterCount)
+        let final = probes.withLock { $0 }
+        XCTAssertEqual(final.peakInFlight, 1, "Cloud syscalls must not run concurrently")
+        XCTAssertEqual(final.everProbed.count, waiterCount, "All twelve waits must have been outstanding together")
     }
 
     /// The half of #2 that is not about the spinner: a cloud wait must not

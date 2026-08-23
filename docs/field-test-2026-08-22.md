@@ -425,17 +425,25 @@ cap on concurrent waiters. N evicted files dropped at once were N waiters each
 making a synchronous `resourceValues` syscall every 250 ms **on the cooperative
 pool**, which has one thread per core and cannot grow — a big drop could starve
 every other async task in the app, the imports queued behind it included.
+`ShelfStore.importFileURLs` spawns one unstructured `Task` per dropped URL with
+no cap of its own, so nothing upstream was capping it either.
 
-The fix bounds the *blocking work*, not the waiting: probes go through
-`CloudProbeQueue`, one serial dispatch queue off the cooperative pool, while
-every waiter keeps its own clock, its own deadline and its own download.
+The fix bounds the *blocking work*, not the waiting: all three cloud syscalls —
+the "is this evicted?" check on the path of every import, the
+`startDownloadingUbiquitousItem` request, and the poll — go through
+`CloudSyscallQueue`, one serial dispatch queue off the cooperative pool at
+`.userInitiated`, while every waiter keeps its own clock, its own deadline and
+its own download.
 Bounding the waits was the obvious fix and the wrong one — iCloud fetches in
 parallel, so a queued waiter would not ask for its download until an earlier one
 finished and its 120 s deadline would start late, which is the bug E1 removed.
-`testConcurrentCloudWaitsOverlapButTheirProbesDoNot` pins both halves: twelve
-waiters outstanding at once, peak probe concurrency of one. Cost, stated: a
-wedged probe delays the others' *elapsed* reporting, never their timeout — the
-deadline is wall-clock and is checked after the probe returns.
+`testConcurrentCloudWaitsOverlapButTheirProbesDoNot` pins both halves, and the
+second one is the point: no waiter may finish until all twelve have probed, so
+anything that re-bounds the *waits* fails on the timeout instead of going green.
+Cost, stated: serial means head-of-line, so a wedged syscall delays every other
+cloud call behind it — it cannot move a deadline, that instant is wall-clock,
+but the deadline is only *checked* after the probe returns, so it does delay
+when a timeout fires.
 
 **Still owed: the feel-test.** Evict a file (right-click ▸ Remove Download),
 drag it to the shelf, and watch. Expect the counter to climb, the tile to land
@@ -444,8 +452,7 @@ when iCloud delivers, and — for a file iCloud will not fetch — a named error
 one together: the ordinary one must land immediately.
 
 **Watch out.** Blocking coordination is still off the main actor, and the
-`NSFileCoordinator` read in `stageFile` is unchanged — only the wait moved.
-The
+`NSFileCoordinator` read in `stageFile` is unchanged — only the wait moved. The
 cloud seam (`isUndownloadedCloudItem` / `startDownload` / `probe`) exists to
 make the path testable without an iCloud account; production defaults are the
 real calls.
