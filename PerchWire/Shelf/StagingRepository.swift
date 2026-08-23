@@ -66,13 +66,13 @@ final class StagingRepository: @unchecked Sendable {
             case .absent, .unreadable: decoded = []
             }
 
-            let existing = decoded.filter { item in
-                guard let url = item.fileURL(inside: rootURL) else { return false }
-                // Detach is authoritative even if the manifest was never
-                // rewritten (a crash between the two): those bytes belong to
-                // whatever took the drop, not to the shelf.
-                return fileManager.fileExists(atPath: url.path)
-                    && !isDetached(url.deletingLastPathComponent())
+            let existing = decoded.compactMap { item -> ShelfItem? in
+                // Resolving rather than merely existence-checking is what lets
+                // a file renamed in Finder come back as *itself* — same id,
+                // same pin, same slot — instead of being dropped here and
+                // re-adopted below as a brand-new item.
+                guard let url = resolvedURLUnlocked(for: item) else { return nil }
+                return item.restaged(at: url, inside: rootURL) ?? item
             }
             let recovered = recoverUntrackedFiles(excluding: Set(existing.map(\.relativePath)))
             let result = (existing + recovered).sorted { $0.addedAt < $1.addedAt }
@@ -152,10 +152,55 @@ final class StagingRepository: @unchecked Sendable {
         )
     }
 
+    /// Where an item's bytes are *right now*, or nil if they are unreachable.
+    ///
+    /// `relativePath` is a durable hint, not the identity. Every import
+    /// allocates its own `<uuid>` container holding exactly one visible entry,
+    /// so the container is what names an item for good and the filename inside
+    /// it belongs to whoever hit **Show in Finder** — renaming there is a
+    /// reasonable thing to do and must not orphan the tile. A container left
+    /// holding exactly one visible child after the named entry vanished is
+    /// unambiguous: that child is this item under a new name.
+    ///
+    /// Nil is a real answer and callers must honour it: the bytes were deleted
+    /// or moved out of the container, and anything that acts on a stale URL
+    /// from here loses the tile for nothing.
+    func resolvedURL(for item: ShelfItem) -> URL? {
+        lock.withLock { resolvedURLUnlocked(for: item) }
+    }
+
+    private func resolvedURLUnlocked(for item: ShelfItem) -> URL? {
+        guard let url = item.fileURL(inside: rootURL) else { return nil }
+        let container = url.deletingLastPathComponent()
+        // Detach is authoritative even if the manifest was never rewritten (a
+        // crash between the two): those bytes belong to whatever took the drop,
+        // not to the shelf — and re-resolution must not be the thing that
+        // hands them back out.
+        guard container == rootURL || !isDetached(container) else { return nil }
+        if fileManager.fileExists(atPath: url.path) { return url }
+        // A bare file directly in the root has no container to re-read, and
+        // the root holds every other item besides.
+        guard container != rootURL else { return nil }
+        let visible = (try? fileManager.contentsOfDirectory(
+            at: container,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        // Two visible children means guessing, and a wrong guess hands a
+        // destination the wrong file. One is the whole invariant.
+        guard visible.count == 1 else { return nil }
+        return visible[0].standardizedFileURL
+    }
+
     func remove(_ item: ShelfItem) throws {
-        guard let url = item.fileURL(inside: rootURL) else {
+        guard let hinted = item.fileURL(inside: rootURL) else {
             throw StagingRepositoryError.unsafePath
         }
+        // Delete what the item *is*, not what it was called at import: a
+        // renamed file left behind here would sit in staging forever, since
+        // the empty-parent walk below stops at a container that still has
+        // content in it.
+        let url = resolvedURL(for: item) ?? hinted
         if fileManager.fileExists(atPath: url.path) {
             try fileManager.removeItem(at: url)
         }

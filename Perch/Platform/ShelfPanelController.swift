@@ -9,6 +9,7 @@ final class ShelfPanelController: NSObject {
     private let geometry: ShelfGeometry
     private let viewState: ShelfPanelState
     private let theme: ShelfTheme
+    private weak var store: ShelfStore?
     private var collapseTask: Task<Void, Never>?
     // Set by "Hide": keeps the shelf dismissed on hover until the pointer has
     // left the target area and returned — so the user can reach menu-bar /
@@ -23,6 +24,7 @@ final class ShelfPanelController: NSObject {
     ) {
         screenID = screen.perchIdentifier
         self.theme = theme
+        self.store = store
         geometry = ShelfGeometry(screen: ScreenDescriptor(screen: screen))
         viewState = ShelfPanelState(
             hasCameraHousing: geometry.hasCameraHousing,
@@ -108,6 +110,10 @@ final class ShelfPanelController: NSObject {
         // Cheapest moment to notice the rice changed underneath us: the panel is
         // about to become visible and nothing is mid-drag. Two small file reads.
         theme.refresh()
+        // Same moment, same reason: someone may have renamed a staged file in
+        // Finder since the shelf was last up, and the tile has to follow it
+        // before it can be grabbed. One `stat` per item.
+        store?.refreshStagedNames()
         viewState.isExpanded = true
         panel.hasShadow = true
         animate(to: geometry.expandedFrame, duration: 0.28)

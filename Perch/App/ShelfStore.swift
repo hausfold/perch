@@ -21,6 +21,9 @@ final class ShelfStore: ObservableObject {
     // with the slot each came from so a refused one lands back in place. Their
     // staged bytes are still on disk — see `liftForExport`.
     private var lifted: [UUID: (item: ShelfItem, index: Int)] = [:]
+    // Items whose drag-out was refused before anything lifted them. See
+    // `returnToShelf`.
+    private var refusedBeforeLift: Set<UUID> = []
     private var retentionTimer: Timer?
 
     init(
@@ -344,16 +347,38 @@ final class ShelfStore: ObservableObject {
     /// still read them and `returnToShelf` can put a refused item back exactly
     /// where it was. What finally happens to those bytes is settled by
     /// `confirmCopied` (deleted) or `handOff` (detached).
+    /// A drag-out began. Clears any verdict left over from a previous one so a
+    /// stale refusal can't suppress this drag's lift — see `returnToShelf`.
+    func beginExport(of ids: Set<UUID>) {
+        refusedBeforeLift.subtract(ids)
+    }
+
     func liftForExport(_ ids: Set<UUID>) {
+        var liftedNow: Set<UUID> = []
         for id in ids {
             guard let index = items.firstIndex(where: { $0.id == id }),
                   !items[index].isPinned
             else {
                 continue
             }
+            // The verdicts for one drag arrive from two places — `.accepted`
+            // inline from the drag session, `.copied`/`.failed` through a hop
+            // from the promise queue — so a promise that fails fast can be
+            // refused *before* it is ever lifted. Honour that refusal instead
+            // of removing the tile after the only thing that could have put it
+            // back has already run.
+            guard refusedBeforeLift.remove(id) == nil else { continue }
+            // Never lift an item whose bytes we cannot find. A staged file
+            // renamed out from under the shelf resolves; one that was deleted
+            // does not, and no destination can have taken a copy of it.
+            guard repository.resolvedURL(for: items[index]) != nil else {
+                report(ShelfExportError.stagedFileMissing(items[index].displayName))
+                continue
+            }
             lifted[id] = (items[index], index)
+            liftedNow.insert(id)
         }
-        items.removeAll { ids.contains($0.id) && !$0.isPinned }
+        items.removeAll { liftedNow.contains($0.id) }
         // The manifest drops them too: if Perch dies mid-export the bytes are
         // still on disk and recovery re-adopts them — nothing is ever lost by
         // lifting optimistically.
@@ -367,7 +392,15 @@ final class ShelfStore: ObservableObject {
     /// The destination refused the item or its copy failed — put it back where
     /// it was. Never removes anything: that was the -8058 data-loss bug.
     func returnToShelf(_ id: UUID) {
-        guard let entry = lifted.removeValue(forKey: id) else { return }
+        guard let entry = lifted.removeValue(forKey: id) else {
+            // Nothing lifted it *yet*. The two verdict paths are not ordered
+            // (see `liftForExport`), so this is a refusal that overtook its own
+            // acceptance rather than a stray report — remember it, or the
+            // `.accepted` still in flight takes the tile away with nothing left
+            // to put it back.
+            refusedBeforeLift.insert(id)
+            return
+        }
         items.insert(entry.item, at: min(entry.index, items.count))
         do {
             try repository.persist(items)
@@ -416,8 +449,40 @@ final class ShelfStore: ObservableObject {
     }
 
     func reveal(_ item: ShelfItem) {
-        guard let url = item.fileURL(inside: repository.rootURL) else { return }
+        guard let url = repository.resolvedURL(for: item) else { return }
         NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    /// Re-reads where each tile's bytes actually are and follows anything that
+    /// was renamed since the last look.
+    ///
+    /// Show in Finder hands the user a real file in a real folder, so renaming
+    /// it there is a reasonable thing to do — and the tile has to keep working
+    /// afterwards, under the new name. One `stat` per item in the common case
+    /// (the directory is only listed when the named entry has gone), which is
+    /// why this can sit on the path that opens the shelf.
+    func refreshStagedNames() {
+        var updated = items
+        var changed = false
+        for index in updated.indices {
+            guard let url = repository.resolvedURL(for: updated[index]),
+                  let renamed = updated[index].restaged(at: url, inside: repository.rootURL)
+            else {
+                // A tile whose bytes are unreachable stays put: the shelf must
+                // not quietly shrink on a transient read, and `liftForExport`
+                // is where a dead item is refused, visibly.
+                continue
+            }
+            updated[index] = renamed
+            changed = true
+        }
+        guard changed else { return }
+        items = updated
+        do {
+            try repository.persist(items)
+        } catch {
+            report(error)
+        }
     }
 
     /// Save to…: copies a staged item out to a folder the user picks, without
@@ -445,7 +510,7 @@ final class ShelfStore: ObservableObject {
     /// raised without activating lands behind the frontmost app and reads as a
     /// hang with no visible cause.
     func save(_ item: ShelfItem) {
-        guard let source = item.fileURL(inside: repository.rootURL) else { return }
+        guard let source = repository.resolvedURL(for: item) else { return }
 
         let panel = NSSavePanel()
         // `displayName` is the staged file's own name — sanitized at import and
@@ -491,7 +556,7 @@ final class ShelfStore: ObservableObject {
     /// window + responder-chain controller) can't be driven without breaking
     /// that design. The out-of-process previewer sidesteps all of it.
     func open(_ item: ShelfItem) {
-        guard let url = item.fileURL(inside: repository.rootURL) else { return }
+        guard let url = repository.resolvedURL(for: item) else { return }
         if shouldQuickLook(item) {
             quickLook(url)
         } else {
@@ -629,6 +694,17 @@ final class ShelfStore: ObservableObject {
         queue.maxConcurrentOperationCount = 2
         return queue
     }()
+}
+
+enum ShelfExportError: LocalizedError {
+    case stagedFileMissing(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .stagedFileMissing(name):
+            "\(name) is no longer where Perch staged it, so it stayed on the shelf."
+        }
+    }
 }
 
 private enum FinderActionImportError: LocalizedError {

@@ -83,6 +83,37 @@ struct ShelfItem: Codable, Identifiable, Hashable, Sendable {
         }
         return root.appending(path: relativePath).standardizedFileURL
     }
+
+    /// The same item, pointing at `url` — its identity, pin and arrival time
+    /// carried across unchanged.
+    ///
+    /// Used when a staged file is found under a new name (see
+    /// `StagingRepository.resolvedURL(for:)`): the shelf follows the rename
+    /// rather than orphaning the tile, so `displayName` follows it too. Returns
+    /// nil when nothing moved, so callers can tell "already current" from
+    /// "rewrite the manifest".
+    func restaged(at url: URL, inside root: URL) -> ShelfItem? {
+        let rootComponents = root.standardizedFileURL.resolvingSymlinksInPath().pathComponents
+        let components = url.standardizedFileURL.resolvingSymlinksInPath().pathComponents
+        guard components.count > rootComponents.count,
+              components.starts(with: rootComponents)
+        else {
+            return nil
+        }
+        let path = components.dropFirst(rootComponents.count).joined(separator: "/")
+        guard path != relativePath else { return nil }
+        return ShelfItem(
+            id: id,
+            displayName: url.lastPathComponent,
+            relativePath: path,
+            // A rename changes neither the bytes nor what they are.
+            kind: kind,
+            contentTypeIdentifier: contentTypeIdentifier,
+            byteCount: byteCount,
+            addedAt: addedAt,
+            isPinned: isPinned
+        )
+    }
 }
 
 struct PendingTransfer: Identifiable, Equatable, Sendable {

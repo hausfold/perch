@@ -29,7 +29,7 @@ is provably the only thing going wrong.
 | 13 | Secondary display never shows a drop target | Platform | Strong hypothesis | **A** |
 | 10 | Open/close animation janks at ~250 items (scrolling is fine) | UI | Confirmed cause | **B** |
 | 9 | 50 folders dropped into Finder land in a diagonal line | UI | **Open** — first theory disproved | **B** |
-| 7 | Rename a staged file in Finder → tile can never be dragged out, and vanishes | Store | Confirmed + a second race | **C** |
+| ~~7~~ | ~~Rename a staged file in Finder → tile can never be dragged out, and vanishes~~ | Store | **Fixed** — re-resolve; decision in `ARCHITECTURE.md` | ~~**C**~~ |
 | 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | Leading hypothesis + 1 confirmed adjacent bug | **D** |
 | 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | Unresolved by reading | **D** |
 | 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | Two candidates | **E** |
@@ -209,7 +209,10 @@ normal grid. Also drop onto a terminal and confirm 50 paths still paste.
 
 ---
 
-## Run C — A staged file the user can rename out from under the shelf (#7)
+## ~~Run C — A staged file the user can rename out from under the shelf (#7)~~
+
+**Landed.** Fix (a) — re-resolve. The rename decision now lives in
+`ARCHITECTURE.md` ("Name collisions" and "Copy versus move"), not here.
 
 **This is the most serious item on the board — it loses a tile.**
 
@@ -550,7 +553,6 @@ Mac" when one can), and one in-place attempt has already failed. **Reversal cost
 existing pairing must be redone by hand on both devices; with the fallback read,
 reverting is a straight revert.
 
-**C · Rename semantics — 3/5.** Fix (a) makes the staged filename user-editable
-and the shelf follows it; fix (b) makes it immutable and errors loudly. (a) is
-recommended, but it changes what "Show in Finder" implies about the shelf and so
-wants a line in `ARCHITECTURE.md`.
+~~**C · Rename semantics — 3/5.**~~ **Answered: (a)**, re-resolve — the staged
+filename is the user's to edit and the shelf follows it. Stated in
+`ARCHITECTURE.md`; Run C is landed.

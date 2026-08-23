@@ -47,6 +47,15 @@ final class ShelfStoreExportTests: XCTestCase {
         try XCTUnwrap(item.fileURL(inside: root))
     }
 
+    /// What the user does in Finder after **Show in Finder**.
+    @discardableResult
+    private func rename(_ item: ShelfItem, to name: String) throws -> URL {
+        let staged = try stagedURL(of: item)
+        let renamed = staged.deletingLastPathComponent().appending(path: name)
+        try FileManager.default.moveItem(at: staged, to: renamed)
+        return renamed.standardizedFileURL
+    }
+
     func testAnAcceptedDropLiftsTheItemBeforeAnythingReadsIt() throws {
         try makeShelf()
         let item = try stageItem()
@@ -126,6 +135,119 @@ final class ShelfStoreExportTests: XCTestCase {
         restored.liftForExport([item.id])
 
         XCTAssertTrue(restored.items.isEmpty)
+    }
+
+    // MARK: - A staged file renamed out from under the shelf (#7)
+
+    /// The field-test repro: Show in Finder, rename there, drag the tile out.
+    /// The container is the durable identity, so the tile follows the name.
+    func testARenamedStagedFileStillResolvesAndStillExports() throws {
+        try makeShelf()
+        let item = try stageItem(named: "screenshot.png")
+        let renamed = try rename(item, to: "keeper.png")
+
+        XCTAssertEqual(repository.resolvedURL(for: item), renamed)
+
+        store.refreshStagedNames()
+        let followed = try XCTUnwrap(store.items.first)
+        XCTAssertEqual(followed.id, item.id, "same tile, not a re-adopted stranger")
+        XCTAssertEqual(followed.displayName, "keeper.png")
+
+        store.liftForExport([followed.id])
+        XCTAssertTrue(store.items.isEmpty, "and it exports like any other tile")
+        store.confirmCopied(followed.id)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: renamed.path))
+    }
+
+    func testARenameSurvivesRelaunchWithTheSameIdentityAndPin() throws {
+        try makeShelf()
+        let item = try stageItem(named: "invoice.pdf")
+        store.setPinned(true, for: item)
+        try rename(item, to: "invoice-final.pdf")
+
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let restored = ShelfStore(repository: repository, settings: AppSettings(defaults: defaults))
+        restored.restore()
+
+        let survivor = try XCTUnwrap(restored.items.first)
+        XCTAssertEqual(restored.items.count, 1, "re-resolved, not dropped and re-adopted")
+        XCTAssertEqual(survivor.id, item.id)
+        XCTAssertEqual(survivor.displayName, "invoice-final.pdf")
+        XCTAssertTrue(survivor.isPinned, "a rename is not a reason to lose the pin")
+    }
+
+    /// Ambiguity is refused rather than guessed: handing a destination the
+    /// wrong file is worse than refusing the drag.
+    func testAContainerWithTwoVisibleChildrenDoesNotGuess() throws {
+        try makeShelf()
+        let item = try stageItem()
+        let staged = try stagedURL(of: item)
+        let container = staged.deletingLastPathComponent()
+        try FileManager.default.moveItem(at: staged, to: container.appending(path: "one.txt"))
+        try Data("other".utf8).write(to: container.appending(path: "two.txt"))
+
+        XCTAssertNil(repository.resolvedURL(for: item))
+    }
+
+    /// Detached bytes belong to whatever took an earlier drop — re-resolution
+    /// must never be the thing that hands them back out.
+    func testResolutionNeverReachesIntoADetachedContainer() throws {
+        try makeShelf()
+        let item = try stageItem()
+        store.liftForExport([item.id])
+        store.handOff([item.id])
+        try rename(item, to: "renamed.txt")
+
+        XCTAssertNil(repository.resolvedURL(for: item))
+    }
+
+    // MARK: - The two independent bugs a rename exposed
+
+    /// `liftForExport` must not take a tile off the shelf when it cannot find
+    /// the bytes: nothing can have copied them, so nothing earned the removal.
+    func testAnAcceptedDropKeepsATileWhoseBytesAreGoneAndSaysSo() throws {
+        try makeShelf()
+        let item = try stageItem()
+        try FileManager.default.removeItem(at: try stagedURL(of: item))
+
+        store.liftForExport([item.id])
+
+        XCTAssertEqual(store.items.map(\.id), [item.id])
+        XCTAssertNotNil(store.latestError, "and the refusal is visible")
+    }
+
+    /// `.accepted` is reported inline from the drag session while `.copied` /
+    /// `.failed` hop to the main actor from the promise queue, so a promise
+    /// that fails fast can be refused before it is ever lifted.
+    func testAFailedVerdictArrivingBeforeTheLiftStillLeavesTheItemOnTheShelf() throws {
+        try makeShelf()
+        let first = try stageItem(named: "first.txt")
+        let second = try stageItem(named: "second.txt")
+        store.beginExport(of: [first.id, second.id])
+
+        store.returnToShelf(second.id)
+        store.liftForExport([first.id, second.id])
+
+        XCTAssertEqual(store.items.map(\.id), [second.id], "the refused one never left")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: try stagedURL(of: second).path),
+            "and its bytes are still there to drag again"
+        )
+    }
+
+    /// The refusal is scoped to the drag that produced it — a later drag of the
+    /// same tile must lift normally.
+    func testAnOutOfOrderRefusalDoesNotSuppressTheNextDrag() throws {
+        try makeShelf()
+        let item = try stageItem()
+        store.beginExport(of: [item.id])
+        store.returnToShelf(item.id)
+        store.liftForExport([item.id])
+
+        store.beginExport(of: [item.id])
+        store.liftForExport([item.id])
+
+        XCTAssertTrue(store.items.isEmpty)
     }
 
     /// A terminal pasted the path; nothing will ever confirm a copy, and the

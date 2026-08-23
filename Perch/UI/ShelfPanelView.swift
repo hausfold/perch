@@ -245,9 +245,9 @@ struct ShelfPanelView: View {
                     // Collapse every tile at once; the strip empties as the
                     // stack lifts off. Pinned tiles stay put and need no grace
                     // bookkeeping because export never deletes or detaches them.
-                    state.beginExport(
-                        of: Set(store.items.lazy.filter { !$0.isPinned }.map(\.id))
-                    )
+                    let exporting = Set(store.items.lazy.filter { !$0.isPinned }.map(\.id))
+                    state.beginExport(of: exporting)
+                    store.beginExport(of: exporting)
                 },
                 onExportEnded: {
                     state.isDropActive = false
@@ -336,7 +336,9 @@ struct ShelfPanelView: View {
                         onOpen: { store.open(item) },
                         onExportStarted: {
                             state.isDropActive = true
-                            state.beginExport(of: item.isPinned ? [] : [item.id])
+                            let exporting: Set<UUID> = item.isPinned ? [] : [item.id]
+                            state.beginExport(of: exporting)
+                            store.beginExport(of: exporting)
                         },
                         onExportEnded: {
                             state.isDropActive = false
