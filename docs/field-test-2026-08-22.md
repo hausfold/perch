@@ -166,6 +166,15 @@ the source, not off a debugger — same standard as the rest of this file. The
 frames were provably wrong and are provably right now; whether that is the
 *whole* of #9 is what the feel-test says.
 
+**Watch out.** 50 items is a 128 pt grid eight wide and seven deep — about
+900 × 820 pt of `.none` frames, centred on a tile that sits at the notch, so
+roughly the top half of that block is above the edge of the display. `.stack` is
+what keeps it from being seen; if the formation ever fails to take, the drag
+sprays across the screen rather than merely looking untidy. The cell is
+deliberately wider than a Finder icon-view cell at its largest — two frames that
+overlap in the destination's grid are two frames it has to de-overlap, which is
+the bug this replaces — so shrinking it to calm the visual trades the fix away.
+
 **Verify.** 5 folders and 50 folders, dropped into (a) an empty Finder window in
 icon view, (b) a list-view window, (c) the Desktop. Icons arrive in Finder's
 normal grid, not a diagonal. Watch the drag itself on the way there — it must
@@ -178,6 +187,8 @@ the `.stack` frames rather than the `.none` ones, in which case the answer is
 `.none` formation plus a visually tighter grid — and the comparison worth having
 first is a 50-file drag out of Finder itself, which lands correctly and is
 therefore the working example to diff against.
+
+---
 
 ## ~~Run C — A staged file the user can rename out from under the shelf (#7)~~
 

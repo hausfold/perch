@@ -136,6 +136,12 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
             count: items.count,
             center: CGPoint(x: bounds.midX, y: bounds.midY)
         )
+        // `zip` would silently drop items on a length mismatch, and
+        // `draggingSession(_:endedAt:)` below reports `.accepted` for every
+        // entry in `items` regardless — so a dropped item would leave the shelf
+        // and have its staged bytes handed off without ever reaching a
+        // pasteboard. Losing a file is not a thing to discover in the field.
+        precondition(frames.count == items.count, "one dragging frame per item")
         let draggingItems = zip(items, frames).map { export, frame -> NSDraggingItem in
             let provider = ExportPromiseProvider(fileType: export.fileType, delegate: self)
             provider.userInfo = export
@@ -150,7 +156,14 @@ final class DragSourceNSView: NSView, NSDraggingSource, NSFilePromiseProviderDel
         // the user sees while dragging. Splitting the two is the whole point of
         // `NSDraggingFormation` — without it a pile that looks right on screen
         // is a pile Finder has to untangle on arrival (#9).
-        session.draggingFormation = .stack
+        //
+        // Only for a real pile. A formation other than `.none` lets AppKit
+        // re-lay-out the image relative to the drag location, and the one-tile
+        // drag — much the commonest gesture — depends on its image staying
+        // registered on the tile under the pointer.
+        if draggingItems.count > 1 {
+            session.draggingFormation = .stack
+        }
     }
 
     // MARK: NSDraggingSource

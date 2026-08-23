@@ -38,11 +38,20 @@ enum DragLayout {
     static let maximumColumns = 8
 
     /// Frames for `count` items, laid out left-to-right and top-to-bottom
-    /// around `center` in a flipped-y (AppKit view) coordinate space.
+    /// around `center`.
+    ///
+    /// `DragSourceNSView` does not override `isFlipped`, so this is AppKit's
+    /// default **unflipped** space: y grows upward, and later rows therefore
+    /// *subtract*. Getting that backwards mirrors the block vertically — item 0
+    /// would arrive in Finder from the bottom row up.
     ///
     /// A single item sits exactly on the centre, which is what a one-tile drag
-    /// has always done and what makes the drag image track the pointer.
+    /// has always done and what keeps the drag image registered on the tile you
+    /// grabbed.
     static func frames(count: Int, center: CGPoint) -> [CGRect] {
+        // Not just a shortcut for the trivial cases: `count == 0` would divide
+        // by `columns == 0` below and trap converting the NaN. Nothing may
+        // remove this guard without handling that.
         guard count > 1 else {
             return count == 1
                 ? [CGRect(
@@ -57,14 +66,14 @@ enum DragLayout {
         let columns = min(count, maximumColumns)
         let rows = Int((Double(count) / Double(columns)).rounded(.up))
         // Centre the whole block on the tile, so the pointer stays in the
-        // middle of the pile rather than at its top-left corner.
-        let originX = center.x - (CGFloat(columns - 1) * cellSide) / 2 - iconSide / 2
-        let originY = center.y - (CGFloat(rows - 1) * cellSide) / 2 - iconSide / 2
+        // middle of the pile rather than at one of its corners.
+        let leftX = center.x - (CGFloat(columns - 1) * cellSide) / 2 - iconSide / 2
+        let topY = center.y + (CGFloat(rows - 1) * cellSide) / 2 - iconSide / 2
 
         return (0..<count).map { index in
             CGRect(
-                x: originX + CGFloat(index % columns) * cellSide,
-                y: originY + CGFloat(index / columns) * cellSide,
+                x: leftX + CGFloat(index % columns) * cellSide,
+                y: topY - CGFloat(index / columns) * cellSide,
                 width: iconSide,
                 height: iconSide
             )
