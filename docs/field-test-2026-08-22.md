@@ -33,8 +33,8 @@ is provably the only thing going wrong.
 | 6 | `curl -o ~/Downloads/slow.bin` never lands | Watch | **Fixed in tests** — dedupe gone, FSEvents sees the rewrite; not yet feel-tested | **D** |
 | 8 | Quit → drop into `~/Downloads` → relaunch → no catch-up | Watch | **Addressed, still unreproduced** — the stream now resumes from a persisted position | **D** |
 | 2 | Non-downloaded iCloud file sticks on "Downloading" forever | Import | Two candidates | **E** |
-| 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | **Cause found** — three Perch bundles registered on this Mac | **F** |
-| 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | Probably an obsolete claim | **F** |
+| 4 | Quick Action absent from Quick Actions; Service listed twice | Finder | **Cause found** — `bench try` gives the appex the app's bundle id | **F** |
+| 5 | No top-level "Add to Perch Shelf" in the Finder context menu | Finder | Blocked on #4 — the extension isn't live in a dev build | **F** |
 | 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Open** — Keychain exonerated by measurement; look at the UI | **G** |
 | 3 | 3 GB file "lands immediately" instead of showing progress | — | **Not a bug** — bad expectation | — |
 | 11 | Phone Wi-Fi off, Mac still receives | — | **Not a bug** — bad expectation | — |
@@ -356,47 +356,67 @@ is). Don't let the fix make a *second* import wait on the first.
 - It **does** appear under Finder ▸ Services — **twice**.
 - There is no top-level "Add to Perch Shelf" in the context menu.
 
-**Step 0 — done, and it explains #4.** Run on Julien's Mac, 2026-08-23:
+**Step 0 — done. The duplicate was this Mac, and the *absence* is the dev app.**
 
-```sh
-pluginkit -mAvvv -p com.apple.services | grep -i -A3 perch
-```
+Two separate things were going on, and neither is in a plist.
 
-**Three** Finder Action extensions are registered, all named "Add to Perch
-Shelf", all present on disk:
+**(i) The duplicates were stale registrations.** `pluginkit -mAvvv -p
+com.apple.services` found **three** "Add to Perch Shelf" extensions, all on
+disk: `/Applications/Perch.app`, `~/code/workshop/perch/DerivedData/…/Release`
+and `~/.cache/bench/perch-dd/…/Debug`. `lsregister -dump` showed a dozen more
+`Perch.app`s under `~/.cache/claude-worktrees/*/DerivedData` — every agent lane
+that ever ran `xcodebuild` registered its build. Unregistering the two dev
+copies took the count to 1.
 
-| bundle id | path |
+**(ii) With one copy left it still doesn't appear — because `bench try`'s dev
+app gives the extension the app's own bundle id.** Measured on the installed
+`2026.08.23-dev` build:
+
+| bundle | `CFBundleIdentifier` |
 |---|---|
-| `com.hausfold.perch.finder-action` (2026.08.20) | `/Applications/Perch.app` |
-| `com.hausfold.perch.finder-action` (dev) | `~/code/workshop/perch/DerivedData/…/Release/Perch.app` |
-| `com.hausfold.perch.dev` (2026.08.14-1-dev) | `~/.cache/bench/perch-dd/…/Debug/Perch.app` |
+| `/Applications/Perch.app` | `com.hausfold.perch.dev` |
+| `…/PlugIns/PerchFinderAction.appex` | `com.hausfold.perch.dev` — **the same** |
 
-Two of them share the *same* bundle id and one carries a different one, which
-is exactly the shape that yields **two** Services rows: LaunchServices collapses
-the duplicate id to one path and lists `.dev` separately. `lsregister -dump`
-also shows a dozen-plus `Perch.app`s under `~/.cache/claude-worktrees/*/DerivedData`
-— every agent lane that ever ran `xcodebuild` registered its build.
+An app extension must carry its own identifier, prefixed by its container's.
+Identical ids are a malformed pair, so PluginKit never surfaces it: no Quick
+Action, and nothing to switch on in Settings ▸ Login Items & Extensions ▸
+System Services Extensions.
 
-So **#4's duplicate is this Mac, not the plist**, and the Quick Actions absence
-plausibly is too: the tick in Customize… is stored per extension identity, so
-it can easily be set on a bundle Finder isn't resolving.
-
-**Next step is Julien's, and it needs a Finder menu** (an agent must not drive
-the screen):
+The cause is one line in **bench**, not in perch:
 
 ```sh
-# unregister the two dev copies, keep /Applications
-lsr=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
-"$lsr" -u ~/code/workshop/perch/DerivedData/Build/Products/Release/Perch.app
-"$lsr" -u ~/.cache/bench/perch-dd/Build/Products/Debug/Perch.app
-pluginkit -mAvvv -p com.apple.services | grep -c com.hausfold   # expect 1
+xcodebuild -scheme Perch … PRODUCT_BUNDLE_IDENTIFIER=com.hausfold.perch.dev
 ```
 
-Then select 3 files in Finder and look at Quick Actions and Services. If both
-show one entry, #4 is closed as an environment artifact — and the durable fix
-is a repo one: dev builds shouldn't register at all, or should carry a distinct
-display name so this is visible instead of confusing. That is worth its own
-issue either way, because every agent worktree adds another registration.
+A `PRODUCT_BUNDLE_IDENTIFIER` on the xcodebuild command line overrides the
+setting for **every target in the scheme** — the app, `PerchFinderAction` and
+`PerchCLI` alike — collapsing all three onto one id. The controlled experiment
+is already in the `pluginkit` dump above: the same source built *normally*
+registers correctly as `com.hausfold.perch.finder-action`; only bench's build
+is broken.
+
+**So #4 and #5 are, on current evidence, artifacts of the dev app and not of
+shipped perch** — which also explains why they resisted a plist-shaped
+diagnosis. Confirm by testing a real notarized release, and fix the dev path so
+`bench try` can feel-test the Finder doors at all:
+
+- **perch** — derive the three ids from one setting, so a single override still
+  produces three distinct ids: project-level `PERCH_BUNDLE_ID = com.hausfold.perch`,
+  then `$(PERCH_BUNDLE_ID)`, `$(PERCH_BUNDLE_ID).finder-action`,
+  `$(PERCH_BUNDLE_ID).cli` on the three targets. Release output must be
+  byte-identical — that is the acceptance test.
+- **bench** — `ensure_perch_dev_app` (`bench:590`) passes `PERCH_BUNDLE_ID=…dev`
+  instead of `PRODUCT_BUNDLE_IDENTIFIER=…dev`.
+
+Until that lands, `bench try` cannot feel-test #4, #5 or anything else that
+depends on the extension being live.
+
+**One thing that is a real perch bug regardless**, and the better explanation
+for "Services listed twice" than duplicate installs: the app declares a legacy
+`NSServices` entry titled "Add to Perch Shelf" in `Perch/Config/Info.plist`
+*and* ships an appex Services extension with the same display name. Those are
+two independent Services providers; on a machine with a single Perch installed
+they still give two rows. Decide which door perch wants and delete the other.
 
 **#4 · Quick Actions.** `PerchFinderAction/Info.plist` declares
 `NSExtensionPointIdentifier = com.apple.services` with
