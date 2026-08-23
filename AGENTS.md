@@ -16,8 +16,8 @@ Per-client wiring lives in that client's own file; the content stays here or in
 - Persist relative staged paths only; never persist or log original paths.
 - A visible `ShelfItem` must point at a completed staged representation.
 - Keep display/window code out of importing and persistence.
-- A sender that isn't the app (Finder Action, `perch` tool, paired phone) gets
-  its admission receipt before it copies a byte.
+- A sender that isn't the app (`perch` tool, paired phone) gets its admission
+  receipt before it copies a byte.
 
 ## Build
 
@@ -58,23 +58,30 @@ it twice — `ENABLE_CODE_COVERAGE=YES -enableCodeCoverage YES … test`. The fl
 alone is not enough: the project-level `NO` wins, `xcodebuild` still exits 0,
 and you get a green run with an empty report.
 
-Targets: `Perch` (macOS) · `PerchFinderAction` (Finder Quick Action) ·
-`PerchCLI` (the `perch` tool, embedded in the app bundle) · `PerchIOS`
-(iPhone/iPad app) · `PerchShare` (Share extension) · `PerchTests`.
+Targets: `Perch` (macOS) · `PerchCLI` (the `perch` tool, embedded in the app
+bundle) · `PerchIOS` (iPhone/iPad app) · `PerchShare` (Share extension) ·
+`PerchTests`. **The Mac ships no app extension.** A `PerchFinderAction` Quick
+Action lived here until 2026-08-23 and was removed: measured on macOS 26 it
+never rendered under Quick Actions, drew a duplicate row under Services, and
+shelved nothing when clicked. The Finder door is the app's own `NSServices`
+entry (`Perch/Config/Info.plist`, `ShelfServicesProvider`).
+
 Shared sources, compiled into their consumers directly: `PerchWire/` (wire
 protocol + crypto + the staging layer both platforms use), `PerchMobileCore/`
 (iOS-only shelf/pairing/delivery, app + extension), and `PerchFinderBridge/`
-(Mac App Group mailbox shared by the macOS app, the Finder Action, and the CLI —
-`HandoffClient` is the sender half both of them run).
+(Mac App Group mailbox; `HandoffClient` is the sender half, and since the
+extension went the CLI is the only sender. The `FinderAction*` names and the
+on-disk `FinderActionRequests` directory stay — an installed `perch` tool
+writes to that path, so renaming it would strand requests from a copy of the
+tool the app didn't ship with).
 
 Every target's bundle id derives from one project-level `PERCH_BUNDLE_ID`
-(`$(PERCH_BUNDLE_ID)`, `.finder-action`, `.cli`, `.tests`, `.ios`,
-`.ios.share`). Rename
-the family with **that** override, never with `PRODUCT_BUNDLE_IDENTIFIER=` on
-the xcodebuild command line — a command-line `PRODUCT_BUNDLE_IDENTIFIER`
-applies to every target in the scheme and collapses the app, the Finder Action
-and the CLI onto one id. An extension sharing its container's id is malformed,
-so Finder silently stops offering the Quick Action.
+(`$(PERCH_BUNDLE_ID)`, `.cli`, `.tests`, `.ios`, `.ios.share`). Rename the
+family with **that** override, never with `PRODUCT_BUNDLE_IDENTIFIER=` on the
+xcodebuild command line — a command-line `PRODUCT_BUNDLE_IDENTIFIER` applies to
+every target in the scheme and collapses them all onto one id, which on the iOS
+side makes `PerchShare` an extension sharing its container's identifier, i.e.
+malformed.
 [`nix/dev-app/README.md`](./nix/dev-app/README.md)
 
 The CLI product is `perch-cli`, not `perch`, and that is load-bearing: macOS

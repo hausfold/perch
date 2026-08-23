@@ -12,10 +12,11 @@ collect several items and then drag the group to one destination.
 - Notch-derived geometry and a clear notchless-display fallback.
 - One public-API overlay per selected display.
 - Finder files and folders, file promises, images, URLs, and text.
-- A Finder Action extension that adds selected files and folders from Finder's
-  Quick Actions menu, on by default, with a Settings shortcut to the pane that
-  holds its checkbox — and a classic Service that puts the same command at the
-  context menu's top level, and in any app's Services menu for text and links.
+- A Finder door: "Add to Perch Shelf" under Services for any selection of files
+  and folders, on by default and needing no setup, and in any app's Services
+  menu for text and links. (An Action Extension shipped alongside it through
+  2026-08-23 and was removed — measured on macOS 26, it drew in the same
+  submenu rather than under Quick Actions, and shelved nothing when clicked.)
 - A `perch add` command line tool, shipped inside the app bundle and put on
   `PATH` by whatever installed it, so a script or an agent can stage files
   without a human present — same admission, same staging, same untouched
@@ -51,15 +52,15 @@ collect several items and then drag the group to one destination.
 8. Enable auto-remove; cancelled drags keep the shelf, successful copies clear it.
 9. With a newer release published, the open shelf offers this install's own
    update step; dismissing it silences that version and no other.
-10. Confirm **Add to Perch Shelf** is ticked under Login Items & Extensions ▸
-    Extensions ▸ System Services, invoke it on three files, and verify three
-    tiles land while every original remains unchanged.
-11. Invoke the top-level **Add to Perch Shelf** on the same three files and get
-    the same outcome — three copies admitted, three originals untouched —
-    proving the Service shares the drag path's admission rather than its own.
-12. Run `perch add` on those three files: it exits 0 and three tiles land. Quit
+10. Right-click three files and invoke **Add to Perch Shelf** under *Services*
+    — exactly one row offers it — and verify three tiles land while every
+    original remains unchanged, proving the Service shares the drag path's
+    admission rather than its own. If the row is missing it is switched off in
+    System Settings ▸ Keyboard ▸ Keyboard Shortcuts… ▸ Services ▸ Files and
+    Folders; there is no extension to enable.
+11. Run `perch add` on those three files: it exits 0 and three tiles land. Quit
     Perch and run it again: it launches the shelf and the file still lands.
-13. Watch a folder holding two files; neither lands. Download into it and one
+12. Watch a folder holding two files; neither lands. Download into it and one
     tile appears only after the download completes; the original stays put.
     Quit perch, drop a file in, relaunch — that file lands too, exactly once.
 

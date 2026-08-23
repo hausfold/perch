@@ -42,9 +42,9 @@ struct ClearConfirmation: Equatable {
 
     /// Voids an arming whose shelf has changed underneath it.
     ///
-    /// Items arrive while the panel is collapsed — a paired iPhone, the Finder
-    /// Quick Action, the App Intent — so "armed" must not survive into a shelf
-    /// the user never looked at.
+    /// Items arrive while the panel is collapsed — a paired iPhone, the `perch`
+    /// tool, a watched folder, the App Intent — so "armed" must not survive into
+    /// a shelf the user never looked at.
     mutating func revalidate(against itemIDs: [UUID]) {
         guard isArmed, armedAgainst != itemIDs else { return }
         disarm()

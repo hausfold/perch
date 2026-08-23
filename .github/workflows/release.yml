@@ -93,16 +93,14 @@ jobs:
           # guarantees the hardened runtime, a secure timestamp, and exactly the
           # declared entitlements (no get-task-allow, which notarization rejects).
           APP="dd/Build/Products/Release/Perch.app"
-          FINDER_ACTION="$APP/Contents/PlugIns/PerchFinderAction.appex"
           CLI="$APP/Contents/MacOS/perch-cli"
           IDENTITY="$(security find-identity -v -p codesigning "$RUNNER_TEMP/signing.keychain-db" \
             | awk -F'"' '/Developer ID Application/{print $2; exit}')"
-          # Nested code is always signed inside-out. The Finder Action and app
-          # must carry the same Team-ID-prefixed App Group entitlement.
-          codesign --force --options runtime --timestamp \
-            --entitlements PerchFinderAction/PerchFinderAction.entitlements \
-            --sign "$IDENTITY" \
-            "$FINDER_ACTION"
+          # Nested code is always signed inside-out — the CLI before the app
+          # that carries it. There is no app extension on the Mac side: the
+          # Finder Action was removed (field test 2026-08-23, #4/#5), so the
+          # only Finder door is the app's own NSServices entry, which is signed
+          # with the app.
           # The `perch` tool, deliberately with NO entitlements: it is the
           # unsandboxed half of the handoff and reads your files as
           # you. Sandboxing it would defeat the point; the App Group it writes
@@ -114,7 +112,6 @@ jobs:
             --entitlements Perch/Config/Perch.entitlements \
             --sign "$IDENTITY" \
             "$APP"
-          codesign --verify --strict --verbose=2 "$FINDER_ACTION"
           codesign --verify --strict --verbose=2 "$CLI"
           codesign --verify --strict --verbose=2 "$APP"
 

@@ -2,9 +2,9 @@ import Foundation
 import XCTest
 @testable import Perch
 
-/// The `perch` tool is a client of the same App Group mailbox the Finder Action
-/// uses, so these drive `HandoffClient` against a real `FinderActionReceiver` —
-/// the whole handoff, end to end, minus the two process boundaries.
+/// The `perch` tool is the App Group mailbox's one sender, so these drive
+/// `HandoffClient` against a real `FinderActionReceiver` — the whole handoff,
+/// end to end, minus the two process boundaries.
 @MainActor
 final class HandoffClientTests: XCTestCase {
     private struct Fixture {

@@ -147,9 +147,9 @@ final class ShelfStore: ObservableObject {
         }
     }
 
-    // MARK: - Finder Action arrivals
+    // MARK: - App Group mailbox arrivals
 
-    /// Reserve shelf slots before the extension asks Finder for any bytes.
+    /// Reserve shelf slots before a mailbox sender copies any bytes.
     /// The response persisted in the App Group is the admission receipt; its
     /// IDs also make pending reservations recoverable across an app relaunch.
     ///

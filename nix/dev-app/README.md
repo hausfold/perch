@@ -20,23 +20,27 @@ committing per build — the override is transient, per `bench try` invocation.
 
 ## Renaming the bundle: use `PERCH_BUNDLE_ID`, never `PRODUCT_BUNDLE_IDENTIFIER`
 
-All six targets derive their identifier from one project-level setting —
-`$(PERCH_BUNDLE_ID)`, `.finder-action`, `.cli`, `.tests`, `.ios`, `.ios.share`
-— precisely so the dev build can rename the whole family with a single
-override:
+All five targets derive their identifier from one project-level setting —
+`$(PERCH_BUNDLE_ID)`, `.cli`, `.tests`, `.ios`, `.ios.share` — precisely so the
+dev build can rename the whole family with a single override:
 
 ```sh
 xcodebuild -scheme Perch … PERCH_BUNDLE_ID=com.hausfold.perch.dev
 ```
 
 A `PRODUCT_BUNDLE_IDENTIFIER=` on the xcodebuild command line applies to **every
-target in the scheme**, which collapses the app, the Finder Action and the CLI
-onto one identifier. An app extension that shares its container's bundle id is
-malformed: PluginKit registers it (`defaults read pbs` even shows
-`APPEXTENSION-… = 1`) but Finder never offers the Quick Action and Login Items &
-Extensions has nothing to switch on — the best current explanation for
-field-test #4, after two passes of looking for it in the plist. Still to be
-confirmed against a real notarized release.
+target in the scheme**, which collapses the app, the CLI and the iOS pair onto
+one identifier. That is still worth avoiding on its own terms — an app
+extension sharing its container's bundle id is malformed, and `PerchShare` on
+the iOS side is exactly such an extension.
+
+It used to matter more: the Mac shipped a `PerchFinderAction` extension, and
+this collapse was the leading explanation for field-test #4 (no Quick Action,
+nothing to switch on in Login Items & Extensions) through two passes. Fixing it
+disproved the theory — with a properly nested id the extension still did not
+render, and clicking it shelved nothing — so the extension was removed on
+2026-08-23 and perch's only Finder door is now the app's own `NSServices`
+entry.
 
 ### What the rename deliberately does *not* change
 

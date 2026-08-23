@@ -163,8 +163,8 @@ struct PerchTool {
             var outcomes: [Outcome] = []
 
             for item in request.items {
-                // `attachmentIndex` is this batch's own ordering — the same
-                // field the Finder Action uses to find its provider.
+                // `attachmentIndex` is this batch's own ordering, and it is
+                // how a sender finds the source behind an admitted item.
                 let source = sources[item.attachmentIndex]
                 guard accepted.contains(item.id) else {
                     outcomes.append(.refused(name: item.displayName, path: source.path))

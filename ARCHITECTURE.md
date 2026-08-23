@@ -8,9 +8,9 @@
 4. A manifest never contains an absolute source path.
 5. Every exported dragging session advertises copy only.
 6. Display topology is replaceable without touching storage or import logic.
-7. No sender on the App Group mailbox — the Finder Action, the `perch` command
-   line tool, or anything else that speaks it — persists a source URL, and none
-   copies a byte before the containing app has persisted an admission response.
+7. No sender on the App Group mailbox — the `perch` command line tool, or
+   anything else that speaks it — persists a source URL, and none copies a byte
+   before the containing app has persisted an admission response.
 
 ## Boundaries
 
@@ -59,49 +59,24 @@ directions:
   `AppEntity` both intents and Spotlight resolve shelf items through — a
   thin, live view onto `ShelfStore.items`, not a stored copy.
 
-Finder's right-click Quick Actions menu is a fourth door, implemented as a
-non-UI Action Extension (`PerchFinderAction`). macOS registers it as a Finder
-Quick Action and turns it on by default — measured on macOS 26.6 (2026-08-14):
-`defaults read pbs` shows `FinderActive` ▸
-`APPEXTENSION-com.hausfold.perch.finder-action = 1` with no user step. Its
-checkbox lives under Login Items &
-Extensions ▸ Extensions ▸ **System Services** (the OS files every app's Quick
-Action under that row, not under the app's own name). Perch exposes a Settings
-shortcut to that pane — the top of it, since macOS publishes no anchor for the
-Extensions section. The extension cannot call its containing app, so
-`PerchFinderBridge/` defines a Mac App Group mailbox with a two-phase
-transaction:
+**Finder's right-click menu** is the fourth door, and it is a *classic
+Service* — `Perch/Config/Info.plist` declares it under `NSServices`, the one
+key with no `INFOPLIST_KEY_` build setting, which is why that partial plist
+exists at all.
 
-1. The extension writes UUIDs, safe display names, and in-memory attachment
-   indexes — never source URLs.
-2. The running app's `FinderActionReceiver` asks `ShelfStore` to reserve slots
-   and atomically writes the accepted IDs. This response is also the relaunch
-   recovery receipt for pending reservations.
-3. Only then does the extension load accepted providers and coordinate/copy
-   their bytes off-main into its request directory. A completion file exposes
-   only paths relative to that directory.
-4. The app adopts each completed representation through `TransferPipeline`,
-   commits the visible `ShelfItem`, and removes the request. Ten-minute stale
-   transactions release reservations and are discarded.
+Perch used to ship a second Finder door beside it: a non-UI Action Extension,
+`PerchFinderAction`, on the understanding that an extension is always nested
+inside the menu's "Quick Actions" submenu while an `NSServices` entry reaches
+the menu's top level. On macOS 26 **neither half of that is true**, and the
+extension did not work. Measured 2026-08-23, with a single registered copy:
+both doors drew under "Services" — so the menu read "Add to Perch Shelf
+(Perch.app)" twice — the extension never rendered under "Quick Actions" despite
+being listed and enabled there, and clicking its row shelved nothing, its App
+Group mailbox never written. The extension was removed; the field-test file's
+#4/#5 carry the measurements.
 
-The shared group is `88M28542LQ.com.hausfold.perch`, the Team-ID-prefixed form
-for a directly distributed macOS app. It is deliberately separate from the iOS
-companion's App Store group.
-
-A **classic Service** is the fifth door. It was added on the understanding that
-an Action Extension is always nested inside the Finder menu's "Quick Actions"
-submenu while an `NSServices` entry reaches the menu's top level — and on
-macOS 26 **neither half of that is true**. Measured 2026-08-23 with a single
-registered copy of the extension: both doors land under "Services", the
-extension does not render under "Quick Actions" at all, and the Service is not
-at the top level. The visible result is "Add to Perch Shelf (Perch.app)" listed
-twice. `Perch/Config/Info.plist` declares it — the one key with no
-`INFOPLIST_KEY_` build setting, so that partial plist exists solely to carry it
-and Xcode merges the generated keys into it. Which door to keep is open; see
-the 2026-08-22 field-test file, #4/#5.
-
-The handler is trivial by design. A Service is delivered to the *running* app,
-not to an extension, so `ShelfServicesProvider`
+The handler that remains is trivial by design. A Service is delivered to the
+*running* app, not to an extension, so `ShelfServicesProvider`
 (`Perch/Importing/ShelfServicesProvider.swift`) hands the pasteboard straight
 to `ShelfDropHandler.accept(_:)` — the same call a drop onto the shelf makes.
 No mailbox, no second staging path, and promises, file URLs, images, links and
@@ -109,13 +84,30 @@ plain text all behave exactly as they do on a drag, because it is the same
 code. `NSUpdateDynamicServices()` at launch is what makes a newly installed
 build's menu item appear without a logout.
 
-A **command line tool** is the sixth door, and it is not a new mechanism: it is
-a second sender on the mailbox above. `perch add <path>...`
-(`PerchCLI/`, shipped inside the bundle as `Contents/MacOS/perch-cli`) runs the
-identical four-step transaction, so `FinderActionReceiver` cannot tell it from
-the extension — which is the point, since admission, path validation, and
-adoption stay in one place. The sender half both of them run is
-`PerchFinderBridge/HandoffClient.swift`.
+A **command line tool** is the fifth door, and the only sender left on the Mac
+App Group mailbox that `PerchFinderBridge/` defines. `perch add <path>...`
+(`PerchCLI/`, shipped inside the bundle as `Contents/MacOS/perch-cli`) runs a
+four-step transaction against it; the sender half is
+`PerchFinderBridge/HandoffClient.swift`, and the app's half is
+`FinderActionReceiver`. Both keep their names — `FinderActionRequests` is a
+directory an *installed* CLI writes to, so renaming it would strand requests
+from a copy of the tool the app was not shipped with.
+
+1. The sender writes UUIDs, safe display names, and in-memory attachment
+   indexes — never source URLs.
+2. The running app's `FinderActionReceiver` asks `ShelfStore` to reserve slots
+   and atomically writes the accepted IDs. This response is also the relaunch
+   recovery receipt for pending reservations.
+3. Only then does the sender load accepted providers and coordinate/copy their
+   bytes off-main into its request directory. A completion file exposes only
+   paths relative to that directory.
+4. The app adopts each completed representation through `TransferPipeline`,
+   commits the visible `ShelfItem`, and removes the request. Ten-minute stale
+   transactions release reservations and are discarded.
+
+The shared group is `88M28542LQ.com.hausfold.perch`, the Team-ID-prefixed form
+for a directly distributed macOS app. It is deliberately separate from the iOS
+companion's App Store group.
 
 The tool has to exist because the app is sandboxed: a URL scheme or Apple Event
 could name a path, but Perch may not open one it was merely told about. The
@@ -127,7 +119,7 @@ dev build owns the notch under its own bundle identifier and would fail a
 bundle-id check while answering perfectly well. See
 [docs/cli.md](docs/cli.md).
 
-A **watched folder** is the seventh door, and the only one that opens without a
+A **watched folder** is the sixth door, and the only one that opens without a
 gesture: Settings keeps a list of user-picked folders (each one panel grant,
 persisted as an app-scoped security bookmark), and new files that appear in
 them are copied onto the shelf by `FolderWatchCenter` /
@@ -258,7 +250,7 @@ the keypair, the signing contract a Worker would have to honour — was
 `git show v2026.08.14-1:docs/going-paid.md` still has it.
 
 The **admission step** it left behind is not a leftover: a sender that is not
-the app — the Finder Action, the `perch` tool, a paired iPhone — asks for a slot
+the app — the `perch` tool, a paired iPhone — asks for a slot
 by name and waits for `ShelfStore` to persist a receipt *before* it copies a
 byte. That ordering is what makes the app the single authority on what is on the
 shelf: it can't adopt bytes it never reserved a pending tile for, and a sender
@@ -278,6 +270,14 @@ ChaChaPoly-sealed under per-session keys. Arriving bytes spool into a hidden
 dot-directory on the shelf's volume, are digest-verified, and enter the shelf
 through the same admission-first, atomic-commit path as a drag. Pairing lives
 in the Keychain; revoking a device deletes its row.
+
+Every wire path — listener, browser and connection alike — sets
+`includePeerToPeer = true`, so a phone that cannot reach the Mac over Wi-Fi
+finds it over AWDL, the same peer-to-peer link AirDrop uses. Delivery needs the
+Wi-Fi radio up at both ends and nothing else: no router, no DHCP lease, no
+shared SSID. What that costs a test is stated where users read it,
+`docs/reference.md` ▸ Permissions — Control Center's Wi-Fi toggle deliberately
+leaves AWDL up, so "Wi-Fi off" is not how you take the link down.
 
 **No account, no relay, and TLS-PSK was considered and declined.** A hausfold
 sync server would spend, for a v1 nobody asked to be cloudy, exactly the trust

@@ -1,13 +1,18 @@
 import AppKit
 
-/// The top-level "Add to Perch Shelf" in the Finder context menu.
+/// perch's one Finder door: the "Add to Perch Shelf" entry declared in
+/// `Perch/Config/Info.plist`, which macOS draws under *Services*.
 ///
-/// This is the classic-Services half of the pair declared in
-/// `Perch/Config/Info.plist`; `PerchFinderAction` is the modern app-extension
-/// half that lives in the Quick Actions submenu. They differ only in where
-/// macOS draws them and who does the copying — a Service is delivered to the
-/// running app, so it reuses `ShelfDropHandler` verbatim and there is no
-/// mailbox, no second staging path, and nothing new to keep in sync.
+/// There used to be a second — a `PerchFinderAction` Action Extension — kept on
+/// the belief that it drew in a different submenu. It didn't, and it didn't
+/// work: measured on macOS 26 (field test 2026-08-23), both doors landed under
+/// Services with the same title, and clicking the extension's row shelved
+/// nothing. It was removed, and this is what remains.
+///
+/// Being delivered to the *running* app is the reason this half is the simple
+/// one: it reuses `ShelfDropHandler` verbatim, so there is no mailbox, no
+/// second staging path, and nothing new to keep in sync. (`PerchFinderBridge`'s
+/// mailbox stays — the `perch` CLI is still a sender.)
 ///
 /// Finder hands over a pasteboard, never a mandate: the source files are read
 /// and copied, exactly as a drag onto the shelf reads and copies them.
