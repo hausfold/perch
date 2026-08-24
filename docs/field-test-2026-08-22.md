@@ -35,7 +35,7 @@ is provably the only thing going wrong.
 | ~~2~~ | ~~Non-downloaded iCloud file sticks on "Downloading" forever~~ | Import | **Fixed** — the poll read a cached status; re-tested 2026-08-23 | ~~**E**~~ |
 | ~~4~~ | ~~Quick Action absent from Quick Actions; Service listed twice~~ | Finder | **Fixed** — the extension was the dead door; removed | ~~**F**~~ |
 | ~~5~~ | ~~No top-level "Add to Perch Shelf" in the Finder context menu~~ | Finder | **Premise dead** — a classic Service does not reach the top level; docs corrected | ~~**F**~~ |
-| 12 | Settings ▸ Devices says "No devices paired" while the phone still delivers | Mobile | **Open** — Keychain exonerated by measurement; look at the UI | **G** |
+| ~~12~~ | ~~Settings ▸ Devices says "No devices paired" while the phone still delivers~~ | Mobile | **Fixed** — by #82, a day before the pass that reported it; verified on 2026.08.24, both surfaces, 2026-08-24 | ~~**G**~~ |
 | 3 | 3 GB file "lands immediately" instead of showing progress | — | **Not a bug** — bad expectation | — |
 | ~~11~~ | ~~Phone Wi-Fi off, Mac still receives~~ | — | **Not a bug** — documented in `docs/reference.md` | — |
 
@@ -58,6 +58,52 @@ The two loose ends this board handed to other sessions have both landed:
 bounding concurrent cloud waiters (E3, #95) and drag-out into a *watched*
 destination shelving the item straight back, with the export-ledger probe race
 it uncovered (#96).
+
+### Where it stands — 2026-08-24 — the board is clear
+
+**#12 is fixed, and was already fixed when it was reported.** Three readings
+on `/Applications/Perch.app` at 2026.08.24 — Developer-ID-signed, notarized,
+sandboxed — against the pairing this Mac has had since 2026-08-21:
+
+| surface | reads |
+|---|---|
+| `PairedDeviceStore.all()` at launch | `Keychain list: 1 paired device(s)` |
+| Menu bar (`PairedDevicesSection`) | `iPhone — paired` |
+| Settings ▸ iPhone & iPad (`DevicesPane`) | `iPhone · Paired Aug 21, 2026`, with a live **Revoke** |
+
+The reported symptom does not exist on the shipped build. **#82** is what fixed
+it — it landed 2026-08-21 00:47 and shipped in `v2026.08.21`, tagged 21:06 that
+evening, about ten hours before this punch list was written (`00900ec`,
+2026-08-22 07:36). The pairing itself was made 00:52 that morning, five minutes
+after #82 was committed and long before any release carried it — so the pass
+that filed #12 was almost certainly driving a build from before the fix, which
+is exactly the shape a bug that "reproduces every time" and then evaporates
+usually has. Everything Run G wrote about the Keychain after that was answering
+a question that no longer had a bug behind it. The measurements it produced
+stand and are worth keeping; the diagnosis they were chasing was of a corpse.
+
+**How the reading was taken**, since it is not obvious and cost a wrong turn:
+
+```sh
+/usr/bin/log stream --predicate 'subsystem == "com.hausfold.perch"' --level info --style compact &
+killall Perch; open -g -a /Applications/Perch.app
+```
+
+`log`, unqualified, is a zsh builtin — hence `/usr/bin/log`. And `--level info`
+is not optional: the count line is `info`, which is **not persisted**, so
+`log show` will never show it however far back you ask. Its absence means
+nothing; the reading only exists live, on a relaunch. No phone was needed —
+`security find-generic-password -s com.hausfold.perch.mobile-device` shows the
+item already on disk (attributes only, no prompt).
+
+**What this does *not* cover, stated so nobody reads more into it than it
+says.** All three readings reach `pairedDevices` through `MobileReceiver.init`,
+at launch. The refresh inside `finishPairing` — a pairing made while the app is
+already up — has still never been watched, and neither has **revoke**, which
+the original pass could not reach *because* of #12. Both are now one session
+with the phone: revoke the iPhone, watch the row leave without a relaunch, pair
+it again, watch it come back. That is the last of this board's coverage, not an
+open bug.
 
 ---
 
@@ -712,15 +758,23 @@ Quick Actions shows it once, Services shows it once, and both land 3 tiles with
 
 ---
 
-## Run G — Settings ▸ Devices says "No devices paired" while the phone works (#12)
+## ~~Run G — Settings ▸ Devices says "No devices paired" while the phone works (#12)~~
 
 **Symptom.** Phone and Mac are paired and delivering. Settings ▸ Devices shows
 "No devices paired yet." Revoke is therefore unreachable, so the revoke test
 could not be run at all.
 
-**Still open — but the Keychain theory is now disproved by measurement, not by
-reading.** Both #82's fix *and* the migration that was going to replace it are
-off the table. `PairedDeviceStore` was instrumented and put under test in a
+**Closed 2026-08-24: #82 had already fixed it, ten hours before this pass ran.**
+Both surfaces list the device on the shipped 2026.08.24 and Revoke is live —
+the readings, and the two paths they still don't cover, are under *Where it
+stands — 2026-08-24* above. **The rest of this run is kept as written**: it is
+wrong about what was broken and right about everything it measured, and those
+measurements are load-bearing — they are why `PairedDeviceStore` has the shape
+it has, and why the data-protection Keychain is not available to perch. Read
+what follows as findings about the Keychain, not as a diagnosis of #12.
+
+**The Keychain theory is disproved by measurement, not by reading.** Both #82's
+fix *and* the migration that was going to replace it are off the table. `PairedDeviceStore` was instrumented and put under test in a
 signed, sandboxed Perch host (`xcodebuild test` *without*
 `CODE_SIGNING_ALLOWED=NO`, which is what makes the app sandboxed and entitled
 the way the shipped one is). What that host actually returns:
@@ -754,6 +808,10 @@ log stream --predicate 'subsystem == "com.hausfold.perch" && category == "Paired
 Pair, and read the count line. `Keychain list: 1 paired device(s)` with an empty
 Settings list moves this to the UI; `no paired devices` moves it to whether the
 pairing was ever stored.
+
+**Taken 2026-08-24: `1 paired device(s)`, and the list was not empty** — so
+neither branch this criterion offers was the answer. Both were written on the
+assumption there was still a bug. *Where it stands — 2026-08-24* above.
 
 **Watch out.** Do not "fix" this by moving to the data-protection Keychain. It
 needs a Keychain access group; naming one needs a `keychain-access-groups`
@@ -821,8 +879,9 @@ turns out not to be available: the data-protection Keychain refuses perch
 outright, for a reason no amount of migration code changes. And Option B has
 nothing left to fix — the file-based enumeration was measured working. The
 decision that *did* land is stated where it binds, in the type comment on
-`PairedDeviceStore` and in the two tests that pin it. Run G stays open on the
-`MobileReceiver`/UI side.
+`PairedDeviceStore` and in the two tests that pin it. The `MobileReceiver`/UI
+side that Run G was left open on turned out to have nothing wrong with it —
+closed 2026-08-24.
 
 ~~**C · Rename semantics — 3/5.**~~ **Answered: (a)**, re-resolve — the staged
 filename is the user's to edit and the shelf follows it. Stated in
