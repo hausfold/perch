@@ -7,7 +7,15 @@ below is one of those, written down because it already cost somebody a wrong
 turn during the 2026-08-22 field test.
 
 Everything here is about *measuring*. What perch does and why lives in
-[`reference.md`](./reference.md), `PRD.md` and `ARCHITECTURE.md`.
+[`reference.md`](./reference.md), `PRD.md` and `ARCHITECTURE.md`. The punch list
+itself is gone — it was empty — but the record of what each finding ruled out is
+retrievable: `git show v2026.08.24:docs/field-test-2026-08-22.md`.
+
+One of its findings outlived it, and the watched-folder section below is how to
+test it honestly: **"quit → drop into `~/Downloads` → relaunch → no catch-up"
+was never reproduced.** The stream now resumes from a persisted position, and
+the launch rescan would find a missed arrival on its own; nothing is owed unless
+it recurs.
 
 ## Reading perch's own log
 
@@ -48,6 +56,15 @@ killall Finder
 block exists.) One Services row after that means a duplicate was lane
 pollution; two would mean two doors really render.
 
+**That clean reading has never actually been taken**, which matters only if
+anyone reconsiders the Finder extension deleted 2026-08-23. The evidence that
+closed it was gathered on a Mac carrying 40 registered copies, so it cannot
+distinguish "the appex is the dead row" from "the second row was another lane's
+build" — both hypotheses predict what was seen. The extension is gone on a
+**product call** (it bought only not-waking-an-app that owns the notch, and the
+classic Service demonstrably works), not on a discriminating measurement. Run
+the block above before treating the question as settled either way.
+
 ## Watched folders: prime the folder, or the first run lies
 
 Testing *quit → drop a file in → relaunch → does it catch up* against a folder
@@ -74,11 +91,19 @@ pass fails, a second passes, and the run reads as flaky.
 4. *Now* ⌘Q, drop the test file, relaunch.
 
 Two more things about that loop. **A re-dropped file is deduped by identity,
-not by name**: the token is `SHA256(inode:birth:size:mtime)` and encodes no
-path (and no name — except on a mount reporting neither inode nor birth date,
-where it falls back to the hashed name), so copying the *same* file back in is
-ignored while a freshly created one with the same name imports fine — use a fresh name each pass and
-stop thinking about it. And **don't count on ⌘Q to persist the position**: the
+not by name**: the token is `SHA256(inode:birth:size:mtime)`
+(`FolderWatcher.swift:42-57`) and encodes no path or name — except on a mount
+reporting neither inode nor birth date, where it falls back to the hashed name.
+So what is silently ignored is a file **moved** back in: `mv`, or a Finder drag
+within one volume, keeps the inode and every other component, and that is
+exactly the gesture a feel-tester reaches for. A **copy** gets a new inode and
+imports fine (measured on this APFS volume: original `79906233`, `cp`
+`79906234`, `cp -c` clone `79906235`), and so does a fresh `touch`. Renaming is
+not the lever either — a rename changes nothing in the token, which
+`testARenameStillDoesNotReimport` (`PerchTests/FolderWatchingTests.swift:507`)
+pins deliberately. **Create a new file each pass**; don't move an old one back
+in, and don't expect a rename to make it new.
+And **don't count on ⌘Q to persist the position**: the
 flush on stop is a `queue.async` that hops to the main actor and then to a
 background write, so it races process exit. Losing it costs a slightly wider
 replay and nothing else.
