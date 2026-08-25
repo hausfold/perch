@@ -41,6 +41,9 @@ Each import gets its own UUID directory — that's what prevents name collisions
 without renaming your file. The manifest records only **staged relative paths**
 and file metadata; original source paths are never persisted, and never logged.
 
+Your settings sit beside it, as `Perch/settings.json` — see [Settings, as a
+file](#settings-as-a-file).
+
 To get a copy out without dragging — the destination is a folder nothing has
 open, or the item is pinned and you just want it on disk — right-click a tile
 and pick **Save to…**. It writes a copy wherever you point the panel and leaves
@@ -155,9 +158,10 @@ follows macOS Light/Dark:
   themes/<name>.json   flat "role": "#hex" map — a nebelung *.hex.json verbatim
 ```
 
-That file carries one non-colour key as well — `screenshotsFolder`, which
-tells the screenshots switch where this Mac saves captures (see [Watched
-folders](#watched-folders)). Anything perch doesn't recognise is ignored.
+That file carries non-colour keys as well — `screenshotsFolder`, which tells the
+screenshots switch where this Mac saves captures (see [Watched
+folders](#watched-folders)), and any setting from [Settings, as a
+file](#settings-as-a-file). Anything perch doesn't recognise is ignored.
 
 A file in `themes/` **shadows** a built-in of the same name, so a palette bump
 lands without a new release, and any Catppuccin-shaped palette drops in under its
@@ -188,6 +192,45 @@ from Settings.
 
 Changes are picked up the next time the shelf opens — no relaunch.
 
+## Settings, as a file
+
+Every switch in Perch Settings is stored in a file, not in `defaults`. Perch
+writes this one, inside its own sandbox container:
+
+```text
+~/Library/Containers/com.hausfold.perch/Data/Library/Application Support/Perch/settings.json
+```
+
+```json
+{
+  "automaticUpdateChecks": true,
+  "mobileEnabled": true,
+  "retentionDays": 0,
+  "showOnAllDisplays": true
+}
+```
+
+Edit it and Perch follows — no relaunch, no restart of the shelf. Write only the
+keys you care about; anything absent is at its default, and anything Perch
+doesn't recognise is left alone. A file that isn't valid JSON changes nothing
+rather than resetting you, and the window names the path at the bottom of
+**Settings ▸ General** so you never have to remember it.
+
+**`~/.config/perch/config.json` wins.** Name any of those keys there — plus
+`launchAtLogin`, which lives nowhere else — and that value is the one Perch uses:
+the row goes read-only in Settings with a padlock and a line saying where it came
+from. That is how a [haus](https://github.com/hausfold/haus) desktop declares
+Perch's behaviour alongside its theme, and how you pin a setting on a Mac you
+manage. Remove the key and the switch is yours again.
+
+Perch never writes `~/.config/perch/` — its sandbox exception for that directory
+is read-only, which is why the file it writes is a separate one inside its
+container.
+
+`defaults` keeps only what a config file has no business holding: which pane
+Settings was last on, the window's size, and what GitHub last said about
+releases.
+
 ## The product boundary (v1)
 
 v1 deliberately stages copies and exports copies.
@@ -208,8 +251,10 @@ permission, and has no Dock icon. It sees only what you drop on it and the
 folders you pick for it to watch.
 
 It is sandboxed, with one read-only exception: `~/.config/perch/`, where the
-theme above lives. That is the only path Perch opens that a drag or a file picker
-didn't hand it, and it is never written. A watched folder is picker-granted
+theme above lives and where a machine can declare any setting. That is the only
+path Perch opens that a drag or a file picker didn't hand it, and **it is never
+written** — Perch's own settings file is inside its container, precisely so that
+exception can stay read-only. A watched folder is picker-granted
 too — perch just keeps that grant across relaunches as an app-scoped security
 bookmark (the `files.bookmarks.app-scope` entitlement), one per folder,
 dropped the moment you stop watching it.

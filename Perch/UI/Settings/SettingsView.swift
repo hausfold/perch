@@ -72,7 +72,7 @@ struct SettingsView: View {
         case .devices:
             DevicesPane(settings: settings, mobile: mobile)
         case .updates:
-            UpdatesPane(update: update)
+            UpdatesPane(settings: settings, update: update)
         }
     }
 

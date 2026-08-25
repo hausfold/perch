@@ -19,7 +19,7 @@ final class ShelfDropHandlerTests: XCTestCase {
         try "dropped".write(to: source, atomically: true, encoding: .utf8)
 
         let repository = try StagingRepository(rootURL: root)
-        let settings = AppSettings(defaults: defaults)
+        let settings = AppSettings(store: TransientSettings.store(), defaults: defaults)
         let store = ShelfStore(repository: repository, settings: settings)
         let handler = ShelfDropHandler(store: store)
         let pasteboard = NSPasteboard(name: .init("PerchTests-\(UUID().uuidString)"))
@@ -49,7 +49,7 @@ final class ShelfDropHandlerTests: XCTestCase {
         let repository = try StagingRepository(rootURL: root)
         let store = ShelfStore(
             repository: repository,
-            settings: AppSettings(defaults: defaults)
+            settings: AppSettings(store: TransientSettings.store(), defaults: defaults)
         )
         let handler = ShelfDropHandler(store: store)
         let pasteboard = NSPasteboard(name: .init("PerchTests-\(UUID().uuidString)"))

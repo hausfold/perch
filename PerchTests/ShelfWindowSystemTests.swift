@@ -18,7 +18,7 @@ final class ShelfWindowSystemTests: XCTestCase {
         let repository = try StagingRepository(rootURL: root)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let settings = AppSettings()
+        let settings = AppSettings(store: TransientSettings.store())
         let store = ShelfStore(repository: repository, settings: settings)
         let system = ShelfWindowSystem(store: store, settings: settings, theme: ShelfTheme())
 

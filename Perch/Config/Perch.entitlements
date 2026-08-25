@@ -40,10 +40,19 @@
 	<!-- The rice's drop: ~/.config/perch/{config.json,themes/*.json}, which
 	     lives outside the container. Read-only, one directory, and the only
 	     path perch reaches for that a drag or a file picker did not hand it.
-	     Two readers, both of that one directory: Perch/UI/Theme/RicePalette.swift
-	     (the palette) and Perch/UI/Settings/ScreenshotsFolder.swift (where this
+	     Three readers, all of that one directory: Perch/UI/Theme/RicePalette.swift
+	     (the palette), Perch/UI/Settings/ScreenshotsFolder.swift (where this
 	     Mac saves screenshots, which is only ever used to aim a file picker —
-	     reading it grants nothing). -->
+	     reading it grants nothing), and Perch/App/AppConfigFile.swift, where a
+	     key this file names declares the matching Settings switch.
+
+	     READ-ONLY, and it stays that way. Settings is file-backed, but the file
+	     it WRITES is ~/Library/Containers/…/Application Support/Perch/settings.json
+	     — perch's own container, which needs no exception at all. Widening this
+	     one to read-write so both could be the same file would trade a narrow,
+	     explicable exception for one that lets perch write anywhere under a
+	     home-relative path, which is the kind App Review reads as a sandbox
+	     that isn't one. Layering the two files costs less than that. -->
 	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
 	<array>
 		<string>/.config/perch/</string>

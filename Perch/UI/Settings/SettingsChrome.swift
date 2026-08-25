@@ -87,11 +87,18 @@ struct SettingsDivider: View {
 
 /// One setting: symbol, label, the line under it that says what turning it on
 /// actually does, and the control that does it.
+///
+/// `locked` is the whole of read-only rendering: the control is disabled and a
+/// padlock sits beside it, so a row this Mac declares reads as *someone else's
+/// to change* rather than as broken. What that someone is gets said once per
+/// card, by `SettingsDeclaredNote` — a padlock on every row plus a sentence on
+/// every row is a pane shouting.
 struct SettingsRow<Control: View>: View {
     var symbol: String?
     var tint: Color = .secondary
     var title: String
     var subtitle: String?
+    var locked = false
     @ViewBuilder var control: Control
 
     var body: some View {
@@ -112,10 +119,66 @@ struct SettingsRow<Control: View>: View {
                 }
             }
             Spacer(minLength: 12)
+            if locked {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Set by this Mac’s configuration file")
+            }
             control
+                .disabled(locked)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
+    }
+}
+
+// MARK: - When a file owns the answer
+
+/// The note under a card whose rows the rice drop declares.
+///
+/// It says the two things a greyed-out switch can't: *which* file decided, and
+/// that perch will follow it the moment it changes — so the answer to "why
+/// can't I click this" is on screen beside the thing that can't be clicked,
+/// rather than in a manual. Renders nothing when nothing in `keys` is declared,
+/// which is the overwhelmingly common case.
+struct SettingsDeclaredNote: View {
+    @ObservedObject var settings: AppSettings
+    let keys: [String]
+
+    var body: some View {
+        let declared = keys.filter(settings.isDeclared).sorted()
+        if !declared.isEmpty {
+            SettingsNote(symbol: "lock.fill", text: note(for: declared))
+        }
+    }
+
+    private func note(for declared: [String]) -> String {
+        let path = settings.declarationURL.map { RiceFiles.abbreviate($0.path) }
+            ?? "its configuration file"
+        return "This Mac sets \(Self.list(declared)) in \(path). Perch follows that file — "
+            + "change it there and it lands here without a relaunch."
+    }
+
+    /// The JSON keys, verbatim: they are what someone opening that file has to
+    /// search for, and a prettified label ("Discard items after") is not in
+    /// there to find.
+    private static func list(_ keys: [String]) -> String {
+        let quoted = keys.map { "“\($0)”" }
+        guard let last = quoted.last, quoted.count > 1 else { return quoted[0] }
+        return quoted.dropLast().joined(separator: ", ") + " and " + last
+    }
+}
+
+/// What a write that didn't land looks like: the switch has already sprung back
+/// to what the file still says, and this says why it did.
+struct SettingsWriteErrorNote: View {
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        if let error = settings.writeError {
+            SettingsNote(symbol: "exclamationmark.triangle.fill", tint: .orange, text: error)
+        }
     }
 }
 

@@ -75,7 +75,8 @@ struct GeneralPane: View {
                 SettingsRow(
                     symbol: "power",
                     title: "Launch Perch at login",
-                    subtitle: "Perch comes back in the menu bar — no window, no Dock icon."
+                    subtitle: "Perch comes back in the menu bar — no window, no Dock icon.",
+                    locked: settings.isDeclared(AppConfig.Key.launchAtLogin)
                 ) {
                     Toggle(
                         "Launch Perch at login",
@@ -91,13 +92,20 @@ struct GeneralPane: View {
                 SettingsRow(
                     symbol: "menubar.dock.rectangle",
                     title: "Show a drop target on every display",
-                    subtitle: "Each screen gets its own shelf at the notch. Off keeps it to your main display."
+                    subtitle: "Each screen gets its own shelf at the notch. Off keeps it to your main display.",
+                    locked: settings.isDeclared(AppConfig.Key.showOnAllDisplays)
                 ) {
                     Toggle("Show a drop target on every display", isOn: $settings.showOnAllDisplays)
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
             }
+
+            SettingsDeclaredNote(
+                settings: settings,
+                keys: [AppConfig.Key.launchAtLogin, AppConfig.Key.showOnAllDisplays]
+            )
+            SettingsWriteErrorNote(settings: settings)
 
             if let error = settings.launchAtLoginError {
                 SettingsNote(symbol: "exclamationmark.triangle.fill", tint: .orange, text: error)
@@ -121,7 +129,21 @@ struct GeneralPane: View {
                 Keyboard ▸ Keyboard Shortcuts… ▸ Services, under Files and Folders.
                 """
             )
+
+            SettingsFootnote(
+                """
+                Every switch in this window is stored in \(configPath) — the file is what \
+                Perch reads, so editing it by hand is the same as clicking here, and it \
+                lands without a relaunch.
+                """
+            )
         }
+    }
+
+    /// Named, not hidden behind a button: it is the only way to find a path
+    /// inside the sandbox container, where nobody would think to look.
+    private var configPath: String {
+        RiceFiles.abbreviate(settings.configFileURL.path)
     }
 }
 
@@ -141,7 +163,8 @@ struct ShelfPane: View {
                 SettingsRow(
                     symbol: "clock.arrow.circlepath",
                     title: "Discard items after",
-                    subtitle: "Anything added longer ago than this leaves the shelf on its own. Pinned items stay."
+                    subtitle: "Anything added longer ago than this leaves the shelf on its own. Pinned items stay.",
+                    locked: settings.isDeclared(AppConfig.Key.retentionDays)
                 ) {
                     Picker("Discard items after", selection: $settings.retentionDays) {
                         ForEach(offeredChoices, id: \.self) { days in
@@ -154,6 +177,9 @@ struct ShelfPane: View {
                 }
             }
             SettingsFootnote(retentionNote)
+
+            SettingsDeclaredNote(settings: settings, keys: [AppConfig.Key.retentionDays])
+            SettingsWriteErrorNote(settings: settings)
 
             SettingsNote(
                 symbol: "lock.shield.fill",
@@ -394,22 +420,20 @@ struct DevicesPane: View {
                 SettingsRow(
                     symbol: "antenna.radiowaves.left.and.right",
                     title: "Receive from paired devices",
-                    subtitle: "Off tears the listener down. Pairings are remembered for when it comes back."
+                    subtitle: "Off tears the listener down. Pairings are remembered for when it comes back.",
+                    locked: settings.isDeclared(AppConfig.Key.mobileEnabled)
                 ) {
-                    Toggle(
-                        "Receive from paired devices",
-                        isOn: Binding(
-                            get: { settings.mobileEnabled },
-                            set: { enabled in
-                                settings.mobileEnabled = enabled
-                                mobile.applyEnabledSetting()
-                            }
-                        )
-                    )
-                    .labelsHidden()
-                    .toggleStyle(.switch)
+                    // Plain binding: `MobileReceiver` follows the setting's
+                    // publisher, so the listener starts and stops whether the
+                    // change came from this switch or from the file.
+                    Toggle("Receive from paired devices", isOn: $settings.mobileEnabled)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
                 }
             }
+
+            SettingsDeclaredNote(settings: settings, keys: [AppConfig.Key.mobileEnabled])
+            SettingsWriteErrorNote(settings: settings)
 
             SettingsCard {
                 if mobile.pairedDevices.isEmpty {
@@ -455,9 +479,8 @@ struct DevicesPane: View {
 // MARK: - Updates
 
 struct UpdatesPane: View {
+    @ObservedObject var settings: AppSettings
     @ObservedObject var update: UpdateCheck
-    /// Read by `UpdateCheck.automaticChecksEnabled`; defaults to on.
-    @AppStorage(UpdateCheck.Key.automatic) private var automaticUpdateChecks = true
 
     var body: some View {
         SettingsPaneLayout(title: SettingsPane.updates.title, subtitle: SettingsPane.updates.summary) {
@@ -465,9 +488,10 @@ struct UpdatesPane: View {
                 SettingsRow(
                     symbol: "arrow.clockwise",
                     title: "Check for new releases",
-                    subtitle: "Perch asks GitHub for the latest tag once an hour. It is its only network call."
+                    subtitle: "Perch asks GitHub for the latest tag once an hour. It is its only network call.",
+                    locked: settings.isDeclared(AppConfig.Key.automaticUpdateChecks)
                 ) {
-                    Toggle("Check for new releases", isOn: $automaticUpdateChecks)
+                    Toggle("Check for new releases", isOn: $settings.automaticUpdateChecks)
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
@@ -495,6 +519,11 @@ struct UpdatesPane: View {
                     }
                 }
             }
+
+            SettingsDeclaredNote(
+                settings: settings, keys: [AppConfig.Key.automaticUpdateChecks]
+            )
+            SettingsWriteErrorNote(settings: settings)
 
             SettingsFootnote(
                 """

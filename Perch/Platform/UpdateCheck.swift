@@ -197,8 +197,12 @@ final class UpdateCheck: ObservableObject {
 
     /// Settings toggle (`Updates` section). Defaults on; user-initiated checks
     /// ignore it, because asking is consent.
+    ///
+    /// Asked of the settings store, not of this object: the hourly timer fires
+    /// wherever it likes and the store answers from any thread, where an
+    /// `@MainActor` property would need a hop to read a `Bool`.
     static var automaticChecksEnabled: Bool {
-        UserDefaults.standard.object(forKey: Key.automatic) as? Bool ?? true
+        ConfigFileStore.shared.current().automaticUpdateChecks
     }
 
     var perchVersion: String {
@@ -429,17 +433,22 @@ final class UpdateCheck: ObservableObject {
 
     // MARK: State
     //
-    // UserDefaults: perch is the only reader (pounce needs a file instead,
-    // because a daemon and a shell script share the state). Under the sandbox
-    // this is the container's own defaults, so a `bench try` dev build — which
-    // signs under `com.hausfold.perch.dev` — keeps its own, exactly like its
-    // own staging directory.
+    // UserDefaults, and it stays there: what GitHub last said and when is a
+    // cache, not a setting, and a settings file someone edits by hand has no
+    // business carrying a timestamp perch rewrites every hour. The one thing
+    // here that IS a setting — the automatic-check switch — lives in
+    // `settings.json` with the rest (`AppConfigFile.swift`).
+    //
+    // Perch is the only reader (pounce needs a file instead, because a daemon
+    // and a shell script share the state). Under the sandbox this is the
+    // container's own defaults, so a `bench try` dev build — which signs under
+    // `com.hausfold.perch.dev` — keeps its own, exactly like its own staging
+    // directory.
 
     enum Key {
         static let checkedAt = "update.checkedAt"
         static let latest = "update.latest"
         static let dismissed = "update.dismissed"
-        static let automatic = "automaticUpdateChecks"
     }
 
     private struct State {

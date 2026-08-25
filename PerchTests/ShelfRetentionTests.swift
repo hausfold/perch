@@ -40,11 +40,26 @@ final class ShelfRetentionTests: XCTestCase {
         return try XCTUnwrap(UserDefaults(suiteName: name))
     }
 
-    private func makeRepository() throws -> StagingRepository {
+    /// A throwaway directory, cleaned up in `tearDown`. Every file fixture
+    /// here goes through it: a settings file left behind is state a later test
+    /// can pass because of.
+    private func makeRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory
             .appending(path: "PerchRetention-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         roots.append(root)
-        return try StagingRepository(rootURL: root)
+        return root
+    }
+
+    /// A settings store on its own file, with no declaration — the shape of a
+    /// standalone install, and the only shape that keeps a test off the real
+    /// `~/.config/perch/config.json` of whichever Mac is running it.
+    private func makeStore() throws -> ConfigFileStore {
+        ConfigFileStore(file: try makeRoot().appending(path: "settings.json"), declaration: nil)
+    }
+
+    private func makeRepository() throws -> StagingRepository {
+        try StagingRepository(rootURL: try makeRoot())
     }
 
     /// A real staged file, dated however the test needs it.
@@ -93,10 +108,10 @@ final class ShelfRetentionTests: XCTestCase {
         XCTAssertLessThan(cutoff, now)
     }
 
-    // MARK: - The default, and the one-time migration
+    // MARK: - The default, and the two migrations
 
     func testRetentionIsOffOnAFreshInstall() throws {
-        let settings = AppSettings(defaults: try makeDefaults())
+        let settings = AppSettings(store: try makeStore(), defaults: try makeDefaults())
         XCTAssertEqual(
             settings.retentionDays, 0,
             "Nothing may be deleted on a timer until someone turns the timer on."
@@ -106,34 +121,106 @@ final class ShelfRetentionTests: XCTestCase {
 
     /// A stored 0 has to survive the read. The old init clamped with `max(1,)`,
     /// which made "never" unrepresentable — anyone who chose it got a one-day
-    /// expiry instead, the most destructive setting on the stepper.
+    /// expiry instead, the most destructive setting on the menu.
     func testStoredNeverIsNotClampedUpToOneDay() throws {
-        let defaults = try makeDefaults()
-        defaults.set(0, forKey: "retentionDays")
-        XCTAssertEqual(AppSettings(defaults: defaults).retentionDays, 0)
+        let store = try makeStore()
+        XCTAssertNil(store.update { $0.retentionDays = 0 })
+        XCTAssertEqual(AppSettings(store: store, defaults: try makeDefaults()).retentionDays, 0)
     }
 
     /// Every stored retention was chosen against a stepper that said "Discard",
     /// started at 1, and never mentioned that discarding is a delete with no
     /// Trash behind it. That consent doesn't carry forward, so it is handed back
-    /// once.
+    /// once — and the *cleared* value is what reaches the file, not the value it
+    /// was cleared from.
     func testARetentionChosenUnderTheOldUIIsTurnedOffOnce() throws {
         let defaults = try makeDefaults()
+        let store = try makeStore()
         defaults.set(14, forKey: "retentionDays")
 
-        XCTAssertEqual(AppSettings(defaults: defaults).retentionDays, 0)
+        XCTAssertEqual(AppSettings(store: store, defaults: defaults).retentionDays, 0)
         XCTAssertTrue(defaults.bool(forKey: "retentionOptInMigrated"))
+        XCTAssertEqual(store.current().retentionDays, 0, "and the file agrees")
     }
 
     /// …and only once. A choice made *after* the migration, against the new
     /// wording, is the user's and stands.
     func testARetentionChosenAfterTheMigrationIsKept() throws {
         let defaults = try makeDefaults()
+        let store = try makeStore()
         defaults.set(14, forKey: "retentionDays")
-        _ = AppSettings(defaults: defaults)
+        let settings = AppSettings(store: store, defaults: defaults)
 
-        defaults.set(30, forKey: "retentionDays")
-        XCTAssertEqual(AppSettings(defaults: defaults).retentionDays, 30)
+        settings.retentionDays = 30
+        XCTAssertEqual(AppSettings(store: store, defaults: defaults).retentionDays, 30)
+    }
+
+    /// The `UserDefaults` builds are what the file replaced, so whatever they
+    /// stored has to arrive intact — otherwise an update silently re-decides
+    /// settings its user already made.
+    func testTheOldUserDefaultsSettingsMoveIntoTheFileOnce() throws {
+        let defaults = try makeDefaults()
+        let store = try makeStore()
+        defaults.set(true, forKey: "retentionOptInMigrated")
+        defaults.set(false, forKey: "showOnAllDisplays")
+        defaults.set(false, forKey: "mobileEnabled")
+        defaults.set(7, forKey: "retentionDays")
+
+        let settings = AppSettings(store: store, defaults: defaults)
+        XCTAssertFalse(settings.showOnAllDisplays)
+        XCTAssertFalse(settings.mobileEnabled)
+        XCTAssertEqual(settings.retentionDays, 7)
+        XCTAssertEqual(store.current().retentionDays, 7, "the file is where they live now")
+        XCTAssertNil(
+            defaults.object(forKey: "retentionDays"),
+            "and the old copy is gone, so it can never be migrated a second time"
+        )
+    }
+
+    /// A key nobody ever touched has no entry in `UserDefaults`, so the
+    /// migration has nothing to carry for it: the file gets that key at its
+    /// compiled-in default, not at a value the migration invented.
+    func testAKeyNobodyEverChangedKeepsItsDefault() throws {
+        let defaults = try makeDefaults()
+        let store = try makeStore()
+        defaults.set(true, forKey: "retentionOptInMigrated")
+        defaults.set(false, forKey: "mobileEnabled")
+
+        let settings = AppSettings(store: store, defaults: defaults)
+        XCTAssertFalse(settings.mobileEnabled, "the one setting that was actually made")
+        XCTAssertEqual(settings.showOnAllDisplays, AppConfig().showOnAllDisplays)
+        XCTAssertEqual(store.current().showOnAllDisplays, AppConfig().showOnAllDisplays)
+    }
+
+    /// The file is a later, more deliberate decision than a switch flipped in a
+    /// previous build — most of all when the *rice* wrote it, where a migration
+    /// that won would take a machine whose settings are declared and quietly
+    /// hand it the old ones instead.
+    func testTheFileWinsOverAStaleUserDefaultsValue() throws {
+        let defaults = try makeDefaults()
+        let store = try makeStore()
+        defaults.set(true, forKey: "retentionOptInMigrated")
+        defaults.set(14, forKey: "retentionDays")
+        XCTAssertNil(store.update { $0.retentionDays = 30 })
+
+        XCTAssertEqual(AppSettings(store: store, defaults: defaults).retentionDays, 30)
+    }
+
+    // MARK: - What a declaration does to the pane
+
+    func testADeclaredRetentionIsReadOnlyAndRefusesToMove() throws {
+        let root = try makeRoot()
+        let declaration = root.appending(path: "config.json")
+        try #"{ "retentionDays": 30 }"#.write(to: declaration, atomically: true, encoding: .utf8)
+        let store = ConfigFileStore(file: root.appending(path: "settings.json"), declaration: declaration)
+
+        let settings = AppSettings(store: store, defaults: try makeDefaults())
+        XCTAssertEqual(settings.retentionDays, 30)
+        XCTAssertTrue(settings.isDeclared(AppConfig.Key.retentionDays))
+
+        settings.retentionDays = 0
+        XCTAssertEqual(settings.retentionDays, 30, "the switch springs back to what the file says")
+        XCTAssertNotNil(settings.writeError, "and says why, rather than moving over a file that didn't")
     }
 
     // MARK: - What prune actually does to the bytes
