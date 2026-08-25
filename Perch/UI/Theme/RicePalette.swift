@@ -296,6 +296,18 @@ enum RiceFiles {
     static var configFile: URL {
         directory.appendingPathComponent("config.json")
     }
+
+    /// `~`-abbreviated for display only, against the real home — inside the
+    /// sandbox `NSHomeDirectory()` is the container, so `abbreviatingWithTilde`
+    /// would leave a container path untouched and a `~/.config` path unchanged
+    /// only by accident. Display, never a path anyone opens.
+    static func abbreviate(_ path: String) -> String {
+        let root = home.path
+        // The separator matters: a bare prefix test turns `/Users/julien` into
+        // `~` for `/Users/julienne/…` too, and renders it as `~ne/…`.
+        guard path == root || path.hasPrefix(root + "/") else { return path }
+        return "~" + path.dropFirst(root.count)
+    }
 }
 
 /// Machine-managed theme defaults from `~/.config/perch/config.json`:
@@ -307,13 +319,13 @@ enum RiceFiles {
 /// ```
 ///
 /// The desktop writes this (haus `modules/shelf`) so `haus.theme.flavor`,
-/// `.contrast` and `.accent` reach perch declaratively. Perch's own settings live
-/// in `UserDefaults`, which Nix has no business writing — this file carries only
-/// what the rice owns, and not only colour: `screenshotsFolder` rides in the
-/// same file and is decoded separately by `ScreenshotsFolder`, each side
-/// ignoring the keys that are not its own. Delete it (or the rice's `theme`
-/// option) and the compiled-in nebelung pair applies, accented with its own
-/// green.
+/// `.contrast` and `.accent` reach perch declaratively. Colour is not all it
+/// carries: `screenshotsFolder` rides in the same file and is decoded
+/// separately by `ScreenshotsFolder`, and any key from `AppConfig.Key`
+/// **declares** the matching Settings switch — read-only in the window, and the
+/// last word over perch's own `settings.json`. Every side ignores the keys that
+/// are not its own. Delete it (or the rice's `theme` option) and the compiled-in
+/// nebelung pair applies, accented with its own green.
 ///
 /// There is no accent picker in Settings and there won't be: the shelf is a
 /// five-second surface, and "follow the rice" is the feature. This file is the

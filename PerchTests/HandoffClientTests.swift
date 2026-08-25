@@ -30,7 +30,7 @@ final class HandoffClientTests: XCTestCase {
 
         let store = ShelfStore(
             repository: try StagingRepository(rootURL: shelfRoot),
-            settings: AppSettings(defaults: defaults)
+            settings: AppSettings(store: TransientSettings.store(), defaults: defaults)
         )
         let mailbox = try FinderActionMailbox(rootURL: mailboxRoot)
         addTeardownBlock {

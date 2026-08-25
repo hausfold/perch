@@ -59,7 +59,7 @@ final class ShelfServicesProviderTests: XCTestCase {
 
         let store = ShelfStore(
             repository: try StagingRepository(rootURL: root),
-            settings: AppSettings(defaults: defaults)
+            settings: AppSettings(store: TransientSettings.store(), defaults: defaults)
         )
         let provider = ShelfServicesProvider(store: store)
         let pasteboard = NSPasteboard(name: .init("PerchServicesTests-\(UUID().uuidString)"))
@@ -91,7 +91,7 @@ final class ShelfServicesProviderTests: XCTestCase {
         let repository = try StagingRepository(rootURL: root)
         let store = ShelfStore(
             repository: repository,
-            settings: AppSettings(defaults: defaults)
+            settings: AppSettings(store: TransientSettings.store(), defaults: defaults)
         )
         let provider = ShelfServicesProvider(store: store)
         let pasteboard = NSPasteboard(name: .init("PerchServicesTests-\(UUID().uuidString)"))

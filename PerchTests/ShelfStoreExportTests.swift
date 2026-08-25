@@ -19,7 +19,10 @@ final class ShelfStoreExportTests: XCTestCase {
         suiteName = "PerchExportSettings-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         repository = try StagingRepository(rootURL: root)
-        store = ShelfStore(repository: repository, settings: AppSettings(defaults: defaults))
+        store = ShelfStore(
+            repository: repository,
+            settings: AppSettings(store: TransientSettings.store(), defaults: defaults)
+        )
         addTeardownBlock { [root, suiteName] in
             if let root {
                 try? FileManager.default.removeItem(at: root)
@@ -127,7 +130,10 @@ final class ShelfStoreExportTests: XCTestCase {
         store.setPinned(true, for: item)
 
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        let restored = ShelfStore(repository: repository, settings: AppSettings(defaults: defaults))
+        let restored = ShelfStore(
+            repository: repository,
+            settings: AppSettings(store: TransientSettings.store(), defaults: defaults)
+        )
         restored.restore()
         XCTAssertTrue(try XCTUnwrap(restored.items.first).isPinned)
 
@@ -166,7 +172,10 @@ final class ShelfStoreExportTests: XCTestCase {
         try rename(item, to: "invoice-final.pdf")
 
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        let restored = ShelfStore(repository: repository, settings: AppSettings(defaults: defaults))
+        let restored = ShelfStore(
+            repository: repository,
+            settings: AppSettings(store: TransientSettings.store(), defaults: defaults)
+        )
         restored.restore()
 
         let survivor = try XCTUnwrap(restored.items.first)

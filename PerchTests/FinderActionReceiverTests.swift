@@ -26,7 +26,7 @@ final class FinderActionReceiverTests: XCTestCase {
         let repository = try StagingRepository(rootURL: shelfRoot)
         let store = ShelfStore(
             repository: repository,
-            settings: AppSettings(defaults: defaults)
+            settings: AppSettings(store: TransientSettings.store(), defaults: defaults)
         )
         let mailbox = try FinderActionMailbox(rootURL: mailboxRoot)
         let receiver = FinderActionReceiver(store: store, mailbox: mailbox)

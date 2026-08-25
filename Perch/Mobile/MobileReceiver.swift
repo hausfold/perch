@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 import OSLog
 
@@ -38,12 +39,30 @@ final class MobileReceiver: ObservableObject {
     /// Captured once so the wire server can ask for the spool root without a
     /// main-actor hop mid-stream.
     private nonisolated let shelfRoot: URL
+    private var cancellables: Set<AnyCancellable> = []
 
     init(store: ShelfStore, settings: AppSettings) {
         self.store = store
         self.settings = settings
         shelfRoot = store.repository.rootURL
         pairedDevices = devices.all()
+
+        // The setting lives in a file now, so it can change without anyone
+        // touching the switch — a hand edit, or a `haus rebuild` declaring it.
+        // Following the publisher is what makes those the same act as the
+        // click, instead of the click being the only path that applies.
+        //
+        // dropFirst: a @Published publisher replays its current value the
+        // instant you subscribe, and starting the listener is `AppRuntime`'s
+        // job at launch, not a side effect of constructing this. Same reason
+        // `ShelfWindowSystem` drops its first `showOnAllDisplays`.
+        settings.$mobileEnabled
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                Task { @MainActor in self?.applyEnabledSetting() }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Lifecycle
@@ -86,6 +105,16 @@ final class MobileReceiver: ObservableObject {
     // MARK: - Pairing window
 
     func openPairingWindow() {
+        // A QR that can't work is worse than no QR. With the setting declared
+        // off, turning it on here would be refused and `start()` below would
+        // bail — so say so and open nothing. The Settings button is already
+        // disabled in that state; the menu bar's is the way in that isn't.
+        guard !settings.isDeclared(AppConfig.Key.mobileEnabled) || settings.mobileEnabled else {
+            lastEvent = ConfigWriteError
+                .declared(keys: [AppConfig.Key.mobileEnabled], file: settings.declarationURL)
+                .localizedDescription
+            return
+        }
         // Asking to pair IS asking for the feature: with the toggle off the
         // listener would silently never start, leaving a QR that can't work.
         settings.mobileEnabled = true

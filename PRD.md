@@ -32,7 +32,10 @@ collect several items and then drag the group to one destination.
 - Copy-only grouped export; optional clear after confirmed copy.
 - Per-item pinning for repeated drag-out copies without removing the staged item.
 - Reduced-motion support, keyboard-readable labels, and no content in logs.
-- Settings for login, display behavior, hover behavior, retention, and clearing.
+- Settings for login, display behavior, hover behavior, retention, and clearing —
+  every one of them stored in a config file the user can edit, not in `defaults`,
+  and any of them declarable by the machine's own drop, which renders that row
+  read-only rather than fighting it.
 - A palette that follows the rice's nebelung variant and macOS Light/Dark, read
   from `~/.config/perch/` and never written.
 - A passive release nudge that names the right next step for *this* install

@@ -208,14 +208,63 @@ variants, or any `role → "#hex"` file in `~/.config/perch/themes/`, which shad
 a built-in of the same name. `~/.config/perch/config.json` names the palette per
 polarity and the macOS appearance picks the half; `ShelfTheme` re-resolves on
 launch, on the light/dark switch, and as the shelf opens, and publishes through
-the environment so every panel and tile repaints together. Perch's own settings
-stay in `UserDefaults` — the rice writes only the theme.
+the environment so every panel and tile repaints together.
 
 Both paths sit outside the app container, which costs one read-only
 home-relative sandbox exception and forces two details: the real home comes from
 `getpwuid` (inside the sandbox `NSHomeDirectory()` is the container), and the
 rice must drop **real files**, since the sandbox resolves a symlink into
 `/nix/store` before it checks the path and denies it.
+
+### Where a setting lives
+
+Every switch in Perch Settings is read from a file and written back to one.
+There is no copy in `UserDefaults` that could disagree, and nothing to "sync":
+a toggle clicked in the window and a line typed into the file are the same act,
+and an edit made while perch runs lands without a relaunch.
+
+Two files, and the order between them is the design:
+
+```text
+compiled-in defaults
+  ‹ …/Application Support/Perch/settings.json   ← Settings writes this
+    ‹ ~/.config/perch/config.json                ← the rice declares this
+```
+
+`ConfigFileStore` (`Perch/App/AppConfigFile.swift`) loads both, follows both,
+and writes only the first — atomically, merging into whatever keys were already
+there so a hand-written note or a newer build's key survives a toggle.
+`AppSettings` is a thin `ObservableObject` face over it.
+
+Settings writes the **container** file because that is the one perch can write
+without asking anybody: the `~/.config/perch/` exception is read-only, and it
+stays read-only. Widening it so both layers could be one file would trade a
+narrow exception for a home-relative *write* grant — the kind App Review reads
+as a sandbox that isn't one.
+
+So the rice's half is a **declaration**: any key it names wins, and Settings
+renders that row read-only with a padlock and a line saying which file decided.
+Refusal happens in the store, before anything in memory moves — a switch that
+accepts a change and springs back on the next read is worse than one that never
+moves. The store keeps the container layer separate from the composed answer and
+writes only the former, so an unrelated toggle never copies the declaration into
+the user's own file: remove the rice's key and the setting the user chose comes
+back, rather than staying frozen at whatever the rice last said. The keys are perch's own (`showOnAllDisplays`, `retentionDays`,
+`mobileEnabled`, `automaticUpdateChecks`, `launchAtLogin`); the theme keys
+sharing that file declare nothing, or every haus desktop would open a greyed-out
+Settings window.
+
+`launchAtLogin` is the odd one: macOS holds the real answer
+(`SMAppService.mainApp.status`), so perch never *writes* that key — a file perch
+wrote saying "yes" would be a standing instruction to put itself back into Login
+Items after someone removed it there. Declared, it is applied on every launch
+and every edit, which is what declaring a machine's configuration means.
+
+`UserDefaults` keeps what a settings file has no business holding: the pane
+Settings was last on, the window frame, the update checker's cache of what
+GitHub last said, the one-shot marker for the retention opt-in migration, and
+`screenshotsFolderID` — a pointer at a watched folder's security bookmark, which
+is a memory of a panel someone clicked. Ephemera and pointers, not settings.
 
 ### Knowing there is a new release
 
