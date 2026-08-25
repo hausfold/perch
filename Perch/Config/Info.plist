@@ -31,7 +31,11 @@
   `bench try` dev app in ~/.cache/bench/perch-dd, still registered from an
   August feel-test. `bench try` builds -configuration Debug (see the workshop's
   `bench`), which is why Debug is the half that gets the suffix: the shipped,
-  notarized Release app is the only one that can claim the plain title.
+  notarized Release app is the only one that can claim the plain title. Note
+  the suffix follows the configuration, not the id — a lane's plain Debug build
+  is `com.hausfold.perch` and wears it too, so the release id's single row can
+  read "(Debug)" until that build is unregistered (`lsregister -u <path>`,
+  measured 2026-08-25: the row then falls through to the next copy of the id).
 
   NSRequiredContext is deliberately empty — every restricting key you add is
   another reason for macOS to hide the item, and the send types below are

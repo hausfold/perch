@@ -38,8 +38,9 @@ ever unregisters it, so this Mac accumulates dozens of `Perch.app` records
 across lanes, bench and scratchpads (measured 2026-08-23: 40 records, 6 of them
 live bundles declaring the `addToShelf` Service, under two bundle ids).
 Duplicate Service rows and a Quick Action whose provider is some lane's build
-cache are both artifacts of that, and both were misread as perch bugs once.
-`pluginkit -r` is **not** a substitute — it only knows appex providers.
+cache are both artifacts of that, and both were misread as perch bugs twice
+(2026-08-23 and 2026-08-25). `pluginkit -r` is **not** a substitute — it only
+knows appex providers.
 
 ### Ask who the providers are before you count rows
 
@@ -48,14 +49,21 @@ LaunchServices to find out costs a `killall Finder` on somebody's live desktop.
 `pbs` will just tell you, read-only, in a second:
 
 ```sh
-/System/Library/CoreServices/pbs -dump_pboard | grep -B6 'Add to Perch Shelf' \
+/System/Library/CoreServices/pbs -dump_pboard | grep -B20 'Add to Perch Shelf' \
   | grep -E 'NSBundleIdentifier|NSBundlePath|default ='
 ```
 
+(The `-B` window has to clear the whole entry. perch's is compact only because
+`NSKeyEquivalent` is empty — AppleSpell's spans some 40 lines — so adding a key
+to `NSServices` would push the id out of a tight window and the reading would
+fail open, silently, exit 0. A window that is too wide drags in the *preceding*
+app's entry — noise, which you can see; too narrow returns a wrong answer, which
+you cannot.)
+
 macOS lists **one Services row per registered bundle id**, so that dump has one
 entry per row you will see in the menu, each naming the bundle behind it. Two
-entries with two different ids is lane pollution; two under one id is not a
-thing macOS does.
+entries under two different ids is lane pollution — that is what every
+duplicate measured here has been.
 
 Measured 2026-08-25, on a "the duplicate is back" report: two providers —
 `com.hausfold.perch` at `/Applications/Perch.app`, and `com.hausfold.perch.dev`
@@ -72,6 +80,14 @@ Since 2026-08-25 the two configurations title the row differently — Release
 in the project, expanded into `Perch/Config/Info.plist`). `bench try` builds
 Debug, so a dev app's row now says so on its face and this reading is only
 needed when the rows are genuinely ambiguous.
+
+The suffix follows the *configuration*, not the bundle id, so it is not only
+the `…dev` app that wears it: a plain `xcodebuild … -configuration Debug` here
+builds under `com.hausfold.perch`, the release id. If that lane build outranks
+`/Applications/Perch.app` for the id, there is one row and it says "(Debug)" —
+correct, and still a surprise if you were not expecting the menu to change
+after a build. `lsregister -u` on that build drops it and the row falls through
+to the next registered copy of the id (measured 2026-08-25, twice).
 
 ### Or clean the instrument
 
