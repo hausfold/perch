@@ -64,6 +64,16 @@ Service* — `Perch/Config/Info.plist` declares it under `NSServices`, the one
 key with no `INFOPLIST_KEY_` build setting, which is why that partial plist
 exists at all.
 
+Its title comes from `PERCH_SERVICE_TITLE`, and Debug builds say "Add to Perch
+Shelf (Debug)" while Release says "Add to Perch Shelf". macOS draws one
+Services row per registered bundle id and never forgets a build, so a Mac that
+has run `bench try` (Debug, `com.hausfold.perch.dev`) shows two rows for one
+command; without the suffix both read "(Perch.app)" and the dev app's row is
+indistinguishable from the shipped one. The suffix tracks the configuration
+rather than the id, so a lane's ordinary Debug build wears it too — under the
+release id, where it can take over the one row. Only the shipped, notarized
+Release app claims the plain title. `docs/feel-testing.md` has the reading.
+
 Perch used to ship a second Finder door beside it: a non-UI Action Extension,
 `PerchFinderAction`, on the understanding that an extension is always nested
 inside the menu's "Quick Actions" submenu while an `NSServices` entry reaches
