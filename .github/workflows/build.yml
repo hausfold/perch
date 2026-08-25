@@ -48,6 +48,17 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
+      # Deliberately NOT passing ENABLE_CODE_COVERAGE=NO to the build above:
+      # the point is to prove the project-level setting still holds on a stock
+      # `build`. Xcode's default is YES and it leaks past `test` into `build`,
+      # an instrumented binary behaves identically, and the only symptom is a
+      # `default.profraw` appearing in whatever directory `perch` was run from.
+      # AGENTS.md has the why; this is the thing that notices.
+      - name: Built binaries carry no profiling instrumentation
+        run: |
+          scripts/assert-no-instrumentation.sh \
+            DerivedData/Build/Products/Release/Perch.app
+
   build-ios:
     name: iOS companion build
     runs-on: macos-26
