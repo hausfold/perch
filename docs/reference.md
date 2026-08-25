@@ -60,10 +60,10 @@ The behaviors the README summarises, spelled out:
 
 - **The catch zone finds the notch.** The drop target hugs the physical camera
   housing when a display has one, and falls back to a tidy top-center band on
-  notchless screens. Either way the collapsed shelf draws no chrome of its own
-  — no synthetic notch, no tray.
+  notchless screens. Either way the collapsed shelf draws no chrome of its
+  own: no synthetic notch, no tray.
 - **You can see it's holding something.** A staged shelf lights a small accent
-  ember under the camera housing — under the menu bar on a notchless screen —
+  ember under the camera housing (under the menu bar on a notchless screen),
   with a pip per item and a flare as each one lands. It says the shelf is
   holding something, not exactly how much; for that, open it.
 - **Awkward producers land correctly.** Photos exports, Safari images, and
@@ -71,19 +71,19 @@ The behaviors the README summarises, spelled out:
   their own import path, so they arrive whole instead of empty.
 - **It stays responsive.** Imports run off the main thread with a
   two-at-a-time limit, and iCloud placeholders are downloaded explicitly,
-  waiting outside that limit — a slow download never holds up an ordinary
-  drop, and a multi-gigabyte file never stops the shelf animating.
+  waiting outside that limit, so a slow download never holds up an ordinary
+  drop and a multi-gigabyte file never stops the shelf animating.
 - **Drag-out is a group, and clears the shelf.** Grab any tile and every
   completed item comes with it, advertised as a copy. Once a destination
   accepts the drop the item leaves the shelf; a refused or cancelled drag
   springs the tiles back.
-- **Pinning.** A pinned tile stays on the shelf after a successful drag —
-  ready to drop into several destinations in quick succession — and survives
+- **Pinning.** A pinned tile stays on the shelf after a successful drag,
+  ready to drop into several destinations in quick succession, and survives
   relaunch. Unpinning restores the usual one-and-done behavior.
 - **It follows you around.** One panel per display, tracking Space,
   fullscreen, and Stage Manager changes with public AppKit behavior. On Tahoe
   it wears `NSGlassEffectView`; older systems get an AppKit material fallback.
-- **If the Services entry goes missing** — it's on by default, but the
+- **If the Services entry goes missing**: it's on by default, but the
   checkbox lives in System Settings ▸ Keyboard ▸ Keyboard Shortcuts… ▸
   Services, under **Files and Folders**, as *Add to Perch Shelf*.
 
