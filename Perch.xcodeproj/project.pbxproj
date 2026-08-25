@@ -295,6 +295,7 @@
 				GCC_OPTIMIZATION_LEVEL = 0;
 				ONLY_ACTIVE_ARCH = YES;
 				PERCH_BUNDLE_ID = com.hausfold.perch;
+				PERCH_SERVICE_TITLE = "Add to Perch Shelf (Debug)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -313,6 +314,7 @@
 				ENABLE_CODE_COVERAGE = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				PERCH_BUNDLE_ID = com.hausfold.perch;
+				PERCH_SERVICE_TITLE = "Add to Perch Shelf";
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;

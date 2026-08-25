@@ -41,7 +41,41 @@ Duplicate Service rows and a Quick Action whose provider is some lane's build
 cache are both artifacts of that, and both were misread as perch bugs once.
 `pluginkit -r` is **not** a substitute — it only knows appex providers.
 
-Clean the instrument first, and take the reading **before the next lane
+### Ask who the providers are before you count rows
+
+Counting rows in the menu cannot tell you *whose* rows they are, and clearing
+LaunchServices to find out costs a `killall Finder` on somebody's live desktop.
+`pbs` will just tell you, read-only, in a second:
+
+```sh
+/System/Library/CoreServices/pbs -dump_pboard | grep -B6 'Add to Perch Shelf' \
+  | grep -E 'NSBundleIdentifier|NSBundlePath|default ='
+```
+
+macOS lists **one Services row per registered bundle id**, so that dump has one
+entry per row you will see in the menu, each naming the bundle behind it. Two
+entries with two different ids is lane pollution; two under one id is not a
+thing macOS does.
+
+Measured 2026-08-25, on a "the duplicate is back" report: two providers —
+`com.hausfold.perch` at `/Applications/Perch.app`, and `com.hausfold.perch.dev`
+at `~/.cache/bench/perch-dd/…/Debug/Perch.app`, a `bench try` dev app still
+registered from an August feel-test. Both bundles are named `Perch.app`, which
+is why macOS disambiguated both rows as "Add to Perch Shelf (Perch.app)" and
+the second read as the deleted extension returning. `lsregister -u <path>` on
+the stale bundle drops one row without touching the rest of the database; the
+menu then falls through to the *next* registered copy of that id, so re-run the
+dump rather than assuming one unregister was enough.
+
+Since 2026-08-25 the two configurations title the row differently — Release
+"Add to Perch Shelf", Debug "Add to Perch Shelf (Debug)" (`PERCH_SERVICE_TITLE`
+in the project, expanded into `Perch/Config/Info.plist`). `bench try` builds
+Debug, so a dev app's row now says so on its face and this reading is only
+needed when the rows are genuinely ambiguous.
+
+### Or clean the instrument
+
+When you do need a clean database, take the reading **before the next lane
 builds**:
 
 ```sh
@@ -60,7 +94,11 @@ pollution; two would mean two doors really render.
 anyone reconsiders the Finder extension deleted 2026-08-23. The evidence that
 closed it was gathered on a Mac carrying 40 registered copies, so it cannot
 distinguish "the appex is the dead row" from "the second row was another lane's
-build" — both hypotheses predict what was seen. The extension is gone on a
+build" — both hypotheses predict what was seen. (The 2026-08-25 reading above
+does not settle it retroactively either: it shows *that* day's duplicate was a
+`.dev` bundle, on a Mac where the appex was already deleted. It does mean the
+`pbs` dump, not the nuke, is the instrument to reach for if the question is
+reopened — it discriminates by identity instead of by count.) The extension is gone on a
 **product call** (it bought only not-waking-an-app that owns the notch, and the
 classic Service demonstrably works), not on a discriminating measurement. Run
 the block above before treating the question as settled either way.

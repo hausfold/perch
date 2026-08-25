@@ -19,6 +19,20 @@
   Here" — no classic Service is, on macOS 26. It is under Services, and that is
   where the Settings pane tells people to look.
 
+  The menu title is $(PERCH_SERVICE_TITLE), a project-level build setting, and
+  the two configurations deliberately disagree: Release says "Add to Perch
+  Shelf", Debug says "Add to Perch Shelf (Debug)". macOS lists one Services row
+  per registered bundle id, and every xcodebuild here registers the app it built
+  and nothing ever unregisters it — so a Mac that has run a dev build carries
+  two providers of the same command. Both bundles are named Perch.app, so macOS
+  disambiguated them identically ("Add to Perch Shelf (Perch.app)" twice) and
+  the second row read as the extension bug above coming back. MEASURED
+  2026-08-25: it wasn't — the second provider was com.hausfold.perch.dev, the
+  `bench try` dev app in ~/.cache/bench/perch-dd, still registered from an
+  August feel-test. `bench try` builds -configuration Debug (see the workshop's
+  `bench`), which is why Debug is the half that gets the suffix: the shipped,
+  notarized Release app is the only one that can claim the plain title.
+
   NSRequiredContext is deliberately empty — every restricting key you add is
   another reason for macOS to hide the item, and the send types below are
   already the filter.
@@ -38,7 +52,7 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>Add to Perch Shelf</string>
+				<string>$(PERCH_SERVICE_TITLE)</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>addToShelf</string>
