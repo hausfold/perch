@@ -119,16 +119,24 @@ final class AppSettings: ObservableObject {
         automaticUpdateChecks = config.automaticUpdateChecks
         declaredKeys = store.declaredKeys()
 
-        store.start { [weak self] config in
-            Task { @MainActor in self?.apply(config) }
+        // The hop drops the snapshot and re-asks. Between the store publishing
+        // and this Task running, a click can land — and pushing the older value
+        // in afterwards would leave the window showing something no file says,
+        // with no further event coming to correct it.
+        store.start { [weak self] _ in
+            Task { @MainActor in self?.applyLatest() }
         }
 
         refreshLaunchAtLogin()
         applyDeclaredLaunchAtLogin(store.current().launchAtLogin)
     }
 
-    /// Push a change that came from a file into the published properties,
-    /// without writing it back out.
+    /// Push whatever the files now say into the published properties, without
+    /// writing it back out.
+    private func applyLatest() {
+        apply(store.current())
+    }
+
     private func apply(_ config: AppConfig) {
         isApplyingFileChange = true
         defer { isApplyingFileChange = false }
@@ -249,9 +257,12 @@ final class AppSettings: ObservableObject {
     /// take a machine whose settings are declared and quietly hand it the old
     /// ones instead.
     ///
-    /// The legacy keys are cleared either way, including when the file can't be
-    /// written at all, so this can't run again on the next launch and can't
-    /// resurrect a value the user has since changed in the file.
+    /// The legacy keys are cleared once the file has them — or once it is clear
+    /// there is nothing to carry — so this can't run twice and can't resurrect a
+    /// value the user has since changed in the file. A write that *fails* keeps
+    /// them, and the migration is retried next launch: dropping them there would
+    /// hand someone who turned the phone listener off a listener that is back on
+    /// with the old answer gone.
     private static func migrateFromDefaults(_ defaults: UserDefaults, into store: ConfigFileStore) {
         let legacy: [(key: String, fileKey: String, carry: @Sendable (Bool, Int, inout AppConfig) -> Void)] = [
             (LegacyKey.showOnAllDisplays, AppConfig.Key.showOnAllDisplays, { flag, _, config in
@@ -269,18 +280,22 @@ final class AppSettings: ObservableObject {
         ]
         let stored = legacy.filter { defaults.object(forKey: $0.key) != nil }
         guard !stored.isEmpty else { return }
-        defer { for entry in stored { defaults.removeObject(forKey: entry.key) } }
+        let clear = { for entry in stored { defaults.removeObject(forKey: entry.key) } }
 
         let spokenFor = store.namedKeys().union(store.declaredKeys())
         let fillable = stored.filter { !spokenFor.contains($0.fileKey) }
-        guard !fillable.isEmpty else { return }
-        let migrated = fillable.reduce(into: store.current()) { config, entry in
-            entry.carry(
-                defaults.bool(forKey: entry.key),
-                defaults.integer(forKey: entry.key),
-                &config
-            )
+        guard !fillable.isEmpty else { return clear() }
+
+        // One mutation per key rather than one wholesale assignment: the store
+        // applies these to its *container* layer, and handing it a whole
+        // `AppConfig` read back out of `current()` would carry the declaration's
+        // answers in with them.
+        let fills: [@Sendable (inout AppConfig) -> Void] = fillable.map { entry in
+            let flag = defaults.bool(forKey: entry.key)
+            let number = defaults.integer(forKey: entry.key)
+            return { config in entry.carry(flag, number, &config) }
         }
-        store.update { config in config = migrated }
+        guard store.update({ config in for fill in fills { fill(&config) } }) == nil else { return }
+        clear()
     }
 }

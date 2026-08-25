@@ -246,7 +246,10 @@ So the rice's half is a **declaration**: any key it names wins, and Settings
 renders that row read-only with a padlock and a line saying which file decided.
 Refusal happens in the store, before anything in memory moves — a switch that
 accepts a change and springs back on the next read is worse than one that never
-moves. The keys are perch's own (`showOnAllDisplays`, `retentionDays`,
+moves. The store keeps the container layer separate from the composed answer and
+writes only the former, so an unrelated toggle never copies the declaration into
+the user's own file: remove the rice's key and the setting the user chose comes
+back, rather than staying frozen at whatever the rice last said. The keys are perch's own (`showOnAllDisplays`, `retentionDays`,
 `mobileEnabled`, `automaticUpdateChecks`, `launchAtLogin`); the theme keys
 sharing that file declare nothing, or every haus desktop would open a greyed-out
 Settings window.

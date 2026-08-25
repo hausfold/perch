@@ -303,7 +303,9 @@ enum RiceFiles {
     /// only by accident. Display, never a path anyone opens.
     static func abbreviate(_ path: String) -> String {
         let root = home.path
-        guard path.hasPrefix(root) else { return path }
+        // The separator matters: a bare prefix test turns `/Users/julien` into
+        // `~` for `/Users/julienne/…` too, and renders it as `~ne/…`.
+        guard path == root || path.hasPrefix(root + "/") else { return path }
         return "~" + path.dropFirst(root.count)
     }
 }

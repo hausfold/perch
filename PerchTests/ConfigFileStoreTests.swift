@@ -165,6 +165,31 @@ final class ConfigFileStoreTests: XCTestCase {
         )
     }
 
+    /// The bug this exists for, and it is the destructive one: a write used to
+    /// serialize the *composed* config, so toggling any unrelated switch copied
+    /// the rice's answers into the user's own file — where they outlived the
+    /// declaration that put them there. For `retentionDays` that turns "this
+    /// machine declares 30 days" into "this user chose a timer that deletes
+    /// their shelf", permanently, with nobody deciding it.
+    func testAWriteNeverCopiesTheDeclarationIntoPerchsOwnFile() throws {
+        try write(#"{ "retentionDays": 0 }"#, to: file)
+        try write(#"{ "retentionDays": 30 }"#, to: declaration)
+        let store = makeStore()
+        XCTAssertEqual(store.current().retentionDays, 30, "the declaration is in force")
+
+        XCTAssertNil(store.update { $0.mobileEnabled = false }, "an unrelated switch")
+        XCTAssertEqual(
+            try contents()[AppConfig.Key.retentionDays] as? Int, 0,
+            "perch's own file still says what its owner chose"
+        )
+
+        try FileManager.default.removeItem(at: declaration)
+        XCTAssertEqual(
+            ConfigFileStore(file: file, declaration: declaration).current().retentionDays, 0,
+            "so removing the declaration hands the setting back, rather than freezing it"
+        )
+    }
+
     func testASettingTheDeclarationIsSilentAboutStillWrites() throws {
         try write(#"{ "showOnAllDisplays": false }"#, to: declaration)
         let store = makeStore()

@@ -105,6 +105,16 @@ final class MobileReceiver: ObservableObject {
     // MARK: - Pairing window
 
     func openPairingWindow() {
+        // A QR that can't work is worse than no QR. With the setting declared
+        // off, turning it on here would be refused and `start()` below would
+        // bail — so say so and open nothing. The Settings button is already
+        // disabled in that state; the menu bar's is the way in that isn't.
+        guard !settings.isDeclared(AppConfig.Key.mobileEnabled) || settings.mobileEnabled else {
+            lastEvent = ConfigWriteError
+                .declared(keys: [AppConfig.Key.mobileEnabled], file: settings.declarationURL)
+                .localizedDescription
+            return
+        }
         // Asking to pair IS asking for the feature: with the toggle off the
         // listener would silently never start, leaving a QR that can't work.
         settings.mobileEnabled = true

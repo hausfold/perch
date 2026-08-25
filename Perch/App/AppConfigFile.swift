@@ -157,9 +157,14 @@ struct AppConfig: Equatable, Sendable {
 /// places at once: SwiftUI on the main actor, `UpdateCheck` from its timer, and
 /// the file-system sources themselves.
 ///
-/// Nothing here touches the main actor and nothing here blocks it — reads and
-/// the atomic write both happen on the queue, which keeps this inside perch's
-/// "blocking file work stays off main" rule.
+/// `update` is deliberately **synchronous**, so a click from the main actor
+/// waits out one small JSON write. That is not the blocking file work perch's
+/// invariant is about — that rule is for importing: copies, cloud waits and
+/// coordinated reads of files someone else owns, which are unbounded and can
+/// take minutes. This is a few hundred bytes into the app's own container, and
+/// buying an async write would cost the thing that makes the window honest:
+/// the caller learns whether the file took the change in time to put the switch
+/// back if it didn't.
 final class ConfigFileStore: @unchecked Sendable {
     static let shared = ConfigFileStore(
         file: defaultFileURL(),
@@ -170,7 +175,21 @@ final class ConfigFileStore: @unchecked Sendable {
     private let declaration: URL?
     private let queue = DispatchQueue(label: "com.hausfold.perch.config")
 
+    /// What perch answers with: the container file with the declaration
+    /// layered over it.
     private var config = AppConfig()
+    /// The container layer **alone** — what perch's own file says, before the
+    /// declaration is applied.
+    ///
+    /// Kept apart from `config` because it is what gets written back. Writing
+    /// the composed value instead would copy the rice's answers into the user's
+    /// own file on the first unrelated toggle, and they would then outlive the
+    /// declaration that put them there: remove the rice's key and the setting
+    /// would not come back, it would stay stuck at whatever the rice last said.
+    /// For `retentionDays` that turns "the machine declares 30 days" into "this
+    /// user chose to have their shelf deleted on a timer", permanently, without
+    /// anyone deciding it.
+    private var own = AppConfig()
     /// Every key the *container* file had, decoded but not interpreted. A
     /// write merges into this rather than replacing it, so a key perch doesn't
     /// know — something a newer build writes, or a note someone left in there
@@ -252,9 +271,14 @@ final class ConfigFileStore: @unchecked Sendable {
     @discardableResult
     func update(_ mutate: @Sendable (inout AppConfig) -> Void) -> Error? {
         queue.sync {
-            var updated = config
-            mutate(&updated)
-            let changed = AppConfig.changedKeys(from: config, to: updated)
+            // Asked against the COMPOSED value, because that is what the caller
+            // saw: someone dragging a declared row back to where their own file
+            // already has it is still asking for a change, and answering "no
+            // change to make" would report success while the window kept showing
+            // the declaration.
+            var requested = config
+            mutate(&requested)
+            let changed = AppConfig.changedKeys(from: config, to: requested)
             guard !changed.isEmpty else { return nil }
             // Refused BEFORE anything in memory moves. A store that accepted
             // the change and only failed the write would answer `current()`
@@ -265,9 +289,17 @@ final class ConfigFileStore: @unchecked Sendable {
             guard blocked.isEmpty else {
                 return ConfigWriteError.declared(keys: blocked.sorted(), file: declaration)
             }
+            // Applied against the CONTAINER layer, which is the only thing that
+            // gets written. Nothing declared is in `changed` by now, so for
+            // every key that moved the two layers agreed anyway — and every key
+            // that didn't move keeps whatever perch's own file said, rather than
+            // inheriting the declaration's answer.
+            var updated = own
+            mutate(&updated)
             do {
                 try write(updated)
-                config = updated
+                own = updated
+                config = AppConfig(json: declared, defaults: own)
                 return nil
             } catch {
                 Self.log.error("settings.json write failed: \(error.localizedDescription, privacy: .public)")
@@ -285,7 +317,8 @@ final class ConfigFileStore: @unchecked Sendable {
         if let declaration {
             declared = decode(declaration, previous: declared, label: "config.json")
         }
-        let composed = AppConfig(json: declared, defaults: AppConfig(json: raw))
+        own = AppConfig(json: raw)
+        let composed = AppConfig(json: declared, defaults: own)
         guard composed != config else { return }
         config = composed
         observer?(composed)
@@ -383,6 +416,13 @@ enum ConfigWriteError: LocalizedError, Equatable {
 /// rather than wait for the next launch. So a file that isn't there is watched
 /// through its **directory** until it is.
 ///
+/// One level, and no further: when `~/.config/perch/` itself doesn't exist the
+/// only place left to watch is `~/.config`, which is outside the read-only
+/// sandbox exception and would be denied. A declaration written into a
+/// directory that had to be created for it therefore lands on the next launch
+/// rather than immediately — the one case this can't follow, and the cheapest
+/// possible one to live with.
+///
 /// Every method runs on the store's serial queue, which is also the queue the
 /// event handlers fire on.
 private final class FileWatch {
@@ -393,6 +433,13 @@ private final class FileWatch {
 
     init(queue: DispatchQueue) {
         self.queue = queue
+    }
+
+    deinit {
+        // Ownership of the descriptor is the cancel handler's, so cancelling is
+        // also what closes it. Nothing in the app outlives its store, but a
+        // test suite makes one per test.
+        source?.cancel()
     }
 
     func follow(_ url: URL, handler: @escaping () -> Void) {
