@@ -44,7 +44,8 @@ and file metadata; original source paths are never persisted, and never logged.
 To get a copy out without dragging — the destination is a folder nothing has
 open, or the item is pinned and you just want it on disk — right-click a tile
 and pick **Save to…**. It writes a copy wherever you point the panel and leaves
-the tile exactly where it was; only the panel can hand a sandboxed Perch a path
+the tile exactly where it was, replacing an existing file only once the new
+copy is whole; only the panel can hand a sandboxed Perch a path
 outside its container, which is why there is no fixed *Save to Downloads*.
 
 Clearing an item deletes its whole import directory — the staged copy is deleted

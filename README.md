@@ -50,7 +50,7 @@ The drag is the front door. The others matter just as much:
 | | |
 |---|---|
 | **right-click** | **Add to Perch Shelf** sits under Finder's *Services* with no setup — and under the same menu for selected text and links in any app. Perch doesn't have to be running; the Service launches it. |
-| **a script** | `perch add report.pdf` shelves from a shell, a Makefile, or an agent; `find . -name '*.png' \| perch add -` takes stdin. Exit codes tell a pipeline what happened. ([the CLI](docs/cli.md)) |
+| **a script** | `perch add report.pdf` shelves from a shell, a Makefile, or an agent; `find . -name '*.png' \| perch add -` takes stdin. Exit codes tell a pipeline what happened — and [the CLI page](docs/cli.md) says how each install puts `perch` on your PATH (the cask doesn't, yet). |
 | **a watched folder** | point Settings at Downloads or a scans folder and new arrivals shelf themselves — plus a one-switch **Shelf my screenshots**. ([how](docs/reference.md#watched-folders)) |
 | **your iPhone** | the free companion app and its Share sheet send photos, links, and files to the Mac's shelf and pull items back — end-to-end encrypted, peer-to-peer, no server, no account. |
 
@@ -90,7 +90,7 @@ your back.
 
 <sub>**pre-release** · built so the paths that could lose your files don't exist: copies in, copies out, clearing asks first. that's the intent, not a warranty — [tell us what breaks](https://github.com/hausfold/perch/issues).</sub>
 
-<sub>MIT — free of charge, no paid tier · the tags that briefly shipped FSL (`v2026.08.04` → `v2026.08.14-1`) are relicensed MIT, so every release, past and future, is MIT</sub>
+<sub>[MIT](LICENSE) — free of charge, no paid tier · the tags that briefly shipped FSL (`v2026.08.04` → `v2026.08.14-1`) are relicensed MIT, so every release, past and future, is MIT</sub>
 
 <sub>one of the [hausfold](https://github.com/hausfold) repos — [haus](https://github.com/hausfold/haus) rebuilds the Mac, this is the shelf on it</sub>
 
