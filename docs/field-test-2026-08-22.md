@@ -98,12 +98,20 @@ item already on disk (attributes only, no prompt).
 
 **What this does *not* cover, stated so nobody reads more into it than it
 says.** All three readings reach `pairedDevices` through `MobileReceiver.init`,
-at launch. The refresh inside `finishPairing` — a pairing made while the app is
-already up — has still never been watched, and neither has **revoke**, which
-the original pass could not reach *because* of #12. Both are now one session
-with the phone: revoke the iPhone, watch the row leave without a relaunch, pair
-it again, watch it come back. That is the last of this board's coverage, not an
-open bug.
+at launch — so neither the refresh inside `finishPairing` nor **revoke** (which
+the original pass could not reach *because* of #12) was covered by them.
+
+**Both were run at the machine, same day, and passed.** Revoke the iPhone,
+watch the row leave without a relaunch, pair it again, watch it come back. The
+store agrees: the pairing record is the same account UUID with its creation
+date rewritten to 2026-08-25 02:53 UTC, which is `store(_:)`'s delete-then-add
+replacing the record — the round trip really went through the Keychain and not
+just the array. #12 and Run G are closed on all three paths.
+
+**Only D3 (#8) outlives this board, unreproduced, and it is not a fix that is
+owed — it is a test that cannot be run naively.** Prime the watched folder
+first; D3 says how, and why a first pass without it reproduces #8's symptom for
+a reason that is not #8.
 
 ---
 
@@ -409,6 +417,44 @@ covered by `testLaunchScanPrunesGoneFilesAndCatchesUpOnUnledgeredOnes` and does 
 in a test. Replay is the stream covering the same gap itself, not a second detector.
 If #8 reproduces after this, the suspicion still falls on the bookmark resolving at
 launch rather than on the scan.
+
+**Prime the folder before testing it, or the first run lies.** Measured
+2026-08-24 on this Mac: `watched-folders.json` has `~/Desktop` at
+`lastEventID: 1203891618` and **`~/Downloads` with no `lastEventID` at all**
+(it is `UInt64?`, so the encoder omits it rather than writing null). A position
+is only written when the stream actually delivers an event, and `~/Desktop`
+takes every screenshot while `~/Downloads` has been quiet since the FSEvents
+build landed — so the folder #8's recipe names is the one with nothing to
+resume from. Absent falls back to `kFSEventStreamEventIdSinceNow`
+(`FolderWatcher.swift:206-208`), which is no replay at all, so *quit → drop →
+relaunch* would reproduce "no catch-up" on the first pass for a reason that has
+nothing to do with #8. Its second pass would then pass, and the run would read
+as flaky.
+
+1. Read the positions **first**, so step 3 has something to compare against —
+   the ids are UUID prefixes, not folder names, so "did it land" is only
+   legible as a before/after:
+
+   ```sh
+   python3 -c "import json;print([(f['id'][:8],f.get('lastEventID')) for f in json.load(open('$HOME/Library/Containers/com.hausfold.perch/Data/Library/Application Support/Perch/watched-folders.json'))])"
+   ```
+
+2. With perch running, `touch ~/Downloads/prime-$(date +%s).txt`. It fires the
+   event and shelves a tile; bin the tile.
+3. Wait past `positionReportInterval` (5 s) and run the same line again: the
+   row that had no number now has one. That folder can now replay.
+4. Now ⌘Q, drop the test file, relaunch.
+
+Two things about that loop worth knowing before it confuses you. **A
+re-dropped file is deduped by identity, not by name** — `importedTokens` holds
+`SHA256(inode:birth:size:mtime)` and encodes no name or path
+(`FolderWatcher.swift:31-33`), so copying the *same* file back in is ignored
+while a freshly created one with the same name imports fine. A fresh name each
+pass is still the simplest way not to have to think about it. And **don't count
+on ⌘Q to persist the position**: `stop()` does flush whatever the throttle was
+holding (`FolderWatcher.swift:265-270`), but that flush is a `queue.async` that
+hops to the main actor and then to a background write, so it races process
+exit. Losing it costs a slightly wider replay and nothing else.
 
 ## Run E — Non-downloaded iCloud file sticks on "Downloading" (#2)
 
