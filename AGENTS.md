@@ -116,7 +116,7 @@ with the app's `Perch.swiftmodule`, so it sets `PRODUCT_MODULE_NAME = PerchCLI`.
 Read `PRD.md` and `ARCHITECTURE.md` before changing transfer semantics, and
 update them when a product boundary changes. **A decision is stated once, at the
 place it binds** — the CLI mailbox in `docs/cli.md`, watched folders and the
-update nudge in `docs/reference.md`, the licence in `README.md`, the companion's
+update nudge in `docs/reference.md`, the licence in `LICENSE`, the companion's
 tag in this file. Don't start a parallel decisions tree; the second copy is the
 one that goes stale.
 
