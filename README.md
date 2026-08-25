@@ -90,9 +90,7 @@ your back.
 
 <sub>**pre-release** · built so the paths that could lose your files don't exist: copies in, copies out, clearing asks first. that's the intent, not a warranty; [tell us what breaks](https://github.com/hausfold/perch/issues).</sub>
 
-<sub>[MIT](LICENSE), free of charge, no paid tier · the tags that briefly shipped FSL (`v2026.08.04` → `v2026.08.14-1`) are relicensed MIT, so every release, past and future, is MIT</sub>
-
-<sub>one of the [hausfold](https://github.com/hausfold) repos: [haus](https://github.com/hausfold/haus) rebuilds the Mac, this is the shelf on it</sub>
+<sub>[MIT](LICENSE), free of charge, no paid tier</sub>
 
 <a href="https://hausfold.co">⌂ hausfold</a>
 
