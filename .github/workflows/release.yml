@@ -87,6 +87,13 @@ jobs:
             OTHER_CODE_SIGN_FLAGS="--timestamp" \
             build
 
+      # Before signing, notarizing, stapling and publishing: a coverage-
+      # instrumented build passes every one of those steps and still drops a
+      # `default.profraw` into the working directory of every user who runs
+      # `perch`. Fail here, where the only cost is a red release run.
+      - name: Released binaries carry no profiling instrumentation
+        run: scripts/assert-no-instrumentation.sh dd/Build/Products/Release/Perch.app
+
       - name: Re-sign with Developer ID (hardened runtime, clean entitlements)
         run: |
           # Explicit re-sign so notarization can't trip on an xcodebuild quirk:

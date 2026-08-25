@@ -75,6 +75,17 @@ it twice — `ENABLE_CODE_COVERAGE=YES -enableCodeCoverage YES … test`. The fl
 alone is not enough: the project-level `NO` wins, `xcodebuild` still exits 0,
 and you get a green run with an empty report.
 
+**`scripts/assert-no-instrumentation.sh` is what keeps that true.** CI runs it
+on the macOS Release build of every PR, and on the **macOS** release build
+*before* it is signed, notarized, stapled and published — an instrumented
+bundle passes all four of those steps. The iOS archive is not guarded: a
+sandboxed app has no shell working directory to litter. It walks every Mach-O in the bundle (the app *and*
+`perch-cli`), fails on `__llvm_prf_cnts`, and fails just as loudly when it finds
+no binaries at all, because a guard with no subject has not passed. The build
+steps deliberately do **not** pass `ENABLE_CODE_COVERAGE=NO`: the point is to
+prove the project-level setting still holds on a stock `build`. Run it by hand
+against any bundle you're about to install.
+
 Targets: `Perch` (macOS) · `PerchCLI` (the `perch` tool, embedded in the app
 bundle) · `PerchIOS` (iPhone/iPad app) · `PerchShare` (Share extension) ·
 `PerchTests`. **The Mac ships no app extension.** A `PerchFinderAction` Quick
