@@ -454,8 +454,7 @@ final class FolderWatcherTests: XCTestCase {
     ///
     /// Two curls onto the *same* path are a different story and not a bug: one
     /// path is one file, it never holds still until the last writer stops, so
-    /// one tile at the end is the only answer available. See the note under
-    /// "Not bugs" in the 2026-08-22 field-test file.
+    /// one tile at the end is the only answer available. See `docs/feel-testing.md`.
     ///
     /// The writers here append *continuously* — faster than
     /// `probeInterval × requiredStableProbes`. Growing in slower bursts leaves

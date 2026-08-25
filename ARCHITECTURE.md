@@ -68,12 +68,14 @@ Perch used to ship a second Finder door beside it: a non-UI Action Extension,
 `PerchFinderAction`, on the understanding that an extension is always nested
 inside the menu's "Quick Actions" submenu while an `NSServices` entry reaches
 the menu's top level. On macOS 26 **neither half of that is true**, and the
-extension did not work. Measured 2026-08-23, with a single registered copy:
-both doors drew under "Services" — so the menu read "Add to Perch Shelf
-(Perch.app)" twice — the extension never rendered under "Quick Actions" despite
-being listed and enabled there, and clicking its row shelved nothing, its App
-Group mailbox never written. The extension was removed; the field-test file's
-#4/#5 carry the measurements.
+extension did not work. Measured 2026-08-23: both doors drew under "Services" — so the menu
+read "Add to Perch Shelf (Perch.app)" twice — the extension never rendered
+under "Quick Actions" despite being listed and enabled there, and clicking its
+row shelved nothing, its App Group mailbox never written. The extension was
+removed on that product call rather than on a measurement that could
+discriminate: the Mac it was taken on carried 40 registered copies of the app,
+which cannot tell the two doors apart. `docs/feel-testing.md` has the caveat
+and the clean-machine test to run before reinstating anything.
 
 The handler that remains is trivial by design. A Service is delivered to the
 *running* app, not to an extension, so `ShelfServicesProvider`
