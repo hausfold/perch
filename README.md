@@ -90,8 +90,6 @@ your back.
 
 <sub>**pre-release** · built so the paths that could lose your files don't exist: copies in, copies out, clearing asks first. that's the intent, not a warranty; [tell us what breaks](https://github.com/hausfold/perch/issues).</sub>
 
-<sub>[MIT](LICENSE), free of charge, no paid tier</sub>
-
 <a href="https://hausfold.co">⌂ hausfold</a>
 
 </div>
