@@ -53,9 +53,12 @@ Quick Action whose registered provider is some lane's build cache are both
 artifacts of it, and both were misread as perch bugs once already. `pluginkit
 -r` does **not** clear them — it only knows appex providers. Before measuring a
 Finder door, run the full-path `lsregister -kill -r -domain local -domain system
--domain user` (it is not on `PATH`; see `docs/field-test-2026-08-22.md` ▸ Run F
-for the invocation), re-register `/Applications/Perch.app`, `killall Finder` —
-and take the reading before the next lane builds.
+-domain user` (it is not on `PATH`; [`docs/feel-testing.md`](./docs/feel-testing.md)
+has the invocation), re-register `/Applications/Perch.app`, `killall Finder` —
+and take the reading before the next lane builds. That file collects the rest of
+the recipes that read wrong on the first run — priming a watched folder before
+testing catch-up, APFS clones making a 3 GB drop instant, `--level info` on `log
+stream` — and is worth a look before any hands-on pass.
 
 Don't pass `CODE_SIGNING_ALLOWED=NO` to the **iOS** build you intend to run:
 it strips the App Group entitlement and the app aborts at launch. Simulator

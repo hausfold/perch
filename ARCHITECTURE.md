@@ -72,8 +72,9 @@ extension did not work. Measured 2026-08-23, with a single registered copy:
 both doors drew under "Services" — so the menu read "Add to Perch Shelf
 (Perch.app)" twice — the extension never rendered under "Quick Actions" despite
 being listed and enabled there, and clicking its row shelved nothing, its App
-Group mailbox never written. The extension was removed; the field-test file's
-#4/#5 carry the measurements.
+Group mailbox never written. The extension was removed, and the caveat on that
+measurement — a Mac polluted with lane builds cannot tell the two doors apart
+— is in `docs/feel-testing.md`.
 
 The handler that remains is trivial by design. A Service is delivered to the
 *running* app, not to an extension, so `ShelfServicesProvider`

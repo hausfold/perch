@@ -12,7 +12,7 @@
   "Add to Perch Shelf (Perch.app)" twice, the extension never rendered under
   "Quick Actions" despite being listed and enabled there, and clicking its row
   shelved nothing — its App Group mailbox was never written. The extension was
-  removed; see the field-test file, #4/#5.
+  removed. Clean LaunchServices before re-measuring: docs/feel-testing.md.
 
   So this entry is NOT at the context menu's top level beside "New Terminal Tab
   Here" — no classic Service is, on macOS 26. It is under Services, and that is
