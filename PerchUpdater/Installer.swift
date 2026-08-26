@@ -74,7 +74,13 @@ struct Installer {
         }
 
         // 1 · the target is ours, and it is the bundle we live in
-        guard request.targetPath.isEmpty || URL(fileURLWithPath: request.targetPath).standardizedFileURL == target else {
+        // Compared as paths, never as URLs: `URL(fileURLWithPath:)` asks the
+        // filesystem whether the path is a directory and adds a trailing slash
+        // when it is, while `deletingLastPathComponent()` always adds one — so
+        // URL equality here answers differently depending on whether the target
+        // happens to exist.
+        let requested = URL(fileURLWithPath: request.targetPath).standardizedFileURL.path
+        guard request.targetPath.isEmpty || requested == target.path else {
             throw InstallerError("the request names a bundle this updater is not part of")
         }
         guard !target.path.hasPrefix("/nix/store/") else {

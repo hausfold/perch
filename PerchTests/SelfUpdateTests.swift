@@ -37,11 +37,15 @@ final class SelfUpdateTests: XCTestCase {
     // anything else is refused.
 
     func testTheUpdaterResolvesTheBundleItIsNestedIn() {
+        // As a path, not as a URL: `URL(fileURLWithPath:)` consults the
+        // filesystem for the trailing slash, so comparing URLs here passes or
+        // fails depending on whether the machine running the suite happens to
+        // have Perch installed. It did, here, and CI didn't.
         XCTAssertEqual(
             UpdateHandoff.enclosingAppBundle(
                 ofUpdaterAt: URL(fileURLWithPath: "/Applications/Perch.app/Contents/Helpers/PerchUpdater.app")
-            ),
-            URL(fileURLWithPath: "/Applications/Perch.app")
+            )?.path,
+            "/Applications/Perch.app"
         )
     }
 
