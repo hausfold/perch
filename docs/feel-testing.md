@@ -275,8 +275,12 @@ shelf's staged items are still there — they live in the container, not the app
 bundle.
 
 **A failed install must still leave you an app.** Worth breaking on purpose
-once: point the request's `payloadPath` at any bundle that isn't a notarized
-build of ours (an Xcode build of perch is the honest case) and run
-`Contents/Library/PerchUpdater.app/Contents/MacOS/PerchUpdater` by hand. It
-must refuse, write `update-result.json` with the reason, and relaunch what was
-already installed.
+once: write a request by hand and run
+`Contents/Helpers/PerchUpdater.app/Contents/MacOS/PerchUpdater` yourself. The
+request has exactly one home — `~/Library/Containers/<the enclosing app's
+bundle id>/Data/Library/Application Support/Perch/update-request.json` — and
+its `payloadPath` must sit under that container's
+`Library/Caches/Updates/`, because the updater installs from perch's own
+staging directory and nowhere else. Point it at an Xcode build of perch and it
+must refuse on the signature, write `update-result.json` with the reason, and
+relaunch what was already installed.

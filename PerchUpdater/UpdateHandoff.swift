@@ -147,6 +147,17 @@ enum UpdateHandoff {
             .appendingPathComponent("Perch", isDirectory: true)
     }
 
+    /// Whether a payload path is one perch staged. The updater installs from
+    /// nowhere else: verifying an arbitrary path and then moving it is a TOCTOU
+    /// with a wide window, and the request file lives where any process running
+    /// as this user can write.
+    static func isStagedPayload(_ payload: URL, home: URL) -> Bool {
+        let staging = downloadDirectory(home: home).standardizedFileURL.path
+        let candidate = payload.standardizedFileURL.path
+        // `hasPrefix` on the string alone would accept `…/UpdatesEvil/x.app`.
+        return candidate.hasPrefix(staging + "/")
+    }
+
     static func requestURL(home: URL) -> URL {
         supportDirectory(home: home).appendingPathComponent(requestFileName)
     }
@@ -156,26 +167,28 @@ enum UpdateHandoff {
     }
 
     /// The app bundle an updater at `updater` lives inside:
-    /// `Perch.app/Contents/Library/PerchUpdater.app` → `Perch.app`. This is the
+    /// `Perch.app/Contents/Helpers/PerchUpdater.app` → `Perch.app`. This is the
     /// ONLY thing the updater is ever allowed to replace, which is what keeps an
     /// unsandboxed helper from being a general-purpose file mover: a request
     /// naming any other path is refused, and there is no path in — no arguments,
     /// no prompt — that changes this answer.
     static func enclosingAppBundle(ofUpdaterAt updater: URL) -> URL? {
         let candidate = updater            // …/PerchUpdater.app
-            .deletingLastPathComponent()   // …/Contents/Library
+            .deletingLastPathComponent()   // …/Contents/Helpers
             .deletingLastPathComponent()   // …/Contents
             .deletingLastPathComponent()   // …/Perch.app
         guard candidate.pathExtension == "app",
               updater.pathExtension == "app",
-              updater.deletingLastPathComponent().lastPathComponent == "Library"
+              updater.deletingLastPathComponent().lastPathComponent == "Helpers"
         else { return nil }
         return candidate.standardizedFileURL
     }
 
-    /// Where a download is staged. Caches, not Application Support: a
-    /// half-downloaded release is exactly what a Caches directory is for, and
-    /// the app prunes it on every run.
+    /// Where a download is staged, and the ONLY place the updater will install
+    /// from. Caches, not Application Support: a half-downloaded release is
+    /// exactly what a Caches directory is for. It is cleared at the start of
+    /// the next download and by the updater when it finishes, so a handoff that
+    /// dies in between leaves one release's worth of bytes behind and no more.
     static func downloadDirectory(home: URL) -> URL {
         home
             .appendingPathComponent("Library/Caches", isDirectory: true)

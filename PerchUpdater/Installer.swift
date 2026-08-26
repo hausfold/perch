@@ -13,7 +13,7 @@ import os
 // LaunchServices does NOT (probed 2026-08-26: a helper launched with
 // `NSWorkspace.openApplication` from a sandboxed parent runs with the real home
 // and writes to `/Applications`). So this bundle — nested at
-// `Perch.app/Contents/Library/PerchUpdater.app`, signed with the same team,
+// `Perch.app/Contents/Helpers/PerchUpdater.app`, signed with the same team,
 // with no sandbox and no entitlements of its own — is the one that swaps the
 // bundle and relaunches.
 //
@@ -60,8 +60,18 @@ struct Installer {
     /// that means the installed app was NOT replaced — in which case the caller
     /// still relaunches what is there, so a failed update never costs the user
     /// their shelf.
-    func install(request: UpdateRequest, target: URL) throws -> String {
+    func install(request: UpdateRequest, target: URL, home: URL) throws -> String {
         let payload = URL(fileURLWithPath: request.payloadPath).standardizedFileURL
+
+        // 0 · the payload comes from perch's own staging directory, or it does
+        // not come at all. Verifying an arbitrary path and then moving it is a
+        // TOCTOU with a wide window — the request and the payload both live
+        // where any process running as this user can write. Pinning the
+        // directory takes "arbitrary path" out of the request's vocabulary:
+        // there is no path in it that names a place perch didn't stage.
+        guard UpdateHandoff.isStagedPayload(payload, home: home) else {
+            throw InstallerError("the download isn't in perch's staging directory")
+        }
 
         // 1 · the target is ours, and it is the bundle we live in
         guard request.targetPath.isEmpty || URL(fileURLWithPath: request.targetPath).standardizedFileURL == target else {
@@ -94,7 +104,14 @@ struct Installer {
         guard payloadVersion == request.version else {
             throw InstallerError("the download is \(payloadVersion), not the \(request.version) that was offered")
         }
-        let installed = Self.shortVersion(at: target) ?? "dev"
+        // A target whose version cannot be read is refused outright. Folding it
+        // into "dev" would make an unreadable Info.plist accept ANY notarized
+        // build of ours, older ones included — a downgrade path opened by
+        // accident, from the one branch that exists to let a `bench try` build
+        // be updated.
+        guard let installed = Self.shortVersion(at: target) else {
+            throw InstallerError("can't read the installed version — install it by hand")
+        }
         guard CalVer.isNewer(payloadVersion, than: installed) || CalVer.isDev(installed) else {
             throw InstallerError("\(installed) is already installed")
         }
@@ -122,8 +139,16 @@ struct Installer {
         let xattr = Process()
         xattr.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
         xattr.arguments = ["-dr", "com.apple.quarantine", bundle.path]
-        try? xattr.run()
-        xattr.waitUntilExit()
+        // `waitUntilExit()` on a Process that never launched raises an
+        // Objective-C exception, which Swift cannot catch — the updater would
+        // die here, before the swap, before the result file, before the
+        // relaunch, and the user would be left with no shelf and no reason.
+        do {
+            try xattr.run()
+            xattr.waitUntilExit()
+        } catch {
+            logger.error("could not clear quarantine: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: The swap
@@ -150,7 +175,20 @@ struct Installer {
             try fm.moveItem(at: payload, to: target)
             try? fm.removeItem(at: aside)
         } catch {
-            try? fm.moveItem(at: aside, to: target)
+            // Clear whatever half-move is sitting on the target first: without
+            // this, a restore that fails because something is already there
+            // leaves the user's only copy of perch under a dot-name Finder does
+            // not show. If even that fails, the message has to say where it
+            // went — this is the one path where the app can end up somewhere
+            // the user would never find it.
+            try? fm.removeItem(at: target)
+            do {
+                try fm.moveItem(at: aside, to: target)
+            } catch {
+                throw InstallerError(
+                    "could not put the new build in place, and Perch is now at \(aside.path)"
+                )
+            }
             throw InstallerError("could not put the new build in place: \(error.localizedDescription)")
         }
     }

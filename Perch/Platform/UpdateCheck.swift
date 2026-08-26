@@ -291,7 +291,6 @@ final class UpdateCheck: ObservableObject {
         // come back.
         if let result = SelfUpdate.consumeResult() {
             note(result.message, transient: result.succeeded)
-            if result.succeeded { dismissedVersion = result.version }
         }
         // User-initiated when the feel-test hook is set: it has to run in a
         // Debug build too, and asking for it IS the consent the flag stands in
@@ -477,7 +476,13 @@ final class UpdateCheck: ObservableObject {
         }
 
         availableVersion = latest
-        if Self.installsOnLaunch, installKind.canSelfUpdate, installPhase == nil {
+        // Every condition `performUpdate` needs to take the INSTALL branch. Not
+        // just tidiness: without them it falls through to the advice branch,
+        // and `.direct` has no command to copy — so a dismissed version, or a
+        // second pass after a failure, would open a browser window on a machine
+        // this flag exists to keep hands off.
+        if Self.installsOnLaunch, installKind.canSelfUpdate, SelfUpdate.isAvailable,
+           !selfUpdateFailed, installPhase == nil, pendingVersion != nil {
             performUpdate()
         }
         if userInitiated {

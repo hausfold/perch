@@ -155,15 +155,10 @@ final class UpdateCheckTests: XCTestCase {
 
     // MARK: - Cohort copy
     //
-    // Perch is sandboxed, so NO cohort self-updates: the button
-    // either copies this install's command or opens the release page. A cohort
-    // handed the wrong command is the only way this feature can mislead.
-
-    func testNoCohortIsOfferedASelfUpdate() {
-        for kind in InstallKind.allCases {
-            XCTAssertNotEqual(kind.buttonLabel, "Update & Restart", "\(kind)")
-        }
-    }
+    // A cohort handed the wrong next step is the only way this feature can
+    // mislead: three of them are owned by a package manager and get its
+    // command, and the fourth installs in place. Which cohort may do that is
+    // pinned in SelfUpdateTests.
 
     func testEachCohortGetsItsOwnNextStep() {
         XCTAssertEqual(InstallKind.rice.updateCommand, "haus update")

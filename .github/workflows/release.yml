@@ -101,7 +101,7 @@ jobs:
           # declared entitlements (no get-task-allow, which notarization rejects).
           APP="dd/Build/Products/Release/Perch.app"
           CLI="$APP/Contents/MacOS/perch-cli"
-          UPDATER="$APP/Contents/Library/PerchUpdater.app"
+          UPDATER="$APP/Contents/Helpers/PerchUpdater.app"
           IDENTITY="$(security find-identity -v -p codesigning "$RUNNER_TEMP/signing.keychain-db" \
             | awk -F'"' '/Developer ID Application/{print $2; exit}')"
           # Nested code is always signed inside-out — the updater and the CLI
@@ -171,6 +171,11 @@ jobs:
         run: |
           APP="dd/Build/Products/Release/Perch.app"
           codesign --verify --deep --strict --verbose=2 "$APP"
+          # Explicitly, as well as via --deep: Contents/Helpers IS in codesign's
+          # default nested-code rule set, and this is the line that notices if
+          # the updater ever moves back out of it and starts being sealed as an
+          # ordinary resource.
+          codesign --verify --strict --verbose=2 "$APP/Contents/Helpers/PerchUpdater.app"
           spctl --assess --type execute "$APP"
           # The exact requirement PerchUpdater checks a download against
           # (PerchSigning.payloadRequirement). A release that fails it installs

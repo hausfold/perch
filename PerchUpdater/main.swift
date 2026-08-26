@@ -4,7 +4,7 @@ import os
 
 // MARK: - PerchUpdater
 //
-// A background app (`LSUIElement`), nested in `Perch.app/Contents/Library/`,
+// A background app (`LSUIElement`), nested in `Perch.app/Contents/Helpers/`,
 // with NO sandbox — the one process in the family that can put a new build into
 // `/Applications`. It has no window, no menu, no user input, and exactly one
 // run: read the request perch left in its container, install, relaunch perch,
@@ -17,7 +17,7 @@ import os
 // `NSApp` costs one file and makes the launch immediate.
 //
 // Run by hand for a feel test:
-//   .../Perch.app/Contents/Library/PerchUpdater.app/Contents/MacOS/PerchUpdater
+//   .../Perch.app/Contents/Helpers/PerchUpdater.app/Contents/MacOS/PerchUpdater
 // with a request already written — see docs/feel-testing.md.
 
 private let logger = Logger(subsystem: "com.hausfold.perch.updater", category: "Run")
@@ -37,16 +37,12 @@ private func run() -> Int32 {
         return 1
     }
 
-    // The request lives in the app's container. A perch that somehow isn't
-    // sandboxed would have written it under the real home instead; try both
-    // rather than fail on a shape we don't ship but could build.
-    let homes = [
-        UpdateHandoff.containerHome(appBundleID: appID),
-        UpdateHandoff.realHome,
-    ]
-    guard let home = homes.first(where: {
-        FileManager.default.fileExists(atPath: UpdateHandoff.requestURL(home: $0).path)
-    }) else {
+    // The app's container, and nowhere else. A fallback to the real home would
+    // read a request out of a directory the sandbox does not protect and then
+    // delete a staging directory there — for the sake of a perch that isn't
+    // sandboxed, which is a shape we do not ship.
+    let home = UpdateHandoff.containerHome(appBundleID: appID)
+    guard FileManager.default.fileExists(atPath: UpdateHandoff.requestURL(home: home).path) else {
         logger.error("no update request to act on")
         return 1
     }
@@ -71,7 +67,7 @@ private func run() -> Int32 {
         finishedAt: Date().timeIntervalSince1970
     )
     do {
-        result.message = try installer.install(request: request, target: target)
+        result.message = try installer.install(request: request, target: target, home: home)
         result.succeeded = true
     } catch {
         result.message = error.localizedDescription

@@ -49,8 +49,15 @@ final class SelfUpdate {
     /// Where the updater lives inside our own bundle. Absent in a build made
     /// before the target existed, and in any bundle assembled by hand — the
     /// caller falls back to the release page rather than pretending.
+    ///
+    /// `Contents/Helpers`, not `Contents/Library`, and that is load-bearing:
+    /// `Helpers/` is in codesign's default **nested code** rule set and
+    /// `Library/` is not, so here the updater is sealed as code with its own
+    /// signature rather than as a resource of ours — which is what makes
+    /// `kSecCSCheckNestedCode` on a payload actually descend into the updater
+    /// that payload carries.
     static var updaterURL: URL {
-        Bundle.main.bundleURL.appendingPathComponent("Contents/Library/PerchUpdater.app")
+        Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/PerchUpdater.app")
     }
 
     static var isAvailable: Bool {
@@ -93,14 +100,24 @@ final class SelfUpdate {
             onPhase(Phase(text: "Downloading Perch \(version)…", progress: fraction))
         }
 
+        // Unpack and verify are the two steps with no progress bar, and both
+        // are long enough to be felt: `ditto` on a whole bundle, then a hash of
+        // every byte in it. Off the main actor, or the shelf freezes on the
+        // step whose label just said to wait (AGENTS.md: copies stay off main).
         onPhase(Phase(text: "Unpacking…", progress: nil))
-        let payload = try await Self.unpack(zip)
+        let payload = try await Task.detached(priority: .userInitiated) {
+            try Self.unpack(zip)
+        }.value
 
         onPhase(Phase(text: "Checking the signature…", progress: nil))
         // Identity only, here: the container cannot settle notarization (see
         // `PerchSigning.identityRequirement`). The full check — the one that
         // decides whether anything is installed — runs in the updater.
-        try PerchSigning.verify(bundle: payload, requirement: PerchSigning.identityRequirement)
+        try await Task.detached(priority: .userInitiated) {
+            try PerchSigning.verify(
+                bundle: payload, requirement: PerchSigning.identityRequirement
+            )
+        }.value
 
         let target = Bundle.main.bundleURL.standardizedFileURL
         let request = UpdateRequest(
@@ -123,6 +140,21 @@ final class SelfUpdate {
         logger.log("handed \(version, privacy: .public) to the updater; quitting")
         // The updater waits for this pid to go before it touches the bundle.
         NSApp.terminate(nil)
+
+        // `terminate(_:)` is a request. A delegate that defers it, or a modal
+        // that swallows it, would otherwise leave the strip reading
+        // "Installing — Perch will reopen…" over a dead button while the
+        // updater's own 30s backstop runs down. Say so instead.
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 15_000_000_000)
+            guard let self, self.running else { return }
+            self.running = false
+            onPhase(Phase(
+                text: "Perch couldn't quit to finish the update — quit it yourself to apply it",
+                progress: nil,
+                isFailure: true
+            ))
+        }
     }
 
     // MARK: Steps
@@ -177,8 +209,10 @@ final class SelfUpdate {
         // A previous attempt's bytes are never reused: the only thing that
         // makes a download trustworthy here is the signature check on what came
         // out of it, and half a file from yesterday fails that slowly.
-        try? FileManager.default.removeItem(at: directory)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try await Task.detached(priority: .userInitiated) {
+            try? FileManager.default.removeItem(at: directory)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }.value
 
         let observer = DownloadProgress(onProgress: onProgress)
         let (temporary, response) = try await URLSession.shared.download(from: url, delegate: observer)
@@ -186,8 +220,10 @@ final class SelfUpdate {
             throw SelfUpdateError("GitHub answered \(http.statusCode) for the download")
         }
         let destination = directory.appendingPathComponent("perch-\(version).zip")
-        try? FileManager.default.removeItem(at: destination)
-        try FileManager.default.moveItem(at: temporary, to: destination)
+        try await Task.detached(priority: .userInitiated) {
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: temporary, to: destination)
+        }.value
         return destination
     }
 
@@ -199,7 +235,7 @@ final class SelfUpdate {
     /// It is a child of a sandboxed process, so it inherits the sandbox: it can
     /// read and write the container and nothing else, which is all it is asked
     /// to do.
-    static func unpack(_ zip: URL) async throws -> URL {
+    nonisolated static func unpack(_ zip: URL) throws -> URL {
         let destination = zip.deletingLastPathComponent().appendingPathComponent("unpacked", isDirectory: true)
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
@@ -207,26 +243,31 @@ final class SelfUpdate {
         let ditto = Process()
         ditto.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         ditto.arguments = ["-x", "-k", zip.path, destination.path]
-        let errors = Pipe()
-        ditto.standardError = errors
+        // A file, not a Pipe: `ditto` writes a line per oddity and nobody is
+        // reading this pipe until it exits, so a noisy archive would fill the
+        // 64K buffer and deadlock — the strip stuck on "Unpacking…" forever,
+        // with no timeout behind it.
+        let errorLog = destination.deletingLastPathComponent().appendingPathComponent("ditto.log")
+        FileManager.default.createFile(atPath: errorLog.path, contents: nil)
+        ditto.standardError = try FileHandle(forWritingTo: errorLog)
         try ditto.run()
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                ditto.waitUntilExit()
-                continuation.resume()
-            }
-        }
+        ditto.waitUntilExit()
         guard ditto.terminationStatus == 0 else {
-            let message = String(
-                data: errors.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8
-            )?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let message = (try? String(contentsOf: errorLog, encoding: .utf8))?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .split(separator: "\n").last.map(String.init)
             throw SelfUpdateError("the download wouldn't unpack\(message.map { ": \($0)" } ?? "")")
         }
-        let contents = (try? FileManager.default.contentsOfDirectory(
-            at: destination, includingPropertiesForKeys: nil
-        )) ?? []
-        guard let app = contents.first(where: { $0.pathExtension == "app" }) else {
-            throw SelfUpdateError("the download had no app in it")
+
+        // By name, and it must be a real directory. `ditto -x -k` restores
+        // symlinks, and `contentsOfDirectory` has no defined order — "the first
+        // thing ending in .app" would let an archive hand us a link to
+        // something already installed and have it verify on the strength of the
+        // app it points at.
+        let app = destination.appendingPathComponent("Perch.app", isDirectory: true)
+        let values = try? app.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard values?.isDirectory == true, values?.isSymbolicLink != true else {
+            throw SelfUpdateError("the download had no Perch.app in it")
         }
         return app.standardizedFileURL
     }

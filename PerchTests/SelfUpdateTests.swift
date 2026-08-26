@@ -39,15 +39,21 @@ final class SelfUpdateTests: XCTestCase {
     func testTheUpdaterResolvesTheBundleItIsNestedIn() {
         XCTAssertEqual(
             UpdateHandoff.enclosingAppBundle(
-                ofUpdaterAt: URL(fileURLWithPath: "/Applications/Perch.app/Contents/Library/PerchUpdater.app")
+                ofUpdaterAt: URL(fileURLWithPath: "/Applications/Perch.app/Contents/Helpers/PerchUpdater.app")
             ),
             URL(fileURLWithPath: "/Applications/Perch.app")
         )
     }
 
     func testAnUpdaterSomewhereElseResolvesNothing() {
-        // Loose in a folder, or nested at the wrong depth: both must answer nil
+        // Loose in a folder, nested at the wrong depth, or in a directory that
+        // isn't the one codesign seals as nested code: each must answer nil
         // rather than name a neighbour.
+        XCTAssertNil(
+            UpdateHandoff.enclosingAppBundle(
+                ofUpdaterAt: URL(fileURLWithPath: "/Applications/Perch.app/Contents/Library/PerchUpdater.app")
+            )
+        )
         XCTAssertNil(
             UpdateHandoff.enclosingAppBundle(ofUpdaterAt: URL(fileURLWithPath: "/tmp/PerchUpdater.app"))
         )
@@ -201,15 +207,42 @@ final class SelfUpdateTests: XCTestCase {
         XCTAssertTrue(PerchSigning.payloadRequirement.contains("anchor apple generic"))
     }
 
-    func testAnUnsignedBundleFailsVerification() throws {
-        // The test host itself: built here, ad-hoc or dev signed, never
-        // notarized — exactly the thing that must not be allowed to install.
-        XCTAssertThrowsError(try PerchSigning.verify(bundle: Bundle.main.bundleURL))
+    func testSomeoneElsesAppFailsVerification() throws {
+        // Apple's own, signed by Apple: it satisfies `anchor apple generic` and
+        // fails on the team, which is the clause that matters. Deliberately NOT
+        // `Bundle.main` — the test host is signed by whatever built it, and
+        // under Xcode's automatic signing that is an Apple Development cert for
+        // OUR team, which satisfies `identityRequirement` and would turn this
+        // into a test that passes or fails depending on who ran it.
+        let foreign = URL(fileURLWithPath: "/System/Applications/Calculator.app")
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: foreign.path))
+        XCTAssertThrowsError(try PerchSigning.verify(bundle: foreign))
         XCTAssertThrowsError(
-            try PerchSigning.verify(
-                bundle: Bundle.main.bundleURL, requirement: PerchSigning.identityRequirement
-            )
+            try PerchSigning.verify(bundle: foreign, requirement: PerchSigning.identityRequirement)
         )
+    }
+
+    // MARK: - Where a payload may come from
+
+    func testThePayloadMustBeStagedByPerch() {
+        let home = URL(fileURLWithPath: "/Users/testuser/Library/Containers/com.hausfold.perch/Data")
+        let staged = UpdateHandoff.downloadDirectory(home: home)
+            .appendingPathComponent("unpacked/Perch.app")
+        XCTAssertTrue(UpdateHandoff.isStagedPayload(staged, home: home))
+
+        // Anything else: a bundle someone else wrote, a sibling directory whose
+        // name merely starts the same way, or a walk back out of the staging
+        // directory.
+        for path in [
+            "/tmp/Perch.app",
+            "/Users/testuser/Library/Containers/com.hausfold.perch/Data/Library/Caches/UpdatesEvil/Perch.app",
+            "/Users/testuser/Library/Containers/com.hausfold.perch/Data/Library/Caches/Updates/../../Perch.app",
+        ] {
+            XCTAssertFalse(
+                UpdateHandoff.isStagedPayload(URL(fileURLWithPath: path), home: home),
+                path
+            )
+        }
     }
 
     // MARK: - Version rules, shared with the updater

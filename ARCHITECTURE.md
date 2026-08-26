@@ -316,7 +316,10 @@ because the tool that installed them owns the bytes and would undo a swap done
 behind its back. The fourth — a ZIP dragged into `/Applications` — installs in
 one click: `SelfUpdate` downloads the release into the container, unzips it and
 checks it is signed by us, then hands it to `PerchUpdater.app`, a nested
-un-sandboxed helper that does the swap and the relaunch. The split is the
+un-sandboxed helper (`Contents/Helpers/`, which is where codesign seals a
+nested app as code rather than as a resource) that does the swap and the
+relaunch. It installs only from perch's own staging directory in the
+container. The split is the
 sandbox's: `/Applications` is outside the container and a spawned child inherits
 the sandbox, but an app launched through LaunchServices does not. The updater
 replaces only the bundle it is nested inside, and only a notarized build of ours

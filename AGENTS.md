@@ -96,7 +96,7 @@ against any bundle you're about to install.
 
 Targets: `Perch` (macOS) · `PerchCLI` (the `perch` tool, embedded in the app
 bundle) · `PerchUpdater` (the one-click update, embedded at
-`Contents/Library/PerchUpdater.app`) · `PerchIOS` (iPhone/iPad app) ·
+`Contents/Helpers/PerchUpdater.app`) · `PerchIOS` (iPhone/iPad app) ·
 `PerchShare` (Share extension) · `PerchTests`. **The Mac ships no app
 extension.** A `PerchFinderAction` Quick
 Action lived here until 2026-08-23 and was removed: measured on macOS 26 it
