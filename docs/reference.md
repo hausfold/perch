@@ -299,20 +299,34 @@ When a newer release exists, the open shelf grows a strip along its bottom edge
 ("Perch 2026.08.05 is out") and the menu bar menu grows a matching row. `✕`
 dismisses that version — the next release asks again.
 
-Perch never installs the update itself: being sandboxed, it cannot replace its
-own bundle in `/Applications`, and it would rather tell you the truth than fail
-quietly. So the button does whatever *your* install needs — it knows which one
-you have:
+The button does whatever *your* install needs — it knows which one you have:
 
 | installed by | the button does |
 | --- | --- |
 | the haus desktop | copies `haus update` |
 | Homebrew | copies `brew upgrade --cask perch` |
 | a Nix store path | copies `nix flake update perch` |
-| dragging the release ZIP | opens the release page |
+| dragging the release ZIP | **Update Now** — installs it |
 
-Perch nudges and never installs: it has no self-updater, so the copied command
-is always the one your install method understands.
+Three of those four are owned by something that already knows how to update
+them, and perch swapping the bundle under `brew` or `haus` would only be undone
+by the next `brew upgrade` or `haus update`. So they get the command, not a
+button that lies.
+
+A copy you dragged in yourself has no such owner, and "download it again and
+drag it again" was the worst step in perch. **Update Now** downloads the release,
+checks it is a build of ours that Apple notarized, replaces the app, and reopens
+it — one click, about as long as the download takes. Your shelf survives it:
+staged items live in perch's own container, not in the app bundle.
+
+The swap itself is not done by perch. The app is sandboxed and `/Applications`
+is outside its container, so it hands the verified download to
+`PerchUpdater.app` — a small helper inside `Perch.app` that has no sandbox, is
+signed by us like the app is, and can only ever replace the one bundle it is
+nested inside. If anything fails — GitHub unreachable, a signature that doesn't
+check out, an `/Applications` you can't write to — perch says so in the strip
+and the button goes back to opening the release page. It never leaves you
+without an app.
 
 ## The one system setting perch needs
 

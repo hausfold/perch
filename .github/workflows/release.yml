@@ -101,13 +101,23 @@ jobs:
           # declared entitlements (no get-task-allow, which notarization rejects).
           APP="dd/Build/Products/Release/Perch.app"
           CLI="$APP/Contents/MacOS/perch-cli"
+          UPDATER="$APP/Contents/Library/PerchUpdater.app"
           IDENTITY="$(security find-identity -v -p codesigning "$RUNNER_TEMP/signing.keychain-db" \
             | awk -F'"' '/Developer ID Application/{print $2; exit}')"
-          # Nested code is always signed inside-out — the CLI before the app
-          # that carries it. There is no app extension on the Mac side: the
-          # Finder Action was removed (field test 2026-08-23, #4/#5), so the
-          # only Finder door is the app's own NSServices entry, which is signed
-          # with the app.
+          # Nested code is always signed inside-out — the updater and the CLI
+          # before the app that carries them. There is no app extension on the
+          # Mac side: the Finder Action was removed (field test 2026-08-23,
+          # #4/#5), so the only Finder door is the app's own NSServices entry,
+          # which is signed with the app.
+          # PerchUpdater.app, deliberately with NO entitlements and NO sandbox:
+          # it is the half that puts a new build into /Applications, which the
+          # sandboxed app cannot do and a child process it spawns cannot either.
+          # Same team as the app it replaces — that identity is the whole
+          # permission model, both for macOS (a same-team update needs no App
+          # Management consent) and for us (`PerchSigning.payloadRequirement`).
+          codesign --force --options runtime --timestamp \
+            --sign "$IDENTITY" \
+            "$UPDATER"
           # The `perch` tool, deliberately with NO entitlements: it is the
           # unsandboxed half of the handoff and reads your files as
           # you. Sandboxing it would defeat the point; the App Group it writes
@@ -119,6 +129,7 @@ jobs:
             --entitlements Perch/Config/Perch.entitlements \
             --sign "$IDENTITY" \
             "$APP"
+          codesign --verify --strict --verbose=2 "$UPDATER"
           codesign --verify --strict --verbose=2 "$CLI"
           codesign --verify --strict --verbose=2 "$APP"
 
@@ -161,6 +172,14 @@ jobs:
           APP="dd/Build/Products/Release/Perch.app"
           codesign --verify --deep --strict --verbose=2 "$APP"
           spctl --assess --type execute "$APP"
+          # The exact requirement PerchUpdater checks a download against
+          # (PerchSigning.payloadRequirement). A release that fails it installs
+          # for nobody on the drag-install path — and would fail it *silently*,
+          # as a one-click update that always refuses, so it is checked here
+          # where the only cost is a red release run.
+          codesign --verify -R \
+            '=anchor apple generic and certificate leaf[subject.OU] = "88M28542LQ" and notarized' \
+            "$APP"
 
       - name: Create GitHub release
         run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes

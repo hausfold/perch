@@ -229,3 +229,54 @@ Two things to know before you start:
   So a strip that will not go away after you set the key back to `false` is the
   signature of the entitlement being missing or stripped, not of a stuck view.
   `codesign -d --entitlements - <bundle>` settles it.
+
+## The one-click update: a VM, never this Mac
+
+`Update Now` is only offered to the drag-install cohort, and the click lives on
+a notch — driving it here means a second shelf on someone's screen and, if it
+works, replacing an app they are using. Take a guest instead
+(`holt runtime up <lane> --backend tart`), and drive it over `ssh`.
+
+Two things make a hands-on pass possible at all:
+
+- **`PERCH_UPDATE_ON_LAUNCH=1`** — perch checks once at launch and installs what
+  it finds, with no click. It reaches only a process that inherits your shell
+  (`.../Contents/MacOS/Perch`, `open --env`, an Xcode scheme); a plain `open -a`
+  gets launchd's environment and the flag never arrives.
+- **A build that thinks it is old.** `MARKETING_VERSION=<an older CalVer>` on the
+  build command is what makes the last release look newer. A Debug build's
+  version is the project placeholder, which `CalVer.isDev` deliberately never
+  nudges.
+
+The payload has to be a *real* release: the updater checks it against
+`PerchSigning.payloadRequirement` (Developer ID, our team, notarized), so a
+locally built app can never be installed by it — that is the point, and it is
+the one part of this flow you cannot fake with a scratch build.
+
+```sh
+# On this Mac: a signed, older-looking Release build.
+xcodebuild -project Perch.xcodeproj -scheme Perch -configuration Release \
+  -destination 'platform=macOS' -derivedDataPath dd \
+  MARKETING_VERSION=2026.08.01 \
+  CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Developer ID Application" \
+  DEVELOPMENT_TEAM=88M28542LQ ENABLE_HARDENED_RUNTIME=YES build
+
+# In the guest: install it, then let it update itself.
+#   /Applications/Perch.app/Contents/MacOS/Perch      (with the flag set)
+# and watch:
+log stream --level info --predicate 'subsystem BEGINSWITH "com.hausfold.perch"'
+```
+
+What you are looking for, in order: the strip's phases in
+`com.hausfold.perch/SelfUpdate`, then `com.hausfold.perch.updater/Install`
+naming the version it installed, then a new pid for `Perch`. Afterwards
+`/Applications/Perch.app` reads the new `CFBundleShortVersionString` and the
+shelf's staged items are still there — they live in the container, not the app
+bundle.
+
+**A failed install must still leave you an app.** Worth breaking on purpose
+once: point the request's `payloadPath` at any bundle that isn't a notarized
+build of ours (an Xcode build of perch is the honest case) and run
+`Contents/Library/PerchUpdater.app/Contents/MacOS/PerchUpdater` by hand. It
+must refuse, write `update-result.json` with the reason, and relaunch what was
+already installed.

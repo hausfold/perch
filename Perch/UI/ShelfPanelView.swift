@@ -457,8 +457,9 @@ struct ShelfPanelView: View {
 /// Updates…" that found nothing — which would otherwise be a menu item with no
 /// visible effect.
 ///
-/// The button never installs anything: perch is sandboxed, so every cohort gets
-/// its command copied or the release page opened (see UpdateCheck). The ✕
+/// What the button does depends on the install: three cohorts get their own
+/// command copied, and a drag install installs it here — the hint line becomes
+/// the progress of that download while it runs (see UpdateCheck). The ✕
 /// dismisses this version only — the next release asks again.
 private struct UpdateStrip: View {
     @ObservedObject var check: UpdateCheck
@@ -475,26 +476,38 @@ private struct UpdateStrip: View {
                     Text("Perch \(pending) is out")
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(rice.text)
-                    // The note (a copied command) takes over from the standing
-                    // hint while it's live.
-                    Text(check.statusNote ?? check.installKind.actionHint)
+                    // An install in progress outranks both; a note (a copied
+                    // command, or why the last install failed) takes over from
+                    // the standing hint while it's live.
+                    Text(check.installPhase?.text ?? check.statusNote ?? check.installKind.actionHint)
                         .font(.caption)
                         .foregroundStyle(rice.subtext0)
                         .lineLimit(1)
+                    if let fraction = check.installPhase?.progress {
+                        ProgressView(value: fraction)
+                            .progressViewStyle(.linear)
+                            .tint(rice.accent)
+                            .frame(maxWidth: 180)
+                    }
                 }
                 Spacer(minLength: 8)
                 Button {
                     check.performUpdate()
                 } label: {
-                    Text(check.installKind.buttonLabel)
+                    Text(check.actionButtonLabel)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(rice.onAccent)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(Capsule().fill(rice.accent.opacity(0.88)))
                         .contentShape(Capsule())
+                        .opacity(check.installPhase == nil ? 1 : 0.45)
                 }
                 .buttonStyle(.plain)
+                // A second click during an install would start a second
+                // download; `SelfUpdate` refuses it anyway, but a live button
+                // that does nothing reads as a broken one.
+                .disabled(check.installPhase != nil)
                 NoticeDismissButton { check.dismiss() }
                     .help("Dismiss until the next release")
             }

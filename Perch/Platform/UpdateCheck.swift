@@ -12,17 +12,19 @@ import os
 //
 // Ported from pounce's `UpdateNudge`: same hourly poll, same per-version
 // dismissal, same CalVer ordering — with two deliberate differences, both
-// forced by **the app sandbox**:
+// shaped by **the app sandbox**:
 //
-//   apply    a nudge outside the sandbox can go further than naming the step —
-//            swap its own bundle for the release ZIP's, or shell out to `brew
-//            upgrade`, for the two cohorts that own their bytes. Perch cannot:
-//            `ENABLE_APP_SANDBOX = YES`, every child
-//            process inherits that sandbox, and /Applications is outside the
-//            container — a self-swap would be denied, and a `brew` spawned from
-//            here would fail in ways nothing could report. So EVERY cohort here
-//            gets an instruction: a command copied to the pasteboard, or the
-//            release page. Nothing in this file writes outside the container.
+//   apply    three cohorts are owned by something that already updates them, so
+//            they get an instruction — the exact command for this install, on
+//            the pasteboard. The fourth, a ZIP dragged into /Applications, has
+//            no such owner, and telling it to download and drag again was the
+//            worst step in perch. It now installs in one click, but NOT from
+//            this process: `ENABLE_APP_SANDBOX = YES`, /Applications is outside
+//            the container, and a child process inherits the sandbox. The swap
+//            is done by `PerchUpdater.app`, nested in this bundle and launched
+//            through LaunchServices, which does not pass the sandbox on. See
+//            `SelfUpdate.swift`. Nothing in THIS file writes outside the
+//            container, and nothing shells out.
 //   surface  the obvious surface is a UNUserNotificationCenter banner. Perch
 //            asks the system for no permissions it can avoid (see the Mission
 //            Control note in the rice's modules/shelf) and notifications are one
@@ -31,7 +33,8 @@ import os
 //            interrupts anything; both wait until you look.
 //
 // Network: one unauthenticated GitHub API call per hour, carrying nothing but an
-// IP and a user-agent, off by a Settings toggle. Never runs in DEBUG builds.
+// IP and a user-agent, off by a Settings toggle — plus, only when someone clicks
+// Update on a drag install, the release ZIP itself. Never runs in DEBUG builds.
 // This is the only reason `com.apple.security.network.client` is in the
 // entitlements — perch reaches for exactly one host, and only to read a tag.
 
@@ -42,7 +45,8 @@ import os
 enum InstallKind: String, Codable, Equatable, CaseIterable {
     /// Homebrew cask — `brew` owns the version.
     case homebrew
-    /// Dragged out of the release ZIP — the user replaces the bundle in Finder.
+    /// Dragged out of the release ZIP — nothing upstream owns this copy, so
+    /// perch installs it itself (`SelfUpdate.swift`).
     case direct
     /// The haus desktop's activation copy — `haus update`.
     case rice
@@ -54,7 +58,7 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
     var actionHint: String {
         switch self {
         case .homebrew: return "Run brew upgrade --cask perch, then reopen Perch"
-        case .direct: return "Download the new build and replace Perch in Applications"
+        case .direct: return "Install it now — Perch downloads it and reopens"
         case .rice: return "Run haus update in a terminal to pick it up"
         case .nix: return "Update your perch flake input to pick it up"
         case .unknown: return "Open the release page to download it"
@@ -65,9 +69,18 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
     var buttonLabel: String {
         switch self {
         case .homebrew, .rice, .nix: return "Copy Command"
-        case .direct, .unknown: return "Open Releases"
+        case .direct: return "Update Now"
+        case .unknown: return "Open Releases"
         }
     }
+
+    /// Whether perch may replace this copy of itself. Only the cohort that owns
+    /// its own bytes: a rice or cask install swapped from under its package
+    /// manager would be reverted by the next `haus update` or `brew upgrade`,
+    /// and a Nix store path is read-only besides. `.unknown` is left out
+    /// because it is, by definition, a copy running from somewhere perch cannot
+    /// reason about.
+    var canSelfUpdate: Bool { self == .direct }
 
     /// The command `Copy Command` puts on the pasteboard, or nil for the two
     /// cohorts that get the release page instead.
@@ -84,7 +97,7 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
     var settingsNote: String {
         switch self {
         case .homebrew: return "Installed with Homebrew — updates come from brew upgrade --cask perch."
-        case .direct: return "Installed from the release ZIP — updates are a download and a drag."
+        case .direct: return "Installed from the release ZIP — Perch installs its own updates."
         case .rice: return "Installed by the haus desktop — updates come from haus update."
         case .nix: return "Running from the Nix store — updates come from your flake input."
         case .unknown: return "Updates open the GitHub release page."
@@ -180,9 +193,14 @@ final class UpdateCheck: ObservableObject {
     /// The version the user waved off, persisted. Per-version on purpose:
     /// dismissing 2026.08.05 says nothing about 2026.08.06.
     @Published private(set) var dismissedVersion: String?
-    /// Transient line shown in the strip — a user-initiated check's answer, or
-    /// the confirmation that a command was copied. Nil most of the time.
+    /// Transient line shown in the strip — a user-initiated check's answer, the
+    /// confirmation that a command was copied, or how the last install went.
+    /// Nil most of the time.
     @Published private(set) var statusNote: String?
+    /// Non-nil only while a drag install is installing itself: the step, and a
+    /// fraction for the one step that has a length. The strip shows it in place
+    /// of the hint, and disables the button.
+    @Published private(set) var installPhase: SelfUpdate.Phase?
 
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "Update")
     private var fetching = false
@@ -194,6 +212,19 @@ final class UpdateCheck: ObservableObject {
     /// Hourly: the nudge should show up the day a release is cut, not a day late.
     nonisolated static let maxAge: TimeInterval = 3600
     nonisolated static let releasesURL = URL(string: "https://github.com/hausfold/perch/releases/latest")!
+
+    /// The feel-test door for the one-click install (`SelfUpdate.swift`).
+    /// Clicking the strip's button is the only other way in, and a click means
+    /// a shelf on someone's notch — so a hands-on pass in a VM sets this
+    /// instead: perch checks once on launch and installs what it finds.
+    ///
+    /// It reaches a process that inherits your shell or an `open --env`, never
+    /// a plain `open -a` (launchd's environment has nothing in it) — the same
+    /// door `PERCH_ALLOW_MULTIPLE` uses, and the same limits.
+    /// See docs/feel-testing.md.
+    static var installsOnLaunch: Bool {
+        ProcessInfo.processInfo.environment["PERCH_UPDATE_ON_LAUNCH"] == "1"
+    }
 
     /// Settings toggle (`Updates` section). Defaults on; user-initiated checks
     /// ignore it, because asking is consent.
@@ -237,29 +268,14 @@ final class UpdateCheck: ObservableObject {
     /// placeholder: a plain string compare would read "0.1.0" as older than
     /// every release and nudge every debug build forever.
     nonisolated static func isDevVersion(_ version: String) -> Bool {
-        if version == "dev" || version.isEmpty || version.hasSuffix("-dev") { return true }
-        return version.range(
-            of: "^[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}(-[0-9]+)?$",
-            options: .regularExpression
-        ) == nil
+        CalVer.isDev(version)
     }
 
-    /// CalVer ordering. The zero-padded date compares lexicographically
-    /// ("2026.07.29" < "2026.07.30"); the same-day `-N` suffix must compare
-    /// NUMERICALLY — a string compare would put "-10" before "-2", which is
-    /// exactly the silent-never-nudge bug the tests pin.
+    /// CalVer ordering — the rules themselves are `CalVer` in
+    /// `UpdateHandoff.swift`, so the updater's downgrade refusal and this
+    /// nudge cannot disagree about which build is newer.
     nonisolated static func isNewer(_ candidate: String, than running: String) -> Bool {
-        guard !isDevVersion(running) else { return false }
-        let c = split(candidate), r = split(running)
-        return c.date == r.date ? c.repeatN > r.repeatN : c.date > r.date
-    }
-
-    private nonisolated static func split(_ version: String) -> (date: String, repeatN: Int) {
-        guard let dash = version.firstIndex(of: "-") else { return (version, 0) }
-        return (
-            String(version[..<dash]),
-            Int(version[version.index(after: dash)...]) ?? 0
-        )
+        CalVer.isNewer(candidate, than: running)
     }
 
     // MARK: Lifecycle
@@ -270,7 +286,17 @@ final class UpdateCheck: ObservableObject {
     func start() {
         guard !didStart else { return }
         didStart = true
-        checkForUpdates()
+        // If this launch is the one the updater asked for, say so — otherwise a
+        // one-click update is indistinguishable from perch having crashed and
+        // come back.
+        if let result = SelfUpdate.consumeResult() {
+            note(result.message, transient: result.succeeded)
+            if result.succeeded { dismissedVersion = result.version }
+        }
+        // User-initiated when the feel-test hook is set: it has to run in a
+        // Debug build too, and asking for it IS the consent the flag stands in
+        // for.
+        checkForUpdates(userInitiated: Self.installsOnLaunch)
         let timer = Timer.scheduledTimer(withTimeInterval: Self.maxAge, repeats: true) { _ in
             Task { @MainActor in UpdateCheck.shared.checkForUpdates() }
         }
@@ -293,6 +319,21 @@ final class UpdateCheck: ObservableObject {
         state.latest = state.latest ?? v
         state.dismissed = v
         Self.writeState(state)
+    }
+
+    /// Set when a one-click install failed on this run. It only downgrades the
+    /// button to the release page — the next launch offers the click again,
+    /// because most failures here (GitHub unreachable, /Applications not yours
+    /// today) are temporary.
+    @Published private(set) var selfUpdateFailed = false
+
+    /// What the strip and Settings put on the button, now that one cohort's
+    /// answer depends on whether its last attempt worked.
+    var actionButtonLabel: String {
+        if installKind.canSelfUpdate, !SelfUpdate.isAvailable || selfUpdateFailed {
+            return "Open Releases"
+        }
+        return installKind.buttonLabel
     }
 
     /// Clears the transient note (the strip's ✕ when nothing is pending).
@@ -376,6 +417,30 @@ final class UpdateCheck: ObservableObject {
     // command for this cohort, on the pasteboard, or the release page.
 
     func performUpdate() {
+        // The drag-install cohort installs it here and now. Everything the
+        // sandbox forbids happens in `PerchUpdater.app`, which this hands off to
+        // just before quitting — see SelfUpdate.swift.
+        // `selfUpdateFailed` is what makes the second click do what the button
+        // now says: once an install has failed on this run, the button reads
+        // Open Releases, and this must not quietly try again behind it.
+        if installKind.canSelfUpdate, SelfUpdate.isAvailable, !selfUpdateFailed,
+           let version = pendingVersion {
+            clearNote()
+            installPhase = SelfUpdate.Phase(text: "Starting…", progress: nil)
+            SelfUpdate.shared.begin(version: version) { [weak self] phase in
+                guard let self else { return }
+                guard !phase.isFailure else {
+                    // Back to advice: the strip's button becomes Open Releases,
+                    // and the reason is on screen rather than in a log.
+                    self.installPhase = nil
+                    self.selfUpdateFailed = true
+                    self.note(phase.text, transient: false)
+                    return
+                }
+                self.installPhase = phase
+            }
+            return
+        }
         if let command = installKind.updateCommand {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(command, forType: .string)
@@ -412,6 +477,9 @@ final class UpdateCheck: ObservableObject {
         }
 
         availableVersion = latest
+        if Self.installsOnLaunch, installKind.canSelfUpdate, installPhase == nil {
+            performUpdate()
+        }
         if userInitiated {
             // The strip itself carries the version and the action; a note on top
             // of it would just repeat them.
