@@ -103,17 +103,21 @@ a companion, not a standalone.
   5.2.5 comes back anyway, the keyword is the next thing to strip.
 - **Category**: Productivity (secondary: Utilities)
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
-- **Support URL**: `https://hausfold.co/perch`
-- **Marketing URL**: `https://hausfold.co/perch`
+- **Support URL**: `https://hausfold.co/docs/perch`
+- **Marketing URL**: `https://hausfold.co/docs/perch`
+  Both were `https://hausfold.co/perch` until **2026-08-26**, when that product
+  page was retired and hausfold.co began redirecting it to the docs tree. A
+  listing still carrying the old value therefore resolves, but with a hop a
+  reviewer doesn't need, so correct both fields at the next submission.
   hausfold is the seller, and perch's privacy policy — the one thing App Store
-  Connect *requires* a URL for — lives at `https://hausfold.co/perch/privacy`;
-  the support and marketing URLs belong beside it.
-  [hausfold/hausfold.co#1](https://github.com/hausfold/hausfold.co/pull/1) is
-  deployed and **both URLs return 200 as of 2026-08-15**, so they are safe to
-  paste. (Support URL reachability is a routine App Review rejection — re-check
-  with `curl -sIL` before a submission if the site has moved since.)
+  Connect *requires* a URL for — is the part that did **not** move: it is still
+  `https://hausfold.co/perch/privacy`, verified 200 on 2026-08-26. (Support URL
+  reachability is a routine App Review rejection — re-check all three with
+  `curl -sIL` before a submission if the site has moved since.)
   ⚠️ **Editing a listing field in App Store Connect is a manual act.** A commit
-  to this file changes the copy of record, not the listing.
+  to this file changes the copy of record, not the listing — and that goes for
+  the **Description** below as well, whose last paragraph names the same URL and
+  is still live with the old one.
 - **Keywords** (100 chars, comma-separated, no spaces):
   `shelf,airdrop,transfer,mac,send,share,files,drop,handoff,local,offline,nearby`
 
@@ -145,8 +149,8 @@ a companion, not a standalone.
 > • Nothing is collected. No analytics, no ads, no tracking, and your file names
 >   never appear in a log.
 >
-> The Mac half is a separate app, downloaded free from hausfold.co/perch. Both
-> halves are free, and always will be.
+> The Mac half is a separate app, downloaded free from hausfold.co/docs/perch.
+> Both halves are free, and always will be.
 
 The listing is *named* `Perch Companion`, so never write "the companion" as if it
 were something else — inside this listing that points at itself. Say "the Mac
@@ -204,8 +208,8 @@ correct.) If you add a device to the list, boot it first.
 
 > Perch Companion is the iPhone/iPad half of Perch, a Mac shelf that lives at
 > the notch. The Mac app is separate, distributed outside the App Store at
-> https://hausfold.co/perch. This app does NOT need a Mac to be reviewed — see
-> 4.
+> https://hausfold.co/docs/perch. This app does NOT need a Mac to be reviewed —
+> see 4.
 >
 > 1. SCREEN RECORDING. Attached. Captured from a physical iPhone 15 Pro running
 > iOS 27.0 mirrored to a Mac so both halves of the product are visible in one

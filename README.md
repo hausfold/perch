@@ -37,8 +37,8 @@ shelf, and how updates arrive.
 
 ## more
 
-- [hausfold.co/perch](https://hausfold.co/perch): the product page
-- [the manual](https://hausfold.co/docs/perch): install, using the shelf, and what stays when you walk away
+- [the manual](https://hausfold.co/docs/perch): install, using the shelf, and what stays when you walk away — the one page about perch on hausfold.co
+- [privacy](https://hausfold.co/perch/privacy): the whole policy, and shorter than the manual
 - [Reference](docs/reference.md): storage, watched folders, theming, permissions, the deep detail
 - [The `perch` command line](docs/cli.md): `perch add`, its exit codes, and the mailbox protocol behind it
 - [`ai/SKILL.md`](ai/SKILL.md): the agent surface, so *"put this in my shelf"* works first try
