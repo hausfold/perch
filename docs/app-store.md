@@ -68,6 +68,17 @@ The first submission is the slow one; everything after it is the loop below.
   listing goes live when you're watching it. Phased release (7-day ramp) is worth
   keeping on for later versions and pointless for the first one.
 
+> ✅ **1.0 is live — approved 2026-08-25**, after a resubmission on 08-19.
+> `Perch Companion`, Apple ID **`6799443735`**, bundle id `com.hausfold.perch.ios`,
+> free, iOS 18+ —
+> [apps.apple.com/app/id6799443735](https://apps.apple.com/app/id6799443735).
+> That id is the durable handle: the short `/app/id<id>` URL redirects to the
+> right localized listing forever, while the slug in the URL App Store Connect
+> shows you changes with the app's name. Turn **phased release** on from the
+> next version. It also unblocks the deletions in
+> [Re-identifying an already-submitted app](#re-identifying-an-already-submitted-app)
+> step 6.
+
 Then each later release is: tag → build lands in TestFlight → **new version
 record** in App Store Connect (`+` next to iOS App) → attach the build → one
 honest What's New line → Submit. A Mac-only release skips all of that and just
@@ -471,9 +482,22 @@ need the old name back:
 5. 🤖 **Upload a build**: `gh workflow run testflight.yml`. No tag needed — the
    phone side ships on `workflow_dispatch`. Confirm it lands in TestFlight under
    the *new* record.
-6. 👤 **Delete the old record**, once the new one has a green build. Unreleased
-   and free, it carries no purchases and — because step 4 took a keeper name —
-   no name anyone is waiting on. Ordinary cleanup, no deadline.
+6. 👤 **Delete the old record** — `Perch for Mac`, Apple ID `6799010687`.
+   Gated on the *new* record being **approved**, by decision, not merely on a
+   green build; ✅ unblocked 2026-08-25. Not because the name was needed back —
+   step 4 took a keeper name and settled that — but because deletion is
+   permanent and a record you might still fall back to is worth keeping until
+   the replacement is approved. Unreleased and free, it carries no
+   purchases and — because step 4 took a keeper name — no name anyone is
+   waiting on. Ordinary cleanup, no deadline. **Permanent**, so it only happens
+   once and only after approval.
+
+   The dead `com.nebelhaus.*` identifiers go with it, in this order: the record,
+   then both `XC com nebelhaus perch ios*` App IDs, then `group.com.nebelhaus.perch`
+   — the App Group refuses to delete while an App ID still enables it. No code,
+   config or entitlement here references `nebelhaus` any more, so the only
+   casualties are provisioning profiles for builds nobody can install. `perch-ios` stays a spent
+   SKU either way; deleting the record does not free it.
 7. 👤 *(only if you needed the old name back)* Rename the new record in App
    Information. Deleting the old record is what *allows* this but does not
    reliably free the name on any documented schedule, so expect to wait and
@@ -492,8 +516,12 @@ identity all become unreachable at once. That is exactly the invariant
 together or die together"* — and dying together is the safe half: the phone
 mints a fresh `deviceID` and you re-pair, rather than presenting a new id while
 holding an old key ("paired on screen, refused by the Mac"). No migration code
-is warranted: the app has never been released, so the only data at risk is on
-your own test devices.
+was warranted **then**: the app had never been released, so the only data at
+risk was on your own test devices. ⚠️ **That escape hatch closed on
+2026-08-25.** Moving the App Group or either side's Keychain *service* strings
+now strands a real user's shelf, outbox and pairing, exactly as described above
+— the same move today owes them a migration, or an honest release note saying
+re-pair.
 
 **The Mac app followed, separately.** It settled on `com.hausfold.perch` on
 2026-08-08 — the bundle id *is* the sandbox container, so the sooner it settles
