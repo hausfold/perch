@@ -276,6 +276,33 @@ GitHub last said, the one-shot marker for the retention opt-in migration, and
 `screenshotsFolderID` — a pointer at a watched folder's security bookmark, which
 is a memory of a panel someone clicked. Ephemera and pointers, not settings.
 
+### Knowing the drop will not land
+
+macOS's *"Drag windows to top of screen to enter Mission Control"* is on by
+default and arms the Dock's top-edge monitor for the whole of **any** drag —
+files included — in exactly the band the notch catch zone occupies. On a stock
+Mac the first drag aimed at the shelf is taken into Mission Control before perch
+sees a `draggingEntered:`, so the app looks broken by the only gesture it has.
+
+`MissionControlCheck` reads the Dock's own answer and says so, on the two
+passive surfaces perch already owns: a strip along the bottom of the expanded
+shelf and a row in the menu bar menu. It never writes that key — the button
+opens System Settings ▸ Desktop & Dock and leaves the decision where it belongs.
+
+Two seams matter here. **An absent value means armed**: a Mac that has never had
+the key written is precisely the stock Mac this exists for, and a denied read is
+indistinguishable from an absent one, so both err toward a dismissible hint
+rather than silently failing every drag. And the shelf's notice slot is
+**shared** — this strip outranks the update strip below, because a pending
+release is worth reading and a shelf that cannot catch anything is not.
+
+Reading `com.apple.dock` needs
+`com.apple.security.temporary-exception.shared-preference.read-only`, one domain,
+read-only. Measured 2026-08-26 on macOS 26.6: without it every route to the value
+answers nil; with it the preference reads answer and the *file* read stays
+denied — the exception widens the sandbox by one domain's preferences and
+nothing on disk.
+
 ### Knowing there is a new release
 
 `UpdateCheck` asks GitHub for the latest tag hourly (and on wake), compares it to

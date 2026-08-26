@@ -13,6 +13,7 @@ struct PerchApp: App {
     // own small view instead — see `PairedDevicesSection`.
     @StateObject private var runtime = AppRuntime.shared
     @StateObject private var update = UpdateCheck.shared
+    @StateObject private var missionControl = MissionControlCheck.shared
 
     init() {
         PerchShortcuts.updateAppShortcutParameters()
@@ -40,6 +41,19 @@ struct PerchApp: App {
                 // alert raised from the menu bar.
                 Button("Clear Shelf…", role: .destructive) {
                     confirmClearFromMenu()
+                }
+            }
+
+            // Deliberately ignores the strip's ✕: waving the strip off is
+            // "stop nagging me", not "I fixed it", and while the Dock's
+            // top-edge trigger is armed the shelf's one gesture does not work.
+            // A menu row costs nothing while the menu is closed, so this is
+            // where the answer stays findable — and it disappears by itself the
+            // moment the toggle is off.
+            if missionControl.isArmed {
+                Divider()
+                Button("Drags Go to Mission Control — Fix…") {
+                    missionControl.openSettings()
                 }
             }
 

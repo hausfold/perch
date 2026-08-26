@@ -10,6 +10,11 @@ struct ShelfPanelView: View {
     /// gets to say so. Observed rather than owned: one check feeds every panel
     /// (one per display) and the menu bar item.
     @ObservedObject var update: UpdateCheck = .shared
+    /// The same slot's other occupant, and the one with the better claim: while
+    /// the Dock's top-edge trigger is armed, dragging to the notch does not
+    /// work at all, so it outranks a pending release. Observed, not owned, for
+    /// the same reason `update` is — one check feeds every panel and the menu.
+    @ObservedObject var missionControl: MissionControlCheck = .shared
 
     let onExpand: () -> Void
     let onHide: () -> Void
@@ -47,6 +52,14 @@ struct ShelfPanelView: View {
             }
         }
         .animation(.snappy(duration: 0.24, extraBounce: 0.08), value: state.isExpanded)
+        // Re-read the Dock on every expand. The check also listens for the
+        // Dock's own prefchanged notification, but this is the path that
+        // matters: someone acting on the strip walks to System Settings, flips
+        // the toggle, comes back and opens the shelf — and the nudge telling
+        // them to do it should already be gone. A preference read, no network.
+        .onChange(of: state.isExpanded) { _, expanded in
+            if expanded { missionControl.refresh() }
+        }
         // The Clear arming's three guards, deliberately on the root rather than
         // beside the button they guard. `header` is only in the tree while the
         // panel is expanded and non-empty, but the panel is never destroyed on
@@ -169,12 +182,23 @@ struct ShelfPanelView: View {
             } else {
                 emptyState
             }
-            if showsUpdateStrip {
+            if showsMissionControlStrip {
+                MissionControlStrip(check: missionControl)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if showsUpdateStrip {
                 UpdateStrip(check: update)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(.snappy(duration: 0.28), value: showsUpdateStrip)
+        .animation(.snappy(duration: 0.28), value: showsMissionControlStrip)
+    }
+
+    /// Yields to a drag and to an error for the same reasons the update strip
+    /// does — but takes the slot from the update strip when both want it.
+    private var showsMissionControlStrip: Bool {
+        guard !state.isDropActive, store.latestError == nil else { return false }
+        return missionControl.showsHint
     }
 
     /// The nudge is the lowest-priority thing on the shelf: it yields to a drag
@@ -424,7 +448,7 @@ private struct UpdateStrip: View {
 
     var body: some View {
         if let pending = check.pendingVersion {
-            row {
+            NoticeRow {
                 Image(systemName: "arrow.down.circle.fill")
                     .font(.body)
                     .foregroundStyle(rice.accent)
@@ -452,11 +476,11 @@ private struct UpdateStrip: View {
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                dismissButton { check.dismiss() }
+                NoticeDismissButton { check.dismiss() }
                     .help("Dismiss until the next release")
             }
         } else if let note = check.statusNote {
-            row {
+            NoticeRow {
                 Image(systemName: "checkmark.circle")
                     .font(.callout)
                     .foregroundStyle(rice.overlay0)
@@ -465,12 +489,35 @@ private struct UpdateStrip: View {
                     .foregroundStyle(rice.subtext0)
                     .lineLimit(1)
                 Spacer(minLength: 8)
-                dismissButton { check.clearNote() }
+                NoticeDismissButton { check.clearNote() }
             }
         }
     }
 
-    private func dismissButton(_ action: @escaping () -> Void) -> some View {
+}
+
+/// Perch's notch tells you things in exactly one place: a quiet strip along the
+/// bottom of the open shelf. Two notices share that slot — an armed Mission
+/// Control trigger and a pending release — so they share its chrome too, rather
+/// than drifting apart one padding value at a time.
+private struct NoticeRow<Content: View>: View {
+    @Environment(\.rice) private var rice
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: 8) { content }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(rice.wash(0.07), in: RoundedRectangle(cornerRadius: 10))
+            .accessibilityElement(children: .contain)
+    }
+}
+
+private struct NoticeDismissButton: View {
+    @Environment(\.rice) private var rice
+    let action: () -> Void
+
+    var body: some View {
         Button(action: action) {
             Image(systemName: "xmark")
                 .font(.caption.weight(.semibold))
@@ -481,13 +528,60 @@ private struct UpdateStrip: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Dismiss")
     }
+}
 
-    private func row<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        HStack(spacing: 8) { content() }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(rice.wash(0.07), in: RoundedRectangle(cornerRadius: 10))
-            .accessibilityElement(children: .contain)
+/// The strip that says the shelf's one gesture will not work yet.
+///
+/// It only ever appears on a Mac where the Dock's top-edge Mission Control
+/// trigger is armed — which is every stock Mac, and no haus one. The button
+/// opens System Settings ▸ Desktop & Dock rather than flipping the toggle:
+/// perch reads that domain and does not write it (see `MissionControlCheck`).
+///
+/// The ✕ is forever, unlike the update strip's per-version wave-off, because
+/// there is no later version of this to re-ask about. The menu bar keeps a row
+/// that ignores the dismissal, so waving it off hides the nag without losing
+/// the answer.
+private struct MissionControlStrip: View {
+    @ObservedObject var check: MissionControlCheck
+
+    @Environment(\.rice) private var rice
+
+    var body: some View {
+        NoticeRow {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.body)
+                .foregroundStyle(rice.accent)
+            VStack(alignment: .leading, spacing: 1) {
+                // Both lines are kept short enough to survive `lineLimit(1)` at
+                // the narrowest the shelf gets: expandedContentWidth caps at
+                // 540, and the icon, the button and the ✕ take most of the rest.
+                // The full setting name is in the README and docs/reference.md —
+                // here the button is what walks you there.
+                Text("Mission Control is eating your drags")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(rice.text)
+                    .lineLimit(1)
+                Text("Turn it off in Desktop & Dock")
+                    .font(.caption)
+                    .foregroundStyle(rice.subtext0)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Button {
+                check.openSettings()
+            } label: {
+                Text("Open Settings")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(rice.onAccent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(rice.accent.opacity(0.88)))
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            NoticeDismissButton { check.dismiss() }
+                .help("Hide this. The menu bar keeps the reminder.")
+        }
     }
 }
 

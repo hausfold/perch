@@ -57,5 +57,24 @@
 	<array>
 		<string>/.config/perch/</string>
 	</array>
+	<!-- The Dock's own preference domain, read-only, one domain: perch reads
+	     `enterMissionControlByTopWindowDrag` to know whether macOS's top-edge
+	     Mission Control trigger is armed, because while it is, it eats every drag
+	     aimed at the notch and perch looks broken by its only gesture. Measured
+	     2026-08-26 on macOS 26.6: without this key EVERY route to that value —
+	     `UserDefaults(suiteName:)`, `CFPreferencesCopyAppValue`, and reading
+	     ~/Library/Preferences/com.apple.dock.plist — answers nil/false, so perch
+	     could not tell an armed Mac from a fixed one. With it, the two preference
+	     reads answer and the FILE read stays denied: this widens the sandbox by
+	     exactly one domain's preferences, and nothing on disk.
+
+	     Read-only, and it stays that way. Perch never writes this key — flipping
+	     someone's system setting from an app is not perch's to do, so the nudge
+	     opens System Settings ▸ Desktop & Dock and lets them decide. See
+	     Perch/Platform/MissionControlCheck.swift. -->
+	<key>com.apple.security.temporary-exception.shared-preference.read-only</key>
+	<array>
+		<string>com.apple.dock</string>
+	</array>
 </dict>
 </plist>
