@@ -310,17 +310,28 @@ this build's CalVer, and — if it is newer and not already dismissed — pins a
 strip along the bottom of the expanded shelf plus a row in the menu bar menu.
 Dismissal is per version, so waving one release away still surfaces the next.
 
-It never installs anything. Perch is sandboxed, so it cannot replace its own
-bundle in `/Applications` and a `brew` spawned from here would inherit the same
-sandbox; instead the button copies this install's command (`haus update`,
-`brew upgrade --cask perch`, `nix flake update perch`) or opens the release page.
-Which of those it offers comes from `InstallKind`, resolved from the bundle path
+What the button does comes from `InstallKind`. Three cohorts get a command
+copied (`haus update`, `brew upgrade --cask perch`, `nix flake update perch`),
+because the tool that installed them owns the bytes and would undo a swap done
+behind its back. The fourth — a ZIP dragged into `/Applications` — installs in
+one click: `SelfUpdate` downloads the release into the container, unzips it and
+checks it is signed by us, then hands it to `PerchUpdater.app`, a nested
+un-sandboxed helper that does the swap and the relaunch. The split is the
+sandbox's: `/Applications` is outside the container and a spawned child inherits
+the sandbox, but an app launched through LaunchServices does not. The updater
+replaces only the bundle it is nested inside, and only a notarized build of ours
+that is newer than the one installed — the notarization clause is *its* check to
+make, since the container cannot settle notarization at all (errSecCSReqFailed
+from inside, a pass from outside, on the same bytes). A failure at any step
+leaves the installed app alone and relaunches it.
+
+Which cohort perch is in is resolved from the bundle path
 plus two out-of-band receipts — the rice's `perch.installed-from` marker and
 brew's Caskroom directory — with the rice's theme drop as a third signal if the
-receipts ever stop being readable from inside the container. The poll is the
-app's only *outbound internet* call and the only reason it holds
-`com.apple.security.network.client`; a Settings toggle stops it, and DEBUG builds
-never run it. (The
+receipts ever stop being readable from inside the container. The poll — and the
+release ZIP that one click downloads — are the app's only *outbound internet*
+traffic and the only reason it holds `com.apple.security.network.client`; a
+Settings toggle stops the poll, and DEBUG builds never run it. (The
 mobile listener below is the app's other network surface — local-network only,
 paired devices only, its own toggle, and the sole reason for
 `network.server`.)
