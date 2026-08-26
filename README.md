@@ -24,6 +24,11 @@ grant, no telemetry, and no Dock icon.
 brew install --cask hausfold/tap/perch
 ```
 
+The phone half is free on the App Store:
+[**Perch Companion**](https://apps.apple.com/app/id6799443735) — pair it once by
+scanning the Mac's code, then send over your own network — or with no
+network at all, peer-to-peer.
+
 The drag is the front door; Finder's right-click menu, the `perch` command
 line, watched folders, and a paired iPhone are the others. The manual lives at
 [hausfold.co/docs/perch](https://hausfold.co/docs/perch): the Nix flake, the

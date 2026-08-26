@@ -11,7 +11,7 @@ final class MobilePairingWindowController: NSWindowController, NSWindowDelegate 
 
     private init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 560),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -81,6 +81,11 @@ struct MobilePairingView: View {
                 .accessibilityLabel("Pairing QR code")
         }
 
+        Link("Don't have it yet? Get it free on the App Store",
+             destination: Self.companionAppStoreURL)
+            .font(.caption)
+            .multilineTextAlignment(.center)
+
         VStack(spacing: 6) {
             Text("No camera handy? Paste this into the phone instead:")
                 .font(.caption)
@@ -124,6 +129,12 @@ struct MobilePairingView: View {
             .buttonStyle(.borderedProminent)
         }
     }
+
+    /// The short `/app/id<id>` form on purpose: it redirects to the viewer's
+    /// own storefront and survives a rename of the listing, which the
+    /// slug-bearing URL App Store Connect hands you does not.
+    nonisolated static let companionAppStoreURL =
+        URL(string: "https://apps.apple.com/app/id6799443735")!
 
     private static func qrImage(for string: String) -> NSImage? {
         let filter = CIFilter.qrCodeGenerator()
