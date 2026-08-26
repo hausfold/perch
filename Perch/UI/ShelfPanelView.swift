@@ -56,7 +56,11 @@ struct ShelfPanelView: View {
         // Dock's own prefchanged notification, but this is the path that
         // matters: someone acting on the strip walks to System Settings, flips
         // the toggle, comes back and opens the shelf — and the nudge telling
-        // them to do it should already be gone. A preference read, no network.
+        // them to do it should already be gone. It costs one synchronous
+        // cfprefsd round-trip (see MissionControlCheck.refresh) on the frame
+        // the expand animation starts — measurably cheaper than the staging
+        // work an expand routinely sits next to, and it runs once per expand,
+        // not per frame.
         .onChange(of: state.isExpanded) { _, expanded in
             if expanded { missionControl.refresh() }
         }
@@ -195,9 +199,24 @@ struct ShelfPanelView: View {
     }
 
     /// Yields to a drag and to an error for the same reasons the update strip
-    /// does — but takes the slot from the update strip when both want it.
+    /// does — but takes the slot from the update strip when both want it, with
+    /// one exception.
+    ///
+    /// **A live `statusNote` wins.** "Check for Updates…" in the menu bar opens
+    /// the shelf precisely because the strip is where its answer lands, and that
+    /// answer — "You're up to date", or the confirmation that a command was
+    /// copied — is rendered by `UpdateStrip` and nowhere else. On a stock Mac
+    /// this hint is showing, so without this the menu item would pop the shelf
+    /// open and display something the user didn't ask about while their answer
+    /// went nowhere. The note clears itself after six seconds and the hint comes
+    /// straight back.
+    ///
+    /// A pending *release* does NOT win: a shelf that cannot catch anything is a
+    /// worse problem than an available update, and the menu bar carries its own
+    /// row for the release either way.
     private var showsMissionControlStrip: Bool {
         guard !state.isDropActive, store.latestError == nil else { return false }
+        guard update.statusNote == nil else { return false }
         return missionControl.showsHint
     }
 

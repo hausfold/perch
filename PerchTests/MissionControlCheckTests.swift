@@ -17,14 +17,12 @@ final class MissionControlCheckTests: XCTestCase {
     /// as nil. Pinning them to the same answer records the deliberate choice:
     /// if the entitlement is ever dropped, perch shows a dismissible hint
     /// rather than silently letting every drag fail.
+    ///
+    /// `false` is the haus case: the desktop writes that key whenever
+    /// `haus.shelf.enable` is on, so a rice install must never see the strip or
+    /// the menu row.
     func testExplicitValuesWin() {
         XCTAssertTrue(MissionControlCheck.isArmed(dockPreference: true))
-        XCTAssertFalse(MissionControlCheck.isArmed(dockPreference: false))
-    }
-
-    /// The haus desktop writes `false` whenever `haus.shelf.enable` is on, so a
-    /// rice install must never see the strip or the menu row.
-    func testRiceInstallIsNotArmed() {
         XCTAssertFalse(MissionControlCheck.isArmed(dockPreference: false))
     }
 
@@ -39,9 +37,11 @@ final class MissionControlCheckTests: XCTestCase {
         )
     }
 
-    /// The domain and key perch reads, pinned because the entitlement in
-    /// Perch.entitlements names the same domain by hand — a rename in one place
-    /// and not the other is a check that silently answers nil forever.
+    /// The domain and key perch reads. A regression pin on the strings only —
+    /// `Perch.entitlements` names `com.apple.dock` by hand and this test cannot
+    /// see it, so it does NOT catch the two drifting apart. That pairing is
+    /// held by the comment in the entitlements file and by the feel-test recipe
+    /// in docs/feel-testing.md, which fails visibly if the read ever answers nil.
     func testReadsTheDockDomain() {
         XCTAssertEqual(MissionControlCheck.dockDomain, "com.apple.dock")
         XCTAssertEqual(MissionControlCheck.dockKey, "enterMissionControlByTopWindowDrag")

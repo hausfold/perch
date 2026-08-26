@@ -113,9 +113,12 @@ final class MissionControlCheck: ObservableObject {
         }
     }
 
-    /// Re-read the Dock's answer. Cheap — a preference read, no network, no
-    /// file — so the shelf calls it on every expand as well, which is what makes
-    /// "I just turned it off" clear the strip that is telling you to.
+    /// Re-read the Dock's answer. No network, but not free either: the
+    /// synchronize below is a synchronous `cfprefsd` round-trip that reaches the
+    /// on-disk store, which is exactly why it can see a toggle another process
+    /// just wrote. Called on every shelf expand as well as from the two
+    /// observers — once per expand, and it is what makes "I just turned it off"
+    /// clear the strip that is telling you to.
     func refresh() {
         let armed = Self.isArmed(dockPreference: Self.readDockPreference())
         guard armed != isArmed else { return }
@@ -136,7 +139,8 @@ final class MissionControlCheck: ObservableObject {
 
     /// `CFPreferencesAppSynchronize` first: without it this process keeps the
     /// value it cached at first read, and a toggle flipped in System Settings
-    /// would not land until relaunch.
+    /// would not land until relaunch. It is a `cfprefsd` round-trip, not a
+    /// memory read — the cost of being right about another process's writes.
     private static func readDockPreference() -> Bool? {
         CFPreferencesAppSynchronize(dockDomain as CFString)
         let value = CFPreferencesCopyAppValue(dockKey as CFString, dockDomain as CFString)

@@ -25,15 +25,19 @@ brew install --cask hausfold/tap/perch
 ```
 
 No Homebrew? [**Download the latest release**](https://github.com/hausfold/perch/releases/latest),
-unzip it, and drag `Perch.app` to your Applications folder — it's
-Developer-ID signed and Apple-notarized, so it opens on the first
-double-click with no warning to click through.
+unzip it, and drag `Perch.app` to your Applications folder. It's Developer-ID
+signed and Apple-notarized, so Gatekeeper doesn't block it — you get the
+ordinary *"downloaded from the Internet, are you sure?"* confirmation on the
+first open and nothing else: no *unidentified developer*, no right-click-Open
+trick, no `xattr`. This route puts no `perch` on your `PATH`; if you want [the
+command line](docs/cli.md), link it yourself with
+`ln -s /Applications/Perch.app/Contents/MacOS/perch-cli /usr/local/bin/perch`.
 
 Then turn **off** System Settings ▸ Desktop & Dock ▸ *"Drag windows to top of
 screen to enter Mission Control"* — macOS ships it on, and it takes the top
 edge of the screen for the whole of any drag, which is exactly where the shelf
-catches. Perch says so on first run and the button walks you there; the
-[haus](https://github.com/hausfold/haus) desktop flips it for you.
+catches. Perch says so the first time you open the shelf and the button walks
+you there; the [haus](https://github.com/hausfold/haus) desktop flips it for you.
 
 The phone half is free on the App Store:
 [**Perch Companion**](https://apps.apple.com/app/id6799443735) — pair it once by

@@ -197,3 +197,35 @@ Turning Wi-Fi off in **Control Center** disconnects from the network and
 deliberately leaves AWDL up, so a paired phone still delivers over the
 peer-to-peer link. Use Airplane Mode, or Settings ▸ Wi-Fi ▸ Off. Stated for
 users, with the mechanism, in [`reference.md`](./reference.md) ▸ Permissions.
+
+## The Mission Control hint is invisible on a haus Mac — arm it first
+
+The strip and the menu row only render while the Dock's top-edge trigger is
+armed, and `haus.shelf.enable` turns that trigger **off**, so on the machine you
+are almost certainly reading this on `isArmed` is false and neither surface ever
+appears. That is the feature working, not a missing view. To see it:
+
+```sh
+defaults write com.apple.dock enterMissionControlByTopWindowDrag -bool true
+killall Dock
+```
+
+Open the shelf — the strip should be along its bottom edge, and the menu bar
+menu should carry *"Drags Go to Mission Control — Fix…"*. Put it back with
+`-bool false` and the same `killall`; the strip clears the next time the shelf
+opens. **While it is armed, dragging to the notch genuinely will not work** —
+that is the whole point of the hint, so don't test the drag in this state.
+
+Two things to know before you start:
+
+- **The ✕ is one-way and there is no Settings switch to undo it.** Dismissing
+  writes `MissionControlHintDismissed` into perch's container, so one idle click
+  kills the strip for the rest of that install. Clear it with
+  `defaults delete com.hausfold.perch MissionControlHintDismissed` (the menu row
+  ignores the dismissal and stays regardless).
+- **A build with no entitlement looks identical to an armed Mac.** The read
+  needs `temporary-exception.shared-preference.read-only` for `com.apple.dock`,
+  and a denied read is indistinguishable from an absent key — both mean armed.
+  So a strip that will not go away after you set the key back to `false` is the
+  signature of the entitlement being missing or stripped, not of a stuck view.
+  `codesign -d --entitlements - <bundle>` settles it.
