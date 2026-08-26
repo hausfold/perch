@@ -81,9 +81,10 @@ struct MobilePairingView: View {
                 .accessibilityLabel("Pairing QR code")
         }
 
-        Link("Don't have it yet? Get Perch Companion — free on the App Store",
+        Link("Don't have it yet? Get it free on the App Store",
              destination: Self.companionAppStoreURL)
             .font(.caption)
+            .multilineTextAlignment(.center)
 
         VStack(spacing: 6) {
             Text("No camera handy? Paste this into the phone instead:")
