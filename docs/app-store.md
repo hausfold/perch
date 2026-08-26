@@ -505,14 +505,16 @@ need the old name back:
    > Ready for Review, Waiting for Review, In Review, Metadata Rejected, or
    > Rejected."* `Perch for Mac` sits at **1.0 Rejected**, and pulling its
    > submission produced that state rather than clearing it — a record that never
-   > shipped has no later state to reach on its own. The escape is to unstick the
-   > *version*: drop the build off 1.0 so it falls back to *Prepare for
-   > Submission*, which **is** removable. Failing that, ask **Contact Us → App
-   > Store Connect → App Management** to remove Apple ID `6799010687`, naming
-   > `6799443735` as the record that superseded it.
+   > shipped has no later state to reach on its own. Unsticking the *version*
+   > first looks like the escape — drop the build off 1.0 and it should fall back
+   > to *Prepare for Submission*, which **is** removable — but a Rejected version
+   > is read-only: the Build section renders the build with no remove control at
+   > all. **Support is the only path.** Contact Us → App Store Connect → App
+   > Management, ask them to remove Apple ID `6799010687`, and name `6799443735`
+   > as the record that superseded it.
    >
-   > This blocks the whole chain — the App ID behind it, and the App Group behind
-   > that. One thing does *not* have to wait: **un-tick App Groups on the
+   > That blocks the rest of the chain — the App ID behind the record, and the
+   > App Group behind the App ID. One thing does *not* have to wait: **un-tick App Groups on the
    > `XC com nebelhaus perch ios` App ID**, and `group.com.nebelhaus.perch` loses
    > its last consumer and deletes cleanly. Editing an App ID's capabilities is
    > allowed even while a record points at it.
