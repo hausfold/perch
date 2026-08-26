@@ -67,6 +67,10 @@ struct PerchApp: App {
                     update.performUpdate()
                     runtime.windowSystem.openShelfOnPointerScreen()
                 }
+                // Same guard the strip and Settings carry: during a one-click
+                // install this row would restart the phase text over a download
+                // that is still running.
+                .disabled(update.installPhase != nil)
             }
             Button("Check for Updates…") {
                 update.checkForUpdates(userInitiated: true)

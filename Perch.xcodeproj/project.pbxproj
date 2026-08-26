@@ -27,11 +27,19 @@
 			remoteGlobalIDString = A20000000000000000000091;
 			remoteInfo = PerchCLI;
 		};
+		A200000000000000000000AD = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A20000000000000000000010;
+			proxyType = 1;
+			remoteGlobalIDString = A200000000000000000000A6;
+			remoteInfo = PerchUpdater;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXBuildFile section */
 		A20000000000000000000067 = {isa = PBXBuildFile; fileRef = A20000000000000000000051; settings = {ATTRIBUTES = (RemoveHeadersOnCopy,);};};
 		A20000000000000000000099 = {isa = PBXBuildFile; fileRef = A20000000000000000000092;};
+		A200000000000000000000AB = {isa = PBXBuildFile; fileRef = A200000000000000000000A0; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, CodeSignOnCopy,);};};
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -53,6 +61,15 @@
 			name = "Embed Command Line Tool";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A200000000000000000000AA = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "Contents/Helpers";
+			dstSubfolderSpec = 1;
+			files = (A200000000000000000000AB,);
+			name = "Embed Updater";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -61,6 +78,7 @@
 		A20000000000000000000050 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PerchIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000051 = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PerchShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000092 = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "perch-cli"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A200000000000000000000A0 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PerchUpdater.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -78,6 +96,11 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (Info.plist, PerchShare.entitlements,);
 			target = A20000000000000000000068;
+		};
+		A200000000000000000000A2 = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (main.swift, Installer.swift,);
+			target = A20000000000000000000011;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -125,6 +148,12 @@
 			path = PerchCLI;
 			sourceTree = "<group>";
 		};
+		A200000000000000000000A1 = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (A200000000000000000000A2,);
+			path = PerchUpdater;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -133,6 +162,7 @@
 		A20000000000000000000062 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A2000000000000000000006A = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A20000000000000000000094 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A200000000000000000000A4 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -144,6 +174,7 @@
 				A2000000000000000000007B,
 				
 				A20000000000000000000090,
+				A200000000000000000000A1,
 				A20000000000000000000055,
 				A20000000000000000000053,
 				A20000000000000000000054,
@@ -154,7 +185,7 @@
 		};
 		A2000000000000000000000C = {
 			isa = PBXGroup;
-			children = (A20000000000000000000004, A20000000000000000000005, A20000000000000000000050, A20000000000000000000051, A20000000000000000000092,);
+			children = (A20000000000000000000004, A20000000000000000000005, A20000000000000000000050, A20000000000000000000051, A20000000000000000000092, A200000000000000000000A0,);
 			name = Products;
 			sourceTree = "<group>";
 		};
@@ -164,10 +195,10 @@
 		A20000000000000000000011 = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A20000000000000000000030;
-			buildPhases = (A20000000000000000000013, A20000000000000000000009, A20000000000000000000014, A20000000000000000000098,);
+			buildPhases = (A20000000000000000000013, A20000000000000000000009, A20000000000000000000014, A20000000000000000000098, A200000000000000000000AA,);
 			buildRules = ();
-			dependencies = (A2000000000000000000009B,);
-			fileSystemSynchronizedGroups = (A20000000000000000000007, A20000000000000000000052, A2000000000000000000007B,);
+			dependencies = (A2000000000000000000009B, A200000000000000000000AC,);
+			fileSystemSynchronizedGroups = (A20000000000000000000007, A20000000000000000000052, A2000000000000000000007B, A200000000000000000000A1,);
 			name = Perch;
 			packageProductDependencies = ();
 			productName = Perch;
@@ -226,6 +257,19 @@
 			productReference = A20000000000000000000005;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		A200000000000000000000A6 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A200000000000000000000A9;
+			buildPhases = (A200000000000000000000A3, A200000000000000000000A4, A200000000000000000000A5,);
+			buildRules = ();
+			dependencies = ();
+			fileSystemSynchronizedGroups = (A200000000000000000000A1,);
+			name = PerchUpdater;
+			packageProductDependencies = ();
+			productName = PerchUpdater;
+			productReference = A200000000000000000000A0;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -241,6 +285,7 @@
 					A20000000000000000000060 = {CreatedOnToolsVersion = 26.6;};
 					A20000000000000000000068 = {CreatedOnToolsVersion = 26.6;};
 					A20000000000000000000091 = {CreatedOnToolsVersion = 26.6;};
+					A200000000000000000000A6 = {CreatedOnToolsVersion = 26.6;};
 				};
 			};
 			buildConfigurationList = A20000000000000000000032;
@@ -253,7 +298,7 @@
 			productRefGroup = A2000000000000000000000C;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (A20000000000000000000011, A20000000000000000000012, A20000000000000000000060, A20000000000000000000068, A20000000000000000000091,);
+			targets = (A20000000000000000000011, A20000000000000000000012, A20000000000000000000060, A20000000000000000000068, A20000000000000000000091, A200000000000000000000A6,);
 		};
 /* End PBXProject section */
 
@@ -262,6 +307,7 @@
 		A20000000000000000000016 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A20000000000000000000063 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A2000000000000000000006B = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A200000000000000000000A5 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -270,12 +316,14 @@
 		A20000000000000000000061 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A20000000000000000000069 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A20000000000000000000093 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A200000000000000000000A3 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
 		A20000000000000000000017 = {isa = PBXTargetDependency; target = A20000000000000000000011; targetProxy = A20000000000000000000003;};
 		A20000000000000000000065 = {isa = PBXTargetDependency; target = A20000000000000000000068; targetProxy = A20000000000000000000066;};
 		A2000000000000000000009B = {isa = PBXTargetDependency; target = A20000000000000000000091; targetProxy = A2000000000000000000009A;};
+		A200000000000000000000AC = {isa = PBXTargetDependency; target = A200000000000000000000A6; targetProxy = A200000000000000000000AD;};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -557,6 +605,50 @@
 			};
 			name = Release;
 		};
+		A200000000000000000000A7 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 88M28542LQ;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Perch Updater";
+				INFOPLIST_KEY_LSUIElement = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PERCH_BUNDLE_ID).updater";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = targeted;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A200000000000000000000A8 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 88M28542LQ;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Perch Updater";
+				INFOPLIST_KEY_LSUIElement = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(PERCH_BUNDLE_ID).updater";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = targeted;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -566,6 +658,7 @@
 		A20000000000000000000074 = {isa = XCConfigurationList; buildConfigurations = (A20000000000000000000070, A20000000000000000000071,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
 		A20000000000000000000075 = {isa = XCConfigurationList; buildConfigurations = (A20000000000000000000072, A20000000000000000000073,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
 		A20000000000000000000097 = {isa = XCConfigurationList; buildConfigurations = (A20000000000000000000095, A20000000000000000000096,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+		A200000000000000000000A9 = {isa = XCConfigurationList; buildConfigurations = (A200000000000000000000A7, A200000000000000000000A8,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
 /* End XCConfigurationList section */
 	};
 	rootObject = A20000000000000000000010;

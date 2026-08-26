@@ -155,28 +155,24 @@ final class UpdateCheckTests: XCTestCase {
 
     // MARK: - Cohort copy
     //
-    // Perch is sandboxed, so NO cohort self-updates: the button
-    // either copies this install's command or opens the release page. A cohort
-    // handed the wrong command is the only way this feature can mislead.
-
-    func testNoCohortIsOfferedASelfUpdate() {
-        for kind in InstallKind.allCases {
-            XCTAssertNotEqual(kind.buttonLabel, "Update & Restart", "\(kind)")
-        }
-    }
+    // A cohort handed the wrong next step is the only way this feature can
+    // mislead: three of them are owned by a package manager and get its
+    // command, and the fourth installs in place. Which cohort may do that is
+    // pinned in SelfUpdateTests.
 
     func testEachCohortGetsItsOwnNextStep() {
         XCTAssertEqual(InstallKind.rice.updateCommand, "haus update")
         XCTAssertEqual(InstallKind.nix.updateCommand, "nix flake update perch")
         XCTAssertEqual(InstallKind.homebrew.updateCommand, "brew upgrade --cask perch")
-        // Nothing to run — these open the release page instead.
+        // Nothing to run: `.unknown` opens the release page, and `.direct`
+        // installs it in place — see SelfUpdateTests.
         XCTAssertNil(InstallKind.direct.updateCommand)
         XCTAssertNil(InstallKind.unknown.updateCommand)
 
         XCTAssertEqual(InstallKind.rice.buttonLabel, "Copy Command")
         XCTAssertEqual(InstallKind.nix.buttonLabel, "Copy Command")
         XCTAssertEqual(InstallKind.homebrew.buttonLabel, "Copy Command")
-        XCTAssertEqual(InstallKind.direct.buttonLabel, "Open Releases")
+        XCTAssertEqual(InstallKind.direct.buttonLabel, "Update Now")
         XCTAssertEqual(InstallKind.unknown.buttonLabel, "Open Releases")
     }
 

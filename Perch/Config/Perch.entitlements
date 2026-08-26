@@ -24,12 +24,14 @@
 	     arrives and never touches the original. -->
 	<key>com.apple.security.files.bookmarks.app-scope</key>
 	<true/>
-	<!-- The update check, and nothing else: one hourly GET to
-	     api.github.com for the latest release tag, off by a Settings
-	     toggle — see Perch/Platform/UpdateCheck.swift. Perch never
-	     uploads anything and never fetches a file; a sandboxed app
-	     cannot replace its own bundle, so the nudge hands you the
-	     command for your install instead of installing anything. -->
+	<!-- The update check: one hourly GET to api.github.com for the latest
+	     release tag, off by a Settings toggle — see
+	     Perch/Platform/UpdateCheck.swift. Perch never uploads anything.
+	     It fetches exactly one kind of file, and only when someone clicks
+	     Update on a drag install: the release ZIP, into this container
+	     (Perch/Platform/SelfUpdate.swift). The install itself happens
+	     outside this sandbox, in PerchUpdater.app — nothing perch does with
+	     this entitlement writes outside the container. -->
 	<key>com.apple.security.network.client</key>
 	<true/>
 	<!-- The mobile shelf listener: paired iPhones deliver to the shelf over

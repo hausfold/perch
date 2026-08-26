@@ -511,10 +511,11 @@ struct UpdatesPane: View {
                             update.checkForUpdates(userInitiated: true)
                         }
                         if pendingVersion != nil {
-                            Button(update.installKind.buttonLabel) {
+                            Button(update.actionButtonLabel) {
                                 update.performUpdate()
                             }
                             .buttonStyle(.borderedProminent)
+                            .disabled(update.installPhase != nil)
                         }
                     }
                 }
@@ -526,10 +527,16 @@ struct UpdatesPane: View {
             SettingsWriteErrorNote(settings: settings)
 
             SettingsFootnote(
-                """
-                \(update.installKind.settingsNote) Sandboxed, Perch never installs the \
-                update itself; it hands you the command for this install instead.
-                """
+                update.installKind.canSelfUpdate
+                    ? """
+                      \(update.installKind.settingsNote) The download is checked against \
+                      our Developer ID and Apple's notarization before it replaces anything, \
+                      and Perch reopens itself when it's done.
+                      """
+                    : """
+                      \(update.installKind.settingsNote) Sandboxed, Perch never installs this \
+                      kind of install itself; it hands you the command instead.
+                      """
             )
         }
     }
@@ -546,6 +553,7 @@ struct UpdatesPane: View {
     /// A user-initiated check's answer wins the line while it lasts — it is the
     /// only feedback the button gives.
     private var versionSubtitle: String {
+        if let phase = update.installPhase { return phase.text }
         if let note = update.statusNote { return note }
         if pendingVersion != nil { return update.installKind.actionHint }
         return "The version running on this Mac."

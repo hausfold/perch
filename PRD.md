@@ -54,7 +54,9 @@ collect several items and then drag the group to one destination.
    remain present.
 8. Enable auto-remove; cancelled drags keep the shelf, successful copies clear it.
 9. With a newer release published, the open shelf offers this install's own
-   update step; dismissing it silences that version and no other.
+   update step — a command to copy, or, for a copy dragged into
+   `/Applications`, **Update Now**, which installs it and reopens perch with
+   the shelf intact; dismissing it silences that version and no other.
 10. Right-click three files and invoke **Add to Perch Shelf** under *Services*
     — exactly one row offers it — and verify three tiles land while every
     original remains unchanged, proving the Service shares the drag path's

@@ -18,6 +18,10 @@ Per-client wiring lives in that client's own file; the content stays here or in
 - Keep display/window code out of importing and persistence.
 - A sender that isn't the app (`perch` tool, paired phone) gets its admission
   receipt before it copies a byte.
+- `PerchUpdater` replaces the one bundle it is nested inside, and only after the
+  download satisfies `PerchSigning.payloadRequirement`. It is the only
+  un-sandboxed code we ship that writes outside a container; it takes no
+  arguments and no path from anyone.
 
 ## Build
 
@@ -83,16 +87,18 @@ and you get a green run with an empty report.
 on the macOS Release build of every PR, and on the **macOS** release build
 *before* it is signed, notarized, stapled and published — an instrumented
 bundle passes all four of those steps. The iOS archive is not guarded: a
-sandboxed app has no shell working directory to litter. It walks every Mach-O in the bundle (the app *and*
-`perch-cli`), fails on `__llvm_prf_cnts`, and fails just as loudly when it finds
+sandboxed app has no shell working directory to litter. It walks every Mach-O in the bundle (the app,
+`perch-cli` *and* the nested `PerchUpdater.app`), fails on `__llvm_prf_cnts`, and fails just as loudly when it finds
 no binaries at all, because a guard with no subject has not passed. The build
 steps deliberately do **not** pass `ENABLE_CODE_COVERAGE=NO`: the point is to
 prove the project-level setting still holds on a stock `build`. Run it by hand
 against any bundle you're about to install.
 
 Targets: `Perch` (macOS) · `PerchCLI` (the `perch` tool, embedded in the app
-bundle) · `PerchIOS` (iPhone/iPad app) · `PerchShare` (Share extension) ·
-`PerchTests`. **The Mac ships no app extension.** A `PerchFinderAction` Quick
+bundle) · `PerchUpdater` (the one-click update, embedded at
+`Contents/Helpers/PerchUpdater.app`) · `PerchIOS` (iPhone/iPad app) ·
+`PerchShare` (Share extension) · `PerchTests`. **The Mac ships no app
+extension.** A `PerchFinderAction` Quick
 Action lived here until 2026-08-23 and was removed: measured on macOS 26 it
 never rendered under Quick Actions, drew a duplicate row under Services, and
 shelved nothing when clicked. The Finder door is the app's own `NSServices`
@@ -115,6 +121,24 @@ every target in the scheme and collapses them all onto one id, which on the iOS
 side makes `PerchShare` an extension sharing its container's identifier, i.e.
 malformed.
 [`nix/dev-app/README.md`](./nix/dev-app/README.md)
+
+`PerchUpdater` is the sandbox's other half. `Perch` is sandboxed, so it can
+download a release into its container and no further — `/Applications` is
+outside it, and a process it spawns inherits the sandbox. An app launched
+through **LaunchServices** does not (probed 2026-08-26: a nested helper launched
+with `NSWorkspace.openApplication` from a sandboxed parent runs with the real
+home and writes to `/Applications`), so the swap lives in this bundle: no
+sandbox, no entitlements, no window, one run. Three refusals are what make that
+safe to ship, and all three are pinned by `PerchTests/SelfUpdateTests.swift` —
+it replaces only the bundle it is nested inside, the payload must be a notarized
+build signed by our team, and it must be a newer build of the *same* bundle id.
+The handoff between the halves is `PerchUpdater/UpdateHandoff.swift`, compiled
+into both targets (the app takes that file and nothing else out of that folder —
+a membership exception in the project). Only the `.direct` cohort ever reaches
+it: swapping a bundle `haus` or `brew` owns would be undone by that tool's next
+run. [`docs/feel-testing.md`](./docs/feel-testing.md) has the VM recipe — the
+click lives on a notch, so a hands-on pass sets `PERCH_UPDATE_ON_LAUNCH=1`
+rather than taking someone's screen.
 
 The CLI product is `perch-cli`, not `perch`, and that is load-bearing: macOS
 filesystems are case-insensitive, so `Contents/MacOS/perch` *is*
