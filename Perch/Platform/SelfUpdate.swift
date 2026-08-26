@@ -12,9 +12,11 @@ import os
 // The sandbox splits the job in two, and the split is the design:
 //
 //   here (sandboxed)   ask GitHub which asset belongs to the tag, download it
-//                      into the container, unzip it there, check the signature.
-//                      Everything so far is inside the container, which is
-//                      exactly what the app sandbox permits.
+//                      into the container, unzip it there, check it is signed
+//                      by us. Everything so far is inside the container, which
+//                      is exactly what the app sandbox permits — including the
+//                      part that ISN'T possible here: notarization, which only
+//                      the updater can settle.
 //   PerchUpdater.app   the swap into /Applications and the relaunch. It is a
 //                      separate, un-sandboxed bundle nested in ours, launched
 //                      through LaunchServices — which does NOT pass our sandbox
@@ -95,7 +97,10 @@ final class SelfUpdate {
         let payload = try await Self.unpack(zip)
 
         onPhase(Phase(text: "Checking the signature…", progress: nil))
-        try PerchSigning.verify(bundle: payload)
+        // Identity only, here: the container cannot settle notarization (see
+        // `PerchSigning.identityRequirement`). The full check — the one that
+        // decides whether anything is installed — runs in the updater.
+        try PerchSigning.verify(bundle: payload, requirement: PerchSigning.identityRequirement)
 
         let target = Bundle.main.bundleURL.standardizedFileURL
         let request = UpdateRequest(

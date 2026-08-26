@@ -26,8 +26,25 @@ enum PerchSigning {
     /// `notarized` is part of the requirement language (verified with
     /// `codesign -R` against a shipped release, 2026-08-26) — it is what makes
     /// a stolen-cert build fail this check even before revocation lands.
+    ///
+    /// **Only the updater can evaluate this**, and that is measured, not
+    /// assumed: from inside the app's container the same call on the same bytes
+    /// answers errSecCSReqFailed (-67050), while an unsandboxed shell on that
+    /// exact path passes (VM, macOS 26.6, 2026-08-26). Notarization is settled
+    /// by syspolicyd, which the container cannot reach. So the gate lives where
+    /// it works — in `PerchUpdater`, which is also the only side whose verdict
+    /// can actually stop an install.
     static let payloadRequirement =
         "anchor apple generic and certificate leaf[subject.OU] = \"\(teamID)\" and notarized"
+
+    /// What the sandboxed app checks before it quits its own shelf: is this
+    /// even a build of ours? It catches the failures worth catching early — a
+    /// truncated download, a mirror serving something else, an unsigned build —
+    /// and deliberately stops short of the notarization clause it cannot
+    /// evaluate. Passing this is not permission to install; it only means the
+    /// download is worth handing over.
+    static let identityRequirement =
+        "anchor apple generic and certificate leaf[subject.OU] = \"\(teamID)\""
 
     struct VerificationError: LocalizedError {
         let message: String
@@ -40,14 +57,14 @@ enum PerchSigning {
     /// runs it again because a check the sandboxed side did is not a check —
     /// the file it verified and the file the updater installs are only the same
     /// file if nothing wrote to the container in between.
-    static func verify(bundle: URL) throws {
+    static func verify(bundle: URL, requirement requirementText: String = payloadRequirement) throws {
         var staticCode: SecStaticCode?
         var status = SecStaticCodeCreateWithPath(bundle as CFURL, [], &staticCode)
         guard status == errSecSuccess, let code = staticCode else {
             throw VerificationError("the download has no readable code signature (\(status))")
         }
         var requirement: SecRequirement?
-        status = SecRequirementCreateWithString(payloadRequirement as CFString, [], &requirement)
+        status = SecRequirementCreateWithString(requirementText as CFString, [], &requirement)
         guard status == errSecSuccess, let requirement else {
             throw VerificationError("could not build the signing requirement (\(status))")
         }
@@ -60,7 +77,9 @@ enum PerchSigning {
         status = SecStaticCodeCheckValidity(code, flags, requirement)
         guard status == errSecSuccess else {
             throw VerificationError(
-                "the download is not a notarized Perch build signed by team \(teamID) (\(status))"
+                requirementText == payloadRequirement
+                    ? "the download is not a notarized Perch build signed by team \(teamID) (\(status))"
+                    : "the download isn't a Perch build signed by team \(teamID) (\(status))"
             )
         }
     }

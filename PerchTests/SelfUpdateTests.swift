@@ -183,6 +183,17 @@ final class SelfUpdateTests: XCTestCase {
     // A literal, because a requirement assembled at runtime from the running
     // bundle's own signature would be satisfied by whatever signed that bundle.
 
+    func testTheSandboxedSideChecksIdentityAndTheUpdaterChecksNotarization() {
+        // Measured, not preferred: `notarized` cannot be evaluated from inside
+        // the container (errSecCSReqFailed on the same bytes an unsandboxed
+        // shell passes), so the app checks what it can and the updater — which
+        // is the side whose verdict can actually stop an install — checks the
+        // rest.
+        XCTAssertTrue(PerchSigning.identityRequirement.contains(PerchSigning.teamID))
+        XCTAssertFalse(PerchSigning.identityRequirement.contains("notarized"))
+        XCTAssertTrue(PerchSigning.payloadRequirement.hasPrefix(PerchSigning.identityRequirement))
+    }
+
     func testThePayloadRequirementNamesOurTeamAndNotarization() {
         XCTAssertEqual(PerchSigning.teamID, "88M28542LQ")
         XCTAssertTrue(PerchSigning.payloadRequirement.contains("88M28542LQ"))
@@ -194,6 +205,11 @@ final class SelfUpdateTests: XCTestCase {
         // The test host itself: built here, ad-hoc or dev signed, never
         // notarized — exactly the thing that must not be allowed to install.
         XCTAssertThrowsError(try PerchSigning.verify(bundle: Bundle.main.bundleURL))
+        XCTAssertThrowsError(
+            try PerchSigning.verify(
+                bundle: Bundle.main.bundleURL, requirement: PerchSigning.identityRequirement
+            )
+        )
     }
 
     // MARK: - Version rules, shared with the updater
