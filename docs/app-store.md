@@ -482,22 +482,51 @@ need the old name back:
 5. 🤖 **Upload a build**: `gh workflow run testflight.yml`. No tag needed — the
    phone side ships on `workflow_dispatch`. Confirm it lands in TestFlight under
    the *new* record.
-6. 👤 **Delete the old record** — `Perch for Mac`, Apple ID `6799010687`.
-   Gated on the *new* record being **approved**, by decision, not merely on a
-   green build; ✅ unblocked 2026-08-25. Not because the name was needed back —
-   step 4 took a keeper name and settled that — but because deletion is
-   permanent and a record you might still fall back to is worth keeping until
-   the replacement is approved. Unreleased and free, it carries no
-   purchases and — because step 4 took a keeper name — no name anyone is
-   waiting on. Ordinary cleanup, no deadline. **Permanent**, so it only happens
-   once and only after approval.
+6. 👤 **Delete the old record** — `Perch for Mac`, Apple ID `6799010687`,
+   and the dead `com.nebelhaus.*` identifiers behind it. Gated on the *new*
+   record being **approved**, by decision, not merely on a green build; ✅
+   unblocked 2026-08-25. Not because the name was needed back — step 4 took a
+   keeper name and settled that — but because deletion is permanent and a record
+   you might still fall back to is worth keeping until its replacement is live.
+   No deadline: the record is unreleased and free, so it carries no purchases and
+   nobody is waiting on its name. `perch-ios` stays a spent SKU either way;
+   deleting the record does not free it.
 
-   The dead `com.nebelhaus.*` identifiers go with it, in this order: the record,
-   then both `XC com nebelhaus perch ios*` App IDs, then `group.com.nebelhaus.perch`
-   — the App Group refuses to delete while an App ID still enables it. No code,
-   config or entitlement here references `nebelhaus` any more, so the only
-   casualties are provisioning profiles for builds nobody can install. `perch-ios` stays a spent
-   SKU either way; deleting the record does not free it.
+   Two dependencies set the order, and the second one has a way around it:
+
+   - An **App ID** can't be removed while an App Store Connect record points at it.
+   - An **App Group** can't be removed while an App ID still enables it — but
+     un-ticking App Groups on that App ID is allowed even when the App ID itself
+     is stuck, which frees the group without waiting.
+
+   No code, config or entitlement here references `nebelhaus` any more, so the
+   only casualties are provisioning profiles for builds nobody can install.
+
+   **Where this actually got to, 2026-08-26:**
+
+   | | |
+   |---|---|
+   | `XC com nebelhaus perch ios share` App ID | ✅ removed — nothing pointed at it |
+   | `group.com.nebelhaus.perch` App Group | ✅ removed, by un-ticking App Groups on the surviving App ID first |
+   | `XC com nebelhaus perch ios` App ID | ⛔ blocked by the record |
+   | `Perch for Mac` record `6799010687` | ⛔ with App Store Connect support |
+
+   > ⛔ **The record cannot be deleted by hand, and waiting won't fix it.** Apple:
+   > *"You can't remove apps that are in the following states: Ready for Review,
+   > Waiting for Review, In Review, Metadata Rejected, or Rejected."* It sits at
+   > **1.0 Rejected**, and pulling its submission produced that state rather than
+   > clearing it — a record that never shipped has no later state to reach on its
+   > own. Unsticking the *version* first looks like the escape (drop the build off
+   > 1.0 and it should fall back to *Prepare for Submission*, which **is**
+   > removable) but a Rejected version is read-only: the Build section renders the
+   > build with no remove control at all. **Support is the only path** — Contact
+   > Us → App Store Connect → App Management, ask them to remove Apple ID
+   > `6799010687`, and name `6799443735` as the record that superseded it, so it
+   > reads as tidy-up rather than a decision. Requested 2026-08-26.
+   >
+   > None of this is urgent, and stuck is an acceptable resting state. A dead
+   > record and a dead App ID cost nothing, expire never, and cannot collide with
+   > the `com.hausfold.*` family.
 7. 👤 *(only if you needed the old name back)* Rename the new record in App
    Information. Deleting the old record is what *allows* this but does not
    reliably free the name on any documented schedule, so expect to wait and
