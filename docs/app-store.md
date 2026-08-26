@@ -494,10 +494,31 @@ need the old name back:
 
    The dead `com.nebelhaus.*` identifiers go with it, in this order: the record,
    then both `XC com nebelhaus perch ios*` App IDs, then `group.com.nebelhaus.perch`
-   — the App Group refuses to delete while an App ID still enables it. No code,
-   config or entitlement here references `nebelhaus` any more, so the only
-   casualties are provisioning profiles for builds nobody can install. `perch-ios` stays a spent
-   SKU either way; deleting the record does not free it.
+   — an App ID can't be removed while an App Store Connect record still points at
+   it, and the App Group can't be removed while an App ID still enables it. No
+   code, config or entitlement here references `nebelhaus` any more, so the only
+   casualties are provisioning profiles for builds nobody can install. `perch-ios`
+   stays a spent SKU either way; deleting the record does not free it.
+
+   > ⛔ **Attempted 2026-08-26 — the record cannot be deleted, and waiting won't
+   > fix it.** Apple: *"You can't remove apps that are in the following states:
+   > Ready for Review, Waiting for Review, In Review, Metadata Rejected, or
+   > Rejected."* `Perch for Mac` sits at **1.0 Rejected**, and pulling its
+   > submission produced that state rather than clearing it — a record that never
+   > shipped has no later state to reach on its own. The escape is to unstick the
+   > *version*: drop the build off 1.0 so it falls back to *Prepare for
+   > Submission*, which **is** removable. Failing that, ask **Contact Us → App
+   > Store Connect → App Management** to remove Apple ID `6799010687`, naming
+   > `6799443735` as the record that superseded it.
+   >
+   > This blocks the whole chain — the App ID behind it, and the App Group behind
+   > that. One thing does *not* have to wait: **un-tick App Groups on the
+   > `XC com nebelhaus perch ios` App ID**, and `group.com.nebelhaus.perch` loses
+   > its last consumer and deletes cleanly. Editing an App ID's capabilities is
+   > allowed even while a record points at it.
+   >
+   > None of this is urgent. A dead record and a dead App ID cost nothing, expire
+   > never, and cannot collide with the `com.hausfold.*` family.
 7. 👤 *(only if you needed the old name back)* Rename the new record in App
    Information. Deleting the old record is what *allows* this but does not
    reliably free the name on any documented schedule, so expect to wait and
