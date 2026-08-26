@@ -47,6 +47,7 @@ final class AppRuntime: ObservableObject {
         finderActions.start()
         windowSystem.start()
         UpdateCheck.shared.start()
+        MissionControlCheck.shared.start()
         mobile.start()
         folderWatch.start()
     }

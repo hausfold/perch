@@ -250,7 +250,7 @@ Perch requests **no** Accessibility, Input Monitoring, or Screen Recording
 permission, and has no Dock icon. It sees only what you drop on it and the
 folders you pick for it to watch.
 
-It is sandboxed, with one read-only exception: `~/.config/perch/`, where the
+It is sandboxed, with one read-only *file* exception: `~/.config/perch/`, where the
 theme above lives and where a machine can declare any setting. That is the only
 path Perch opens that a drag or a file picker didn't hand it, and **it is never
 written** — Perch's own settings file is inside its container, precisely so that
@@ -258,6 +258,13 @@ exception can stay read-only. A watched folder is picker-granted
 too — perch just keeps that grant across relaunches as an app-scoped security
 bookmark (the `files.bookmarks.app-scope` entitlement), one per folder,
 dropped the moment you stop watching it.
+
+There is one other exception and it touches no files at all: perch reads a
+single key out of the Dock's preference domain (`com.apple.dock`, read-only) to
+know whether macOS's top-edge Mission Control trigger is armed — see [The one
+system setting perch needs](#the-one-system-setting-perch-needs). That
+entitlement grants the preference read and nothing on disk, and perch never
+writes it.
 
 There is no telemetry. Nothing about your files is written to a log.
 
@@ -329,6 +336,28 @@ drag would require a `CGEventTap` — an Accessibility grant perch deliberately
 refuses to ask for (see Permissions above). A system toggle is the honest fix,
 and it is reversible in the same place.
 
+**Perch tells you when it's armed.** It reads the Dock's own answer, and while
+the trigger is on you get a strip along the bottom of the open shelf —
+*"Mission Control is eating your drags"* — plus a matching row in the menu bar
+menu. Both carry a button that opens System Settings ▸ Desktop & Dock; neither
+flips the switch for you, because changing a system setting from inside an app
+isn't perch's to do. Turn it off and both disappear the next time the shelf
+opens.
+
+The strip's `✕` hides it for good — there's no later version of this to re-ask
+about — but the **menu row ignores that dismissal**, so waving off the nag never
+loses the answer.
+
+Reading another app's preference domain needs an entitlement, and perch has
+exactly the narrowest one that works:
+`com.apple.security.temporary-exception.shared-preference.read-only`, naming
+`com.apple.dock` and nothing else. Measured 2026-08-26 on macOS 26.6: without
+it every route to that value — `UserDefaults(suiteName:)`,
+`CFPreferencesCopyAppValue`, and reading the plist directly — answers nil, so
+perch could not tell an armed Mac from a fixed one. With it, the two preference
+reads answer and the **file** read stays denied. It is read-only, and perch
+never writes that key.
+
 The [haus](https://github.com/hausfold/haus) desktop sets this for you
-whenever `haus.shelf.enable` is on. Standalone cask installs should flip it
-by hand, once.
+whenever `haus.shelf.enable` is on, so a rice install reads "off" here and never
+sees the strip or the menu row. Cask and drag installs get the nudge.
