@@ -93,6 +93,26 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
         }
     }
 
+    /// The cohort's name, for anywhere a person reads it.
+    ///
+    /// `rawValue` is a code identifier and two of the five are wrong in prose:
+    /// **`rice` is the old word for a desktop** and the workshop's naming rule
+    /// keeps it out of anything new a reader sees, and `unknown` reads as a
+    /// malfunction rather than as a cohort. Every other user-facing use of this
+    /// enum already goes through a written label (`actionHint`, `settingsNote`,
+    /// `buttonLabel`); this is the one for the bug-report block, which is the
+    /// first place the cohort is quoted into text somebody else reads — a
+    /// public GitHub issue.
+    var displayName: String {
+        switch self {
+        case .homebrew: return "Homebrew cask"
+        case .direct: return "release ZIP"
+        case .rice: return "haus desktop"
+        case .nix: return "Nix store path"
+        case .unknown: return "install not recognised"
+        }
+    }
+
     /// One line for Settings, so the toggle's copy matches what the shelf offers.
     var settingsNote: String {
         switch self {

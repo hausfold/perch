@@ -328,6 +328,23 @@ check out, an `/Applications` you can't write to — perch says so in the strip
 and the button goes back to opening the release page. It never leaves you
 without an app.
 
+## Reporting a bug
+
+Menu bar ▸ **Report a Bug…**. It opens perch's issue form in your browser with
+the *Version and macOS* field already filled in — perch's version, your macOS
+version and build, your Mac model, and which install this copy is — one of the
+four in the table above, or *install not recognised* if it is somewhere perch
+can't reason about. That last line is the one you would never have thought to
+include, and is often the answer.
+
+Nothing is sent anywhere by that click. It opens a page; you write the report
+and you press Submit. **There is no telemetry in perch and there never will
+be**, which is the reason the row exists at all: an issue nobody files is a bug
+we never learn about.
+
+Wrong repo? File it anyway — the form says so too. hausfold is one product
+across several repositories and moving an issue between them is one click for us.
+
 ## The one system setting perch needs
 
 Turn **off** System Settings ▸ Desktop & Dock ▸ *"Drag windows to top of screen

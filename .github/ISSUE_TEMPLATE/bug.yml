@@ -50,7 +50,7 @@ body:
       label: |-
         Version and macOS
       description: |-
-        Perch's version (menu bar → About, or `perch --version`), your macOS version, and your Mac model. Perch has no doctor command yet, so this is the substitute.
+        **Perch's menu bar ▸ Report a Bug… fills this in for you** — it opens this form with the version, your macOS build, your Mac model and how this copy was installed already here, and sends nothing until you press Submit. By hand: `perch --version` (or Settings, bottom of the sidebar), your macOS version, and your Mac model. Perch has no doctor command yet, so this is the substitute.
       render: text
     validations:
       required: false
