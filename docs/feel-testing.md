@@ -235,7 +235,7 @@ Two things to know before you start:
 `Update Now` is only offered to the drag-install cohort, and the click lives on
 a notch — driving it here means a second shelf on someone's screen and, if it
 works, replacing an app they are using. Take a guest instead
-(`holt runtime up <lane> --backend tart`), and drive it over `ssh`.
+(`scruff runtime up <lane> --backend tart`), and drive it over `ssh`.
 
 Two things make a hands-on pass possible at all:
 
