@@ -13,6 +13,6 @@
 # leading "v"; `sha256` is the release .zip's SHA-256 in hex (what `sha256sum`
 # prints — the same value the cask stores).
 {
-  version = "2026.08.27";
-  sha256 = "6560f2d8fea638480745d349073c0582466ad15e5bab63d86908b52b7b8865dc";
+  version = "2026.08.27-1";
+  sha256 = "462730e786fcf1e216e706368271d5c7518b069a20ce2befd447ad714afa4aab";
 }
