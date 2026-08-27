@@ -12,7 +12,7 @@
 # that LLVM's profile runtime writes a `default.profraw` into whatever
 # directory the process exits in. `perch` is on PATH everywhere and its Quick
 # Action runs from Finder's cwd, so those files landed in whichever repo the
-# shell was sitting in and read as untracked work to `holt reap` and
+# shell was sitting in and read as untracked work to `scruff reap` and
 # `bench status`, which then refuse to sweep the checkout.
 #
 # A setting nothing checks is a setting that comes back. hausfold/trill#14 is
@@ -72,7 +72,7 @@ if (( ${#dirty[@]} > 0 )); then
 
 Shipping these would drop a `default.profraw` into the working directory of
 every process that runs them — including whatever repo a `perch` invocation
-happens to be sitting in, which `holt reap` then refuses to sweep.
+happens to be sitting in, which `scruff reap` then refuses to sweep.
 
 Check that ENABLE_CODE_COVERAGE is still NO in both project-level build
 configurations, and that nothing reintroduced it via an xcconfig or a scheme:
