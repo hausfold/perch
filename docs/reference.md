@@ -342,7 +342,7 @@ be**, which is the reason the row exists at all: an issue nobody files is a bug
 we never learn about.
 
 Wrong repo? File it anyway — the form says so too. hausfold is one product
-across nine repositories and moving an issue between them is one click for us.
+across several repositories and moving an issue between them is one click for us.
 
 ## The one system setting perch needs
 

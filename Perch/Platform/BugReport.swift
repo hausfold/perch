@@ -7,7 +7,7 @@ import Foundation
 /// issue form is not one feedback channel among several — it is the only one
 /// (workshop `docs/bug-reports.md`). A form nobody can find from inside the app
 /// is a channel that exists on paper, and "open GitHub, find the right repo of
-/// nine, find the Issues tab" is three steps a stranger with a broken Mac has
+/// several, find the Issues tab" is three steps a stranger with a broken Mac has
 /// agreed to none of.
 ///
 /// So: one menu row, straight onto the form, with the one field perch can

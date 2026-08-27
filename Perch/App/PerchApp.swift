@@ -82,7 +82,7 @@ struct PerchApp: App {
 
             // The only feedback channel perch has. There is no telemetry in
             // anything we ship, so a bug we are never told about is a bug that
-            // does not exist to us — and "find the right repo of nine, find its
+            // does not exist to us — and "find the right repo of several, find its
             // Issues tab" is three steps a stranger with a broken shelf has
             // agreed to none of. This row is one step, and it fills in the
             // version/OS/install field the form would otherwise ask them to
