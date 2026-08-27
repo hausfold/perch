@@ -106,4 +106,4 @@ anything**, and **never put a source path in the JSON**.
 a machine with no checkout — the routing document that makes *"put this in my
 shelf"* work first try. It quotes the verbs, flags and exit codes above, so
 **change it in the same PR that changes any of them.** It is bound by the
-family standard, the workshop's `notes/agent-surface.md`.
+family standard, the workshop's `docs/agent-surface.md`.

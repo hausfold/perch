@@ -277,8 +277,7 @@ correct.) If you add a device to the list, boot it first.
 
 Also fill in: no demo account needed, contact = `julien@hausfold.co`. (Not
 `support@…` on either domain, and not the old `hi@` — the address moved
-2026-08-22; the record of why is the workshop's `notes/go-to-market.md` §6,
-which is the one place that owns it. **Send yourself a test message before you
+2026-08-22). **Send yourself a test message before you
 type it in.** A review contact that bounces is the one field you cannot afford
 to get wrong, and this doc cannot assert deliverability on your behalf —
 verify, don't assume. ⚠️ App Store Connect is the one surface a commit cannot
