@@ -332,9 +332,10 @@ without an app.
 
 Menu bar ▸ **Report a Bug…**. It opens perch's issue form in your browser with
 the *Version and macOS* field already filled in — perch's version, your macOS
-version and build, your Mac model, and which of the four installs above this
-copy is. That last one is the line you would never have thought to include and
-is often the answer.
+version and build, your Mac model, and which install this copy is — one of the
+four in the table above, or *install not recognised* if it is somewhere perch
+can't reason about. That last line is the one you would never have thought to
+include, and is often the answer.
 
 Nothing is sent anywhere by that click. It opens a page; you write the report
 and you press Submit. **There is no telemetry in perch and there never will

@@ -46,10 +46,13 @@ enum BugReport {
     /// What the form's "Version and macOS" field asks for, verbatim, plus the
     /// install cohort.
     ///
-    /// Deliberately four short lines. This lands in a public issue and a
+    /// Deliberately three short lines. This lands in a public issue and a
     /// reporter reads it before they hit Submit — anything they would want to
     /// redact does not belong in a field the app filled in for them, which is
-    /// why there are no paths, no usernames, and nothing from their shelf.
+    /// why there are no paths, no usernames, and nothing from their shelf —
+    /// and why the cohort is quoted through `displayName`, not `rawValue`: the
+    /// raw case for the desktop cohort is the word `rice`, which is our old
+    /// vocabulary and does not belong in prose a stranger reads.
     static func diagnostics(
         version: String,
         install: InstallKind,
@@ -57,7 +60,7 @@ enum BugReport {
         model: String
     ) -> String {
         """
-        Perch \(version) (\(install.rawValue))
+        Perch \(version) (\(install.displayName))
         macOS \(operatingSystem)
         \(model)
         """

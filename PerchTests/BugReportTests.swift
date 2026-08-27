@@ -85,10 +85,23 @@ final class BugReportTests: XCTestCase {
             model: "Mac16,10"
         )
         XCTAssertEqual(block, """
-            Perch 2026.08.20 (rice)
+            Perch 2026.08.20 (haus desktop)
             macOS 26.0.1 (25A354)
             Mac16,10
             """)
+    }
+
+    /// The block is quoted into a public GitHub issue, which makes it prose a
+    /// stranger reads — and `InstallKind.rice.rawValue` is `rice`, the old word
+    /// for a desktop that the family's naming rule keeps out of anything new.
+    /// `unknown` is the other one: it reads as a malfunction, not a cohort.
+    func testNoCohortReachesAPublicIssueAsACodeIdentifier() {
+        for kind in InstallKind.allCases {
+            XCTAssertFalse(kind.displayName.isEmpty, "\(kind) has no wording")
+            XCTAssertNotEqual(kind.displayName, "rice", "`rice` is our vocabulary, not a reporter's")
+            XCTAssertNotEqual(kind.displayName, "unknown", "`unknown` reads as a malfunction")
+        }
+        XCTAssertEqual(InstallKind.rice.displayName, "haus desktop")
     }
 
     func testTheLiveModelAndOSReadBackFromSysctl() {
