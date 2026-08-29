@@ -584,19 +584,36 @@ private struct MissionControlStrip: View {
                 .font(.body)
                 .foregroundStyle(rice.accent)
             VStack(alignment: .leading, spacing: 1) {
-                // Both lines are kept short enough to survive `lineLimit(1)` at
-                // the narrowest the shelf gets: expandedContentWidth caps at
-                // 540, and the icon, the button and the ✕ take most of the rest.
-                // The full setting name is in the install page on hausfold.co —
-                // here the button is what walks you there.
+                // Both lines have to survive `lineLimit(1)` at the NARROWEST
+                // the shelf gets, which is not the 540 cap: expandedContentWidth
+                // is `min(min(screenWidth - 48, 540), collapsedWidth)`, and on a
+                // notchless display collapsedWidth is
+                // `max(300, min(screenWidth * 0.32, 460))` — so a 1280-wide
+                // external panel is 409, not 540. Take the row's chrome off that
+                // (10pt padding a side, four 8pt gaps, the 17pt symbol, the 8pt
+                // minimum spacer, "Open Settings" + its 20pt of padding, and the
+                // 20pt ✕) and the text column is ~222pt. Measured at the same
+                // fonts SwiftUI resolves: line 1 is 211pt and line 2 is 204pt,
+                // so line 1 is the binding one and neither truncates.
+                //
+                // The second line names the toggle rather than only the pane it
+                // is in. "Open Settings" lands on Desktop & Dock, which is a
+                // long pane of switches with nothing selected or scrolled to —
+                // so a reader who arrives there knowing only "turn it off in
+                // Desktop & Dock" has to guess which of them it is. The row in
+                // System Settings reads "Drag windows to top of screen to enter
+                // Mission Control", and it is the only row under Mission Control
+                // that begins with "Drag", so the truncated quote is enough to
+                // scan for. The tooltip carries the whole of it.
                 Text("Mission Control is eating your drags")
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(rice.text)
                     .lineLimit(1)
-                Text("Turn it off in Desktop & Dock")
+                Text("Desktop & Dock ▸ “Drag windows to top…”")
                     .font(.caption)
                     .foregroundStyle(rice.subtext0)
                     .lineLimit(1)
+                    .help("Turn off “Drag windows to top of screen to enter Mission Control”, under Mission Control in System Settings ▸ Desktop & Dock.")
             }
             Spacer(minLength: 8)
             Button {

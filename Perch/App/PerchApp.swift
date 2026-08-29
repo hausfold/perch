@@ -19,6 +19,11 @@ struct PerchApp: App {
         PerchShortcuts.updateAppShortcutParameters()
     }
 
+    /// hausfold.co carries the manual; nothing in the repo does (perch's own
+    /// `docs/` is for someone working ON it). Trailing slash because the
+    /// slashless form redirects to it, so the link costs no extra round trip.
+    static let manualURL = URL(string: "https://hausfold.co/docs/perch/")!
+
     var body: some Scene {
         MenuBarExtra {
             Button("Open Shelf") {
@@ -88,6 +93,9 @@ struct PerchApp: App {
             // version/OS/install field the form would otherwise ask them to
             // assemble by hand. See BugReport.swift.
             Divider()
+            Button("Perch Manual") {
+                NSWorkspace.shared.open(Self.manualURL)
+            }
             Button("Report a Bug…") {
                 BugReport.open()
             }

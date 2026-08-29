@@ -148,12 +148,13 @@ The CLI product is `perch-cli`, not `perch`, and that is load-bearing: macOS
 filesystems are case-insensitive, so `Contents/MacOS/perch` *is*
 `Contents/MacOS/Perch` and silently replaces the app's own executable — the app
 you launch then prints CLI usage and exits 1. Installers put it on `PATH` as
-`perch` — a symlink into the bundle, never a copy (see `nix/package.nix`, and
-haus's Shelf room, which links it out of `/Applications`). ⚠️ **The cask is the
-one that doesn't**: `Casks/perch.rb` has no `binary` stanza, so a
-`brew install --cask` user has the app and no `perch`. Same class of
-trap: a Swift target named `perch` emits a `perch.swiftmodule` that collides
-with the app's `Perch.swiftmodule`, so it sets `PRODUCT_MODULE_NAME = PerchCLI`.
+`perch` — a symlink into the bundle, never a copy: `nix/package.nix`,
+`Casks/perch.rb`'s `binary … target: "perch"`, and haus's Shelf room, which
+links it out of `/Applications`. A copy would drift from the shelf it talks to
+the first time either moved, since the CLI is signed and notarized *with* the
+app. Same class of trap: a Swift target named `perch` emits a
+`perch.swiftmodule` that collides with the app's `Perch.swiftmodule`, so it sets
+`PRODUCT_MODULE_NAME = PerchCLI`.
 [`docs/cli.md`](./docs/cli.md)
 
 Read `PRD.md` and `ARCHITECTURE.md` before changing transfer semantics, and
