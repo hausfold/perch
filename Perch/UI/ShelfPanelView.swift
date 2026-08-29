@@ -585,31 +585,41 @@ private struct MissionControlStrip: View {
                 .foregroundStyle(rice.accent)
             VStack(alignment: .leading, spacing: 1) {
                 // Both lines have to survive `lineLimit(1)` at the NARROWEST
-                // the shelf gets, which is not the 540 cap: expandedContentWidth
-                // is `min(min(screenWidth - 48, 540), collapsedWidth)`, and on a
-                // notchless display collapsedWidth is
+                // the shelf gets, and 540 is the CAP rather than that:
+                // `expandedContentWidth` is
+                // `min(min(screenWidth - 48, 540), collapsedWidth)`, and on a
+                // notchless display `collapsedWidth` is
                 // `max(300, min(screenWidth * 0.32, 460))` — so a 1280-wide
-                // external panel is 409, not 540. Take the row's chrome off that
-                // (10pt padding a side, four 8pt gaps, the 17pt symbol, the 8pt
-                // minimum spacer, "Open Settings" + its 20pt of padding, and the
-                // 20pt ✕) and the text column is ~222pt. Measured at the same
-                // fonts SwiftUI resolves: line 1 is 211pt and line 2 is 204pt,
-                // so line 1 is the binding one and neither truncates.
+                // external is 410, not 540. Two subtractions then apply, not
+                // one: `expandedShelf` pads its content 18pt a side INSIDE that
+                // frame, and the row's own chrome is ~187 (10pt padding a side,
+                // four 8pt gaps, the 17pt symbol, the 8pt minimum spacer,
+                // "Open Settings" plus its 20pt of padding, and the 20pt ✕).
+                // 410 − 36 − 187 leaves a ~186pt text column.
+                //
+                // Measured at the fonts SwiftUI resolves (.callout 12pt,
+                // .caption 10pt): line 1 is 211pt and line 2 is 156pt. So line
+                // 1 is the binding one — it wants a notchless display ≥ ~1359pt
+                // wide and truncates below that, which it already did before
+                // line 2 was touched — and line 2, at ≥ ~1187pt, stays well
+                // inside it. Keep any rewrite of line 2 under line 1's width
+                // and it can never be the one that truncates first.
                 //
                 // The second line names the toggle rather than only the pane it
-                // is in. "Open Settings" lands on Desktop & Dock, which is a
-                // long pane of switches with nothing selected or scrolled to —
-                // so a reader who arrives there knowing only "turn it off in
-                // Desktop & Dock" has to guess which of them it is. The row in
-                // System Settings reads "Drag windows to top of screen to enter
-                // Mission Control", and it is the only row under Mission Control
-                // that begins with "Drag", so the truncated quote is enough to
-                // scan for. The tooltip carries the whole of it.
+                // is in. "Open Settings" lands on Desktop & Dock with nothing
+                // selected and nothing scrolled to, and Mission Control's
+                // section there holds five switches; a reader who knows only
+                // "turn it off in Desktop & Dock" has to guess which. The row
+                // reads "Drag windows to top of screen to enter Mission
+                // Control" (read off DesktopSettings.appex, macOS 26), and it
+                // is the only one in that section beginning "Drag windows to
+                // top", so the truncated quote identifies it. The pane is what
+                // the button walks you to; the tooltip carries both in full.
                 Text("Mission Control is eating your drags")
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(rice.text)
                     .lineLimit(1)
-                Text("Desktop & Dock ▸ “Drag windows to top…”")
+                Text("Turn off “Drag windows to top…”")
                     .font(.caption)
                     .foregroundStyle(rice.subtext0)
                     .lineLimit(1)
