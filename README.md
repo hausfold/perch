@@ -1,6 +1,7 @@
 <div align="center">
 
-# 🪺 perch
+<!-- identity banner — green wordmark on graphite (assets/perch-banner.png) -->
+<img src="./assets/perch-banner.png" alt="perch" width="480">
 
 **drop it in the notch, drag it out anywhere**
 
