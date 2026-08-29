@@ -377,9 +377,10 @@ Every wire path — listener, browser and connection alike — sets
 `includePeerToPeer = true`, so a phone that cannot reach the Mac over Wi-Fi
 finds it over AWDL, the same peer-to-peer link AirDrop uses. Delivery needs the
 Wi-Fi radio up at both ends and nothing else: no router, no DHCP lease, no
-shared SSID. What that costs a test is stated where users read it,
-`docs/reference.md` ▸ Permissions — Control Center's Wi-Fi toggle deliberately
-leaves AWDL up, so "Wi-Fi off" is not how you take the link down.
+shared SSID. What that costs a test is stated where users read it, [the phone half of the
+install page](https://hausfold.co/docs/perch/install#5-the-phone-half) —
+Control Center's Wi-Fi toggle deliberately leaves AWDL up, so "Wi-Fi off" is not
+how you take the link down.
 
 **No account, no relay, and TLS-PSK was considered and declined.** A hausfold
 sync server would spend, for a v1 nobody asked to be cloudy, exactly the trust

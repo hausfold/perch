@@ -587,7 +587,7 @@ private struct MissionControlStrip: View {
                 // Both lines are kept short enough to survive `lineLimit(1)` at
                 // the narrowest the shelf gets: expandedContentWidth caps at
                 // 540, and the icon, the button and the ✕ take most of the rest.
-                // The full setting name is in the README and docs/reference.md —
+                // The full setting name is in the install page on hausfold.co —
                 // here the button is what walks you there.
                 Text("Mission Control is eating your drags")
                     .font(.callout.weight(.semibold))

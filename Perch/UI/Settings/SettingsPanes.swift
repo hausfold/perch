@@ -5,9 +5,10 @@ import SwiftUI
 
 /// The sidebar's contents, in the order they appear.
 ///
-/// The names are load-bearing: `docs/reference.md` sends people to
-/// "Settings ▸ Shelf", "Settings ▸ Watched Folders" and "Settings ▸ Updates" by
-/// name. Rename one here and rename it there in the same change.
+/// The names are load-bearing: the manual sends people to "Settings ▸ Shelf",
+/// "Settings ▸ Watched Folders" and "Settings ▸ Updates" by name — and it lives
+/// in `hausfold/hausfold.co`, so it cannot be the same commit and nothing here
+/// checks the two agree. Rename one here and rename it there in the same round.
 enum SettingsPane: String, CaseIterable, Identifiable {
     case general
     case shelf

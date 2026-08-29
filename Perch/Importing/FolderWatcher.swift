@@ -38,7 +38,7 @@ enum FolderWatchRules {
     /// name against the first one, forever, and the file never appeared again
     /// (#6). A browser dodged it only by writing `…​.crdownload` and renaming to
     /// a fresh name each time. Replaced contents are a new arrival; see
-    /// `docs/reference.md`.
+    /// the manual on hausfold.co.
     static func identityToken(forFileAt url: URL) throws -> String {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         let inode = (attributes[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
