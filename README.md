@@ -24,40 +24,29 @@ grant, no telemetry, and no Dock icon.
 brew install --cask hausfold/tap/perch
 ```
 
-No Homebrew? [**Download the latest release**](https://github.com/hausfold/perch/releases/latest),
-unzip it, and drag `Perch.app` to your Applications folder. It's Developer-ID
-signed and Apple-notarized, so Gatekeeper doesn't block it — you get the
-ordinary *"downloaded from the Internet, are you sure?"* confirmation on the
-first open and nothing else: no *unidentified developer*, no right-click-Open
-trick, no `xattr`. This route puts no `perch` on your `PATH`; if you want [the
-command line](docs/cli.md), link it yourself with
-`ln -s /Applications/Perch.app/Contents/MacOS/perch-cli /usr/local/bin/perch`.
+macOS 14 or newer, signed and notarized. The phone half is free on the App
+Store — [**Perch Companion**](https://apps.apple.com/app/id6799443735) — and
+pairs by scanning the Mac's code, over your own network or with no network at
+all.
 
-Then turn **off** System Settings ▸ Desktop & Dock ▸ *"Drag windows to top of
-screen to enter Mission Control"* — macOS ships it on, and it takes the top
-edge of the screen for the whole of any drag, which is exactly where the shelf
-catches. Perch says so the first time you open the shelf and the button walks
-you there; the [haus](https://github.com/hausfold/haus) desktop flips it for you.
+## the manual
 
-The phone half is free on the App Store:
-[**Perch Companion**](https://apps.apple.com/app/id6799443735) — pair it once by
-scanning the Mac's code, then send over your own network — or with no
-network at all, peer-to-peer.
+📖 **[hausfold.co/docs/perch](https://hausfold.co/docs/perch)** — and it only
+lives there: [install](https://hausfold.co/docs/perch/install) (which opens with
+the one macOS setting that steals the drop if you leave it on),
+[using the shelf](https://hausfold.co/docs/perch/using), and
+[privacy](https://hausfold.co/perch/privacy), which is shorter than either.
 
-The drag is the front door; Finder's right-click menu, the `perch` command
-line, watched folders, and a paired iPhone are the others. The manual lives at
-[hausfold.co/docs/perch](https://hausfold.co/docs/perch): the Nix flake, the
-one macOS setting that steals the drop if you leave it on, every way onto the
-shelf, and how updates arrive.
+Inside a haus machine it's [the Shelf
+room](https://hausfold.co/docs/haus/rooms/shelf) — installed, themed and kept
+current with the rest of the desktop.
 
-## more
+## in this repo
 
-- [the manual](https://hausfold.co/docs/perch): install, using the shelf, and what stays when you walk away — the one page about perch on hausfold.co
-- [privacy](https://hausfold.co/perch/privacy): the whole policy, and shorter than the manual
-- [Reference](docs/reference.md): storage, watched folders, theming, permissions, the deep detail
-- [The `perch` command line](docs/cli.md): `perch add`, its exit codes, and the mailbox protocol behind it
-- [`ai/SKILL.md`](ai/SKILL.md): the agent surface, so *"put this in my shelf"* works first try
-- [Architecture](ARCHITECTURE.md): the invariants, and the seams that hold them
+- [`docs/cli.md`](docs/cli.md) — `perch add`, its exit codes, and the mailbox protocol behind it
+- [`ai/SKILL.md`](ai/SKILL.md) — the agent surface, so *"put this in my shelf"* works first try
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — the invariants, and the seams that hold them
+- [`AGENTS.md`](AGENTS.md) — building it, testing it, shipping it
 
 ---
 

@@ -6,8 +6,9 @@ recipes **produce a confident wrong answer on the first run**. Each section
 below is one of those, written down because it already cost somebody a wrong
 turn during the 2026-08-22 field test.
 
-Everything here is about *measuring*. What perch does and why lives in
-[`reference.md`](./reference.md), `PRD.md` and `ARCHITECTURE.md`. The punch list
+Everything here is about *measuring*. What perch does lives in the manual on
+[hausfold.co](https://hausfold.co/docs/perch); why it does it lives in `PRD.md`
+and `ARCHITECTURE.md`. The punch list
 itself is gone — it was empty — but the record of what each finding ruled out is
 retrievable: `git show v2026.08.24:docs/field-test-2026-08-22.md`.
 
@@ -196,7 +197,8 @@ doing its job, not a double import.
 Turning Wi-Fi off in **Control Center** disconnects from the network and
 deliberately leaves AWDL up, so a paired phone still delivers over the
 peer-to-peer link. Use Airplane Mode, or Settings ▸ Wi-Fi ▸ Off. Stated for
-users, with the mechanism, in [`reference.md`](./reference.md) ▸ Permissions.
+users at [hausfold.co/docs/perch/install](https://hausfold.co/docs/perch/install#5-the-phone-half),
+with the mechanism in `ARCHITECTURE.md`.
 
 ## The Mission Control hint is invisible on a haus Mac — arm it first
 

@@ -25,6 +25,10 @@ Per-client wiring lives in that client's own file; the content stays here or in
 
 ## Build
 
+**Xcode 26 or newer, macOS 14 or newer.** A bundle you built or copied by hand
+may carry macOS's quarantine flag, where the signed cask never does — clear it
+with `xattr -dr com.apple.quarantine /Applications/Perch.app`.
+
 ```sh
 # macOS app + the whole test suite (includes the wire loopback tests)
 xcodebuild -project Perch.xcodeproj -scheme Perch \
@@ -154,9 +158,12 @@ with the app's `Perch.swiftmodule`, so it sets `PRODUCT_MODULE_NAME = PerchCLI`.
 
 Read `PRD.md` and `ARCHITECTURE.md` before changing transfer semantics, and
 update them when a product boundary changes. **A decision is stated once, at the
-place it binds** — the CLI mailbox in `docs/cli.md`, watched folders and the
-update nudge in `docs/reference.md`, the licence in `LICENSE`, the companion's
-tag in this file. Don't start a parallel decisions tree; the second copy is the
+place it binds** — the CLI mailbox in `docs/cli.md`, the licence in `LICENSE`,
+the companion's tag in this file, and everything a *user* meets (watched
+folders, the update nudge, the shelf's own behaviour, the Settings pane names)
+in the perch tree on hausfold.co. ⚠️ That last one is a different **repo**, so
+it can never be the same commit and nothing checks the halves agree — change
+both in the same round. Don't start a parallel decisions tree; the second copy is the
 one that goes stale.
 
 ## The agent surface (`ai/SKILL.md`)

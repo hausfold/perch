@@ -93,7 +93,7 @@ struct ShelfGeometry: Equatable, Sendable {
             // content further down. Sizing alone cannot dodge the Dock's
             // top-edge Mission Control trigger — that monitor runs above every
             // window level, so it wins wherever the panel ends. Disabling it is
-            // a system setting; see docs/reference.md.
+            // a system setting; see hausfold.co/docs/perch/install.
             collapsedWidth = max(360, min(screen.frame.width * 0.42, 640))
             collapsedHeight = screen.safeAreaTop + 34
         } else {
