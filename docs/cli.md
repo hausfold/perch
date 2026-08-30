@@ -21,8 +21,8 @@ app and can never drift from the shelf it talks to.
 |---|---|
 | haus | the Shelf room links it out of the copy it placed in `/Applications` (`haus.shelf.enable = true`) |
 | Nix, on its own | `pkgs.perch` exposes `bin/perch` |
-| Homebrew cask | ⚠️ nothing yet — the cask places the app and stops there. Take the row below until it carries a `binary` stanza |
-| Neither | `ln -s /Applications/Perch.app/Contents/MacOS/perch-cli /usr/local/bin/perch` |
+| Homebrew cask | `Casks/perch.rb`'s `binary … target: "perch"` (hausfold/homebrew-tap) |
+| Neither | nothing does — `ln -s /Applications/Perch.app/Contents/MacOS/perch-cli /usr/local/bin/perch`, once |
 
 Every one of those is a **symlink** into the bundle, never a copy: the tool is
 notarized as part of the app, so a copy outside it is nested code torn out of

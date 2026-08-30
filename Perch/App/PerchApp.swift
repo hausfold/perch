@@ -19,6 +19,11 @@ struct PerchApp: App {
         PerchShortcuts.updateAppShortcutParameters()
     }
 
+    /// hausfold.co carries the manual; nothing in the repo does (perch's own
+    /// `docs/` is for someone working ON it). Trailing slash because the
+    /// slashless form redirects to it, so the link costs no extra round trip.
+    static let manualURL = URL(string: "https://hausfold.co/docs/perch/")!
+
     var body: some Scene {
         MenuBarExtra {
             Button("Open Shelf") {
@@ -80,6 +85,15 @@ struct PerchApp: App {
             Divider()
             PairedDevicesSection(mobile: runtime.mobile)
 
+            Divider()
+            // No ellipsis, and "Report a Bug…" below keeps one on purpose:
+            // Apple's rule is that the ellipsis means "this asks you for more
+            // before it does anything". A manual opens and is done; a bug
+            // report opens a form the reporter has to fill in. Same split as
+            // "Safari Help" beside "Report an Issue…".
+            Button("Perch Manual") {
+                NSWorkspace.shared.open(Self.manualURL)
+            }
             // The only feedback channel perch has. There is no telemetry in
             // anything we ship, so a bug we are never told about is a bug that
             // does not exist to us — and "find the right repo of several, find its
@@ -87,7 +101,6 @@ struct PerchApp: App {
             // agreed to none of. This row is one step, and it fills in the
             // version/OS/install field the form would otherwise ask them to
             // assemble by hand. See BugReport.swift.
-            Divider()
             Button("Report a Bug…") {
                 BugReport.open()
             }
