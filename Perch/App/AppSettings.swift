@@ -11,8 +11,7 @@ import ServiceManagement
 ///
 /// What is left in `UserDefaults` is what a settings file has no business
 /// holding: the pane Settings was last on, the window's frame, the update
-/// checker's cache, and the watched-folder id the screenshots switch remembers.
-/// Ephemera and pointers, not settings.
+/// checker's cache. Ephemera, not settings.
 @MainActor
 final class AppSettings: ObservableObject {
     /// The `UserDefaults` keys the file-backed builds replaced. Read exactly
@@ -26,6 +25,13 @@ final class AppSettings: ObservableObject {
         /// `UserDefaults`: it records that a migration ran on this Mac, which
         /// is not a setting and would be meaningless in a file someone edits.
         static let retentionOptInMigrated = "retentionOptInMigrated"
+        /// The watched folder the "Shelf my screenshots" switch remembered.
+        /// That switch is gone — Settings ▸ Folders offers the screenshots
+        /// folder and nothing more — so this is removed rather than carried
+        /// anywhere: it pointed at one row's security bookmark, and a stale
+        /// pointer at a bookmark is exactly the kind of trace perch does not
+        /// leave lying around.
+        static let screenshotsFolderID = "screenshotsFolderID"
     }
 
     @Published var showOnAllDisplays: Bool {
@@ -111,6 +117,7 @@ final class AppSettings: ObservableObject {
         // the wrong copy.
         Self.migrateRetentionToOptIn(defaults)
         Self.migrateFromDefaults(defaults, into: store)
+        defaults.removeObject(forKey: LegacyKey.screenshotsFolderID)
 
         let config = store.current()
         showOnAllDisplays = config.showOnAllDisplays

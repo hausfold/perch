@@ -24,10 +24,9 @@ import os.log
 /// act (`haus rebuild`, or a text editor), exactly like declaring the theme.
 ///
 /// `UserDefaults` keeps only what a settings file has no business holding:
-/// which pane Settings was last on, the Settings window's frame, the update
-/// checker's cache of what GitHub last said, and `screenshotsFolderID` — a
-/// pointer at one watched folder's security bookmark, which is a memory of a
-/// panel someone clicked and means nothing to a human reading a config file.
+/// which pane Settings was last on, the Settings window's frame, and the update
+/// checker's cache of what GitHub last said — none of which means anything to a
+/// human reading a config file.
 struct AppConfig: Equatable, Sendable {
     /// A shelf at the notch of every screen. On by default: a drop target that
     /// isn't on the display you're dragging on is a drop target that isn't

@@ -73,10 +73,29 @@
 	     Read-only, and it stays that way. Perch never writes this key — flipping
 	     someone's system setting from an app is not perch's to do, so the nudge
 	     opens System Settings ▸ Desktop & Dock and lets them decide. See
-	     Perch/Platform/MissionControlCheck.swift. -->
+	     Perch/Platform/MissionControlCheck.swift.
+
+	     `com.apple.screencapture` answers the other question perch cannot
+	     otherwise ask: where this Mac saves screenshots (`location`, absent on a
+	     stock Mac, which means the Desktop). Measured the same way, 2026-08-31 on
+	     macOS 26.6, with two signed one-line probes in real app bundles: sandboxed
+	     without this domain the read is nil, sandboxed with it the real path comes
+	     back. It is read for exactly one purpose
+	     — aiming the folder picker in Settings ▸ Folders at the folder the
+	     person is looking for — so reading it grants nothing and a wrong answer
+	     would only cost a navigation. Guessing instead was worse than it looks:
+	     the offered folder is also how Settings decided a folder was "the
+	     screenshots one", so a wrong guess quietly attached itself to a folder
+	     someone added for another reason. See
+	     Perch/UI/Settings/ScreenshotsFolder.swift.
+
+	     Perch never writes this key either. Where screenshots go is macOS's
+	     setting and the person's choice; perch only wants to stop asking them
+	     to type it. -->
 	<key>com.apple.security.temporary-exception.shared-preference.read-only</key>
 	<array>
 		<string>com.apple.dock</string>
+		<string>com.apple.screencapture</string>
 	</array>
 </dict>
 </plist>
