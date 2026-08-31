@@ -229,44 +229,42 @@ struct ShelfPane: View {
 struct WatchedFoldersPane: View {
     @ObservedObject var folderWatch: FolderWatchCenter
 
-    /// Which watched folder the person meant by "my screenshots". Not a
-    /// preference — a memory of the panel they clicked, so the switch below
-    /// still reads as on when their captures land somewhere
-    /// `screenshotsTarget` would never have guessed.
+    /// Where this Mac saves screenshots, and that path in the canonical form
+    /// `FolderWatchCenter` dedupes on — both worked out in one detached read
+    /// when the pane appears, rather than from a body accessor. Same spirit as
+    /// ShelfTheme re-reading the drop when the shelf opens, and no file watcher
+    /// anywhere.
     ///
-    /// The folder's ID and deliberately not its path: a watched folder lives
-    /// in this app as a security bookmark precisely so no plain source path is
-    /// persisted anywhere, and a convenience switch is no reason to be the one
-    /// place that writes one down. Empty until the switch is used at all, and
-    /// stale the moment that folder is removed — which is why it is only ever
-    /// consulted against the rows that exist.
-    @AppStorage("screenshotsFolderID") private var screenshotsFolderID: String = ""
+    /// The canonical path rides along so `body` never has to resolve symlinks
+    /// itself: that is a filesystem call, and this pane is not the place to
+    /// make an exception to "blocking file work stays off the main actor".
+    ///
+    /// Nil until the read lands, and the offer below renders nothing while it
+    /// is: a card that says "Desktop" and then corrects itself to "Downloads"
+    /// is worse than one that arrives a beat late.
+    private struct ScreenshotsOffer: Sendable {
+        let url: URL
+        let canonicalPath: String
+    }
 
-    /// The rice's answer, read once when the pane appears rather than from a
-    /// body accessor — same spirit as ShelfTheme re-reading the drop when the
-    /// shelf opens, and no file watcher anywhere. nil until the read lands,
-    /// which reads as the Desktop: macOS's own default, and right far more
-    /// often than not.
-    @State private var riceFolder: URL?
+    @State private var offer: ScreenshotsOffer?
 
     var body: some View {
         SettingsPaneLayout(title: SettingsPane.folders.title, subtitle: SettingsPane.folders.summary) {
-            SettingsCard {
-                SettingsRow(
-                    symbol: "camera.viewfinder",
-                    tint: .blue,
-                    title: "Shelf my screenshots",
-                    subtitle: screenshotsSubtitle
-                ) {
-                    Toggle(
-                        "Shelf my screenshots",
-                        isOn: Binding(
-                            get: { screenshotsRow != nil },
-                            set: { wanted in setScreenshotsWatched(wanted) }
-                        )
-                    )
-                    .labelsHidden()
-                    .toggleStyle(.switch)
+            if let suggestion = screenshotsSuggestion {
+                SettingsCard {
+                    SettingsRow(
+                        symbol: "camera.viewfinder",
+                        tint: .blue,
+                        title: "Shelf my screenshots",
+                        subtitle: "This Mac saves captures to \(Self.abbreviate(suggestion.path)). "
+                            + "Watch that folder and new ones land on the shelf."
+                    ) {
+                        Button("Watch That Folder") {
+                            watchScreenshots(at: suggestion)
+                        }
+                        .controlSize(.small)
+                    }
                 }
             }
 
@@ -303,77 +301,61 @@ struct WatchedFoldersPane: View {
                 """
                 New files that land in a watched folder are copied onto the shelf. The \
                 originals never move, and taking a tile off the shelf never touches them. \
-                Every folder here is one you picked in a panel — the screenshots switch \
-                above opens that same panel, already pointed at the folder your captures \
-                go to.
+                Every folder here is one you picked in a panel, and this list is the only \
+                place they are added or removed — one row, one folder, “Stop Watching” to \
+                undo it.
                 """
             )
         }
-        // Off main: a read is small, but the pane is not the place to make an
-        // exception to "blocking file work stays off the main actor".
-        .task { riceFolder = await Task.detached(priority: .utility) { ScreenshotsFolder.resolve() }.value }
+        // Off main: the reads are small, but the pane is not the place to make
+        // an exception to "blocking file work stays off the main actor".
+        .task {
+            offer = await Task.detached(priority: .utility) {
+                let url = ScreenshotsFolder.resolve()
+                return ScreenshotsOffer(
+                    url: url,
+                    canonicalPath: url.standardizedFileURL.resolvingSymlinksInPath().path
+                )
+            }.value
+        }
     }
 
     // MARK: Shelf my screenshots
 
-    /// The folder the switch OFFERS when nothing is watched yet: what the
-    /// desktop config named, else the Desktop.
-    private var screenshotsTarget: URL {
-        riceFolder ?? RiceFiles.home.appendingPathComponent("Desktop", isDirectory: true)
-    }
-
-    /// The watched folder this switch is about, if there is one: the one the
-    /// person picked through it, else whichever row happens to sit on the
-    /// folder we would have offered — so a folder added through "Watch a
-    /// Folder…" reads as on too, rather than as a second thing to turn on.
-    private var screenshotsRow: FolderWatchCenter.Row? {
-        if let id = UUID(uuidString: screenshotsFolderID),
-           let row = folderWatch.rows.first(where: { $0.id == id }) {
-            return row
-        }
-        guard let id = folderWatch.watchedFolderID(for: screenshotsTarget) else { return nil }
-        return folderWatch.rows.first { $0.id == id }
-    }
-
-    private var screenshotsSubtitle: String {
-        guard let row = screenshotsRow else {
-            return "Perch will ask for \(Self.abbreviate(screenshotsTarget.path)) once, "
-                + "then new captures land on the shelf."
-        }
-        guard let path = row.displayPath else {
-            return "Perch can no longer reach that folder."
-        }
-        return "New captures in \(path) land on the shelf."
-    }
-
-    /// On: the same panel as “Watch a Folder…”, already at the right folder —
-    /// the grant has to come from a panel, so the most this can save is the
-    /// navigating and the knowing-where. Cancelling grants nothing and the
-    /// switch falls back, which is the truth: nothing is being watched.
+    /// The folder to offer, or nil when there is nothing to offer — the read has
+    /// not landed, or perch already watches it.
     ///
-    /// Whatever they actually pick becomes the screenshots folder, even when
-    /// it isn’t the one we offered. They know where their captures go and we
-    /// were guessing.
-    private func setScreenshotsWatched(_ wanted: Bool) {
-        guard wanted else {
-            if let row = screenshotsRow { folderWatch.removeFolder(row.id) }
-            screenshotsFolderID = ""
-            return
-        }
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = screenshotsTarget
-        panel.prompt = "Watch"
-        panel.message = "Perch will copy new screenshots from this folder onto the shelf."
-        NSApp.activate()
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        // The id comes back even when perch was already watching that folder,
-        // so picking one that is in the list simply adopts it.
-        if let id = folderWatch.addFolder(at: url) {
-            screenshotsFolderID = id.uuidString
-        }
+    /// An offer is the whole of this feature now. It adds one folder and is gone
+    /// once taken; it owns no row in the list below, and there is no state
+    /// anywhere recording that a folder came from here. The switch this replaced
+    /// was the other thing — a live query over the list, whose "off" deleted
+    /// whichever row happened to sit on the folder it had guessed at, including
+    /// one added deliberately through "Watch a Folder…".
+    ///
+    /// `watches(canonicalPath:)` answers false for the first moments after
+    /// launch, before any bookmark has resolved, so this can briefly offer a
+    /// folder that is already watched. Harmless in both directions: `rows` publishes when the
+    /// watcher attaches and the card goes, and taking the offer meanwhile adopts
+    /// the existing folder rather than adding a second one.
+    private var screenshotsSuggestion: URL? {
+        guard let offer, !folderWatch.watches(canonicalPath: offer.canonicalPath) else { return nil }
+        return offer.url
+    }
+
+    /// The panel is the whole permission model, so even a folder perch can name
+    /// has to be handed over in one. All an offer can save is the navigating and
+    /// the knowing-where — which, on a Mac whose captures do not go to the
+    /// Desktop, is most of it. Cancelling grants nothing and changes nothing.
+    ///
+    /// Whatever they pick is what gets watched, even when it is not the folder
+    /// offered: it is an ordinary watched folder from the moment it lands, and
+    /// nothing here treats it differently afterwards.
+    private func watchScreenshots(at folder: URL) {
+        watch(runFolderPanel(
+            openingAt: folder,
+            allowsMultiple: false,
+            message: "Perch will copy new screenshots from this folder onto the shelf."
+        ))
     }
 
     /// `~`-abbreviated for display only, against the real home — inside the
@@ -395,15 +377,31 @@ struct WatchedFoldersPane: View {
     /// the watcher keeps (as an app-scoped bookmark), so there is
     /// nothing to pre-authorize and nothing typed in by hand.
     private func addWatchedFolder() {
+        watch(runFolderPanel(
+            openingAt: nil,
+            allowsMultiple: true,
+            message: "Perch will copy new files from this folder onto the shelf."
+        ))
+    }
+
+    /// Both doors into this pane are the same panel — the offer only opens it
+    /// somewhere in particular and takes one folder. Empty when it was
+    /// cancelled, which grants nothing and changes nothing.
+    private func runFolderPanel(openingAt directory: URL?, allowsMultiple: Bool, message: String) -> [URL] {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
-        panel.allowsMultipleSelection = true
+        panel.allowsMultipleSelection = allowsMultiple
+        panel.directoryURL = directory
         panel.prompt = "Watch"
-        panel.message = "Perch will copy new files from this folder onto the shelf."
+        panel.message = message
         NSApp.activate()
-        guard panel.runModal() == .OK else { return }
-        for url in panel.urls {
+        guard panel.runModal() == .OK else { return [] }
+        return panel.urls
+    }
+
+    private func watch(_ urls: [URL]) {
+        for url in urls {
             folderWatch.addFolder(at: url)
         }
     }

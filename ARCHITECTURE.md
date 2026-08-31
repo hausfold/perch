@@ -272,9 +272,8 @@ and every edit, which is what declaring a machine's configuration means.
 
 `UserDefaults` keeps what a settings file has no business holding: the pane
 Settings was last on, the window frame, the update checker's cache of what
-GitHub last said, the one-shot marker for the retention opt-in migration, and
-`screenshotsFolderID` — a pointer at a watched folder's security bookmark, which
-is a memory of a panel someone clicked. Ephemera and pointers, not settings.
+GitHub last said, and the one-shot marker for the retention opt-in migration.
+Ephemera, not settings.
 
 ### Knowing the drop will not land
 

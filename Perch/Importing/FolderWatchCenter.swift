@@ -87,8 +87,8 @@ final class FolderWatchCenter: ObservableObject {
     }
 
     /// The id of the folder now being watched — the existing one when this is
-    /// a folder perch already has, so a caller that wants to REMEMBER which
-    /// folder it asked for can hold an opaque id rather than a path.
+    /// a folder perch already has, so adding one twice is an adoption rather
+    /// than a second watcher.
     @discardableResult
     func addFolder(at url: URL) -> UUID? {
         // Compare through symlinks, or the same directory picked via an alias
@@ -126,18 +126,24 @@ final class FolderWatchCenter: ObservableObject {
         }
     }
 
-    /// The configured folder sitting on this path, if there is one. Canonical
-    /// comparison, the same one `addFolder` dedupes with — so an alias, a
-    /// symlinked path and the folder itself all answer as one folder.
+    /// Is one of the configured folders this path? The path must already be
+    /// canonical — `standardizedFileURL.resolvingSymlinksInPath()`, the same
+    /// form `addFolder` dedupes on, so an alias, a symlinked path and the
+    /// folder itself all answer as one folder.
+    ///
+    /// Canonicalising is the CALLER's job precisely because it is a filesystem
+    /// call: the one caller asks from a SwiftUI `body`, where doing it here
+    /// would put a syscall on the main actor on every render — and stall it
+    /// outright on an unmounted volume. It canonicalises once, off main, in the
+    /// same task that reads the folder.
     ///
     /// Configured, not "currently being watched": a folder whose bookmark has
     /// stopped resolving is still one of yours (it is the orange row in
     /// Settings), and a caller asking "is this folder already in the list"
-    /// must not be told no and go add it twice. Nil during the first moments
+    /// must not be told no and go add it twice. False during the first moments
     /// after launch, before any bookmark has resolved.
-    func watchedFolderID(for url: URL) -> UUID? {
-        let canonical = url.standardizedFileURL.resolvingSymlinksInPath().path
-        return lastKnownPaths.first { $0.value == canonical }?.key
+    func watches(canonicalPath: String) -> Bool {
+        lastKnownPaths.values.contains(canonicalPath)
     }
 
     func removeFolder(_ id: UUID) {
