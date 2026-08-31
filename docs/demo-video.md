@@ -12,8 +12,8 @@ a window-scoped capture cuts the subject out of frame.
 
 | | On screen | Said over it |
 |---|---|---|
-| **0:00–0:07** | Drag a file off the Desktop, flick up to the notch. The shelf drops, the tile lands. | "Drag anything, flick up to the notch, and a shelf drops down to catch it." |
-| **0:07–0:22** | Three more without stopping: select a paragraph in a browser and drag it up; drag a **folder** out of a Finder window; drag a file out of **Downloads**. Then grab the **Drag all 4** pill in the shelf header and drop the pile into one folder. | "Pile in as much as you like, from as many places as you like — a chunk of text, a folder, a download — then take the whole stack out in one motion." |
+| **0:00–0:07** | Drag an **image straight out of a web page**, flick up to the notch. The shelf drops, the tile lands. Nothing on the Desktop, no Finder yet — that's the point. | "Drag anything, flick up to the notch, and a shelf drops down to catch it." |
+| **0:07–0:22** | Three more without stopping: select a paragraph on that page and drag it up; drag a **folder** out of a Finder window; drag a file out of **Downloads**. Then grab the **Drag all 4** pill in the shelf header and drop the pile into one folder. | "Pile in as much as you like, from as many places as you like — a chunk of text, a folder, a download — then take the whole stack out in one motion." |
 | **0:22–0:36** | Settings ▸ **Watched Folders**, "Shelf my screenshots" **off**. ⇧⌘4 a region — nothing lands. Flip the switch **on**, click **Watch** in the panel. ⇧⌘4 again — the tile appears on its own. | "Point it at your screenshots folder and it catches those too, the moment they're taken. The originals never move." |
 | **0:36–0:44** | iPhone Mirroring window beside the shelf. In the phone: share a photo → **Perch** → the sheet turns to a green check, **On \<your Mac\>**, and the tile lands on the Mac's shelf. | "And your phone is a shelf as well. Share to Perch there, and it turns up here." |
 | **0:44–0:57** | Hold on the phone-to-Mac beat; optionally cut to Settings ▸ **iPhone & iPad** showing the paired phone. | The paragraph below. |
@@ -78,6 +78,15 @@ that on my shelf' just works."
   sandbox can't read where macOS actually puts your captures. If yours go
   somewhere else you'll be navigating a panel on camera. Know the click:
   pick the folder, then **Watch**.
+- **A web image is a file promise, so rehearse the cold open.** It's the right
+  drag to open on — it needs nothing on disk — but perch has to fetch the bytes
+  before the tile completes, so pick a small image on a page that's already
+  loaded rather than a 12 MP hero shot. If you want a guaranteed-instant first
+  tile, drag a file out of the same Finder window you use at 0:07 instead.
+- **A hidden Desktop helps this demo.** Captures still land in the folder and
+  perch still catches them whether or not Finder draws icons, so with icons off
+  the shelf's tile is the *only* thing that changes on screen when the switch is
+  on — and "nothing happens" reads cleanly in the off half.
 - **Use fresh files in every take.** A watched folder dedupes by file identity,
   not name: a file *moved* back into Downloads keeps its inode and will not land
   a second time. Copy or create, don't move. (`docs/feel-testing.md`)
