@@ -30,6 +30,35 @@ a window-scoped capture cuts the subject out of frame.
 sentence is the one to drop; "no relay, no server, no account" is the line the
 team will repeat.
 
+## Two lines the 60-second cut has no room for
+
+Written in the same voice as the App Store bullets, for the longer cut, the
+Slack post that ships the video, or the question someone always asks first.
+
+**"So it's AirDrop?"** — no, and the difference is what perch *is*, not how it
+moves bytes:
+
+> Not another AirDrop. AirDrop moves a file from one machine to another and
+> ends in your Downloads folder. Perch isn't a way of sending things — it's a
+> third place to *keep* them, for the couple of minutes between "I have this"
+> and "I know where it goes." The phone is one way onto the shelf, not the point
+> of it. Nothing is filed for you, and nothing leaves until you drag it out.
+
+**Why it earns its keep next to an AI** — two doors, one for each hand:
+
+> Prompting is a screenshot sport now. With the switch on, every capture is a
+> tile on the notch the moment you take it — drag it straight into the chat box,
+> no Finder detour, no Desktop full of `Screenshot 2026-…`. And agents get their
+> own door: the app ships a `perch` command and an agent skill, so `perch add
+> build/app.zip` puts a file on your shelf without a human present, and "put
+> that on my shelf" works first try. Add-only, on purpose — nothing can read
+> your shelf back or take things off it.
+
+Twelve-second cut of the second one, if it's going over a shot: "Prompting is a
+screenshot sport — every capture is a tile the second you take it, ready to drag
+into the chat. And agents get their own door: `perch add`, plus a skill, so 'put
+that on my shelf' just works."
+
 ## Before you hit record
 
 - **Pair the phone the day before.** The local-network prompt fires over the
