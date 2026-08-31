@@ -1,7 +1,7 @@
 import XCTest
 @testable import Perch
 
-/// The folder Settings ▸ Folders offers to watch. None of this is a permission
+/// The folder Settings ▸ Watched Folders offers to watch. None of this is a permission
 /// — the grant still comes from the panel, and the offer only ever *adds* a
 /// folder — so what these pin is the precedence: macOS's own answer first, the
 /// rice drop as a fallback, the Desktop when neither speaks, and never a path
@@ -59,29 +59,37 @@ final class ScreenshotsFolderTests: XCTestCase {
         XCTAssertEqual(resolve(system: "", rice: "~/Shots"), home.appending(path: "Shots").path)
     }
 
-    /// The reading overload, pinned against a drop that does not exist. It
-    /// still asks the real `com.apple.screencapture`, so this asserts only the
-    /// part the machine cannot move: with no drop and no system location, the
-    /// answer is the Desktop — and on a machine that *has* one, it is at least
-    /// never built out of the process's working directory.
-    func testTheResolvingOverloadNeverBuildsARelativePath() {
-        let resolved = ScreenshotsFolder.resolve(
-            configURL: home.appending(path: "absent.json"),
-            home: home
+    /// The reading overload with no drop and nothing from the system: the
+    /// Desktop, and never a path built out of the process's working directory.
+    func testTheResolvingOverloadFallsBackToTheDesktop() {
+        XCTAssertEqual(
+            ScreenshotsFolder.resolve(
+                configURL: home.appending(path: "absent.json"),
+                home: home,
+                systemValue: nil
+            ).path,
+            home.appending(path: "Desktop").path
         )
-        XCTAssertTrue(resolved.path.hasPrefix("/"))
-        if ScreenshotsFolder.systemValue() == nil {
-            XCTAssertEqual(resolved.path, home.appending(path: "Desktop").path)
-        }
     }
 
+    /// The drop's path through the reading overload. `systemValue` is handed
+    /// in rather than skipped around: a Mac that sets a screenshot location —
+    /// which outranks the drop, and is exactly the Mac this feature is for —
+    /// would otherwise leave this untested.
     func testTheDropIsReadThroughTheResolvingOverload() throws {
         let url = try writeConfig(["screenshotsFolder": "~/Pictures/Screenshots"])
-        try XCTSkipUnless(ScreenshotsFolder.systemValue() == nil,
-                          "This Mac sets com.apple.screencapture location, which outranks the drop.")
         XCTAssertEqual(
-            ScreenshotsFolder.resolve(configURL: url, home: home).path,
+            ScreenshotsFolder.resolve(configURL: url, home: home, systemValue: nil).path,
             home.appending(path: "Pictures/Screenshots").path
+        )
+    }
+
+    /// And the system still outranks it through that same overload.
+    func testTheSystemLocationOutranksTheDropThroughTheResolvingOverload() throws {
+        let url = try writeConfig(["screenshotsFolder": "~/Pictures/Screenshots"])
+        XCTAssertEqual(
+            ScreenshotsFolder.resolve(configURL: url, home: home, systemValue: "/Volumes/Shots").path,
+            "/Volumes/Shots"
         )
     }
 
@@ -115,6 +123,12 @@ final class ScreenshotsFolderTests: XCTestCase {
                        "/Users/someone/Pictures/Screenshots")
         XCTAssertEqual(resolve(system: "file:///Users/someone/Screen%20Shots"),
                        "/Users/someone/Screen Shots")
+        // Not a legal URL — `URL(string:)` may refuse it, and refusing must not
+        // drop through to the home-relative branch and name a folder "file:".
+        XCTAssertEqual(resolve(system: "file:///Users/someone/Screen Shots"),
+                       "/Users/someone/Screen Shots")
+        XCTAssertEqual(resolve(system: "file://localhost/Users/someone/Shots"),
+                       "/Users/someone/Shots")
     }
 
     // MARK: Reading the drop

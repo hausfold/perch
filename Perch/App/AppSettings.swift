@@ -26,7 +26,7 @@ final class AppSettings: ObservableObject {
         /// is not a setting and would be meaningless in a file someone edits.
         static let retentionOptInMigrated = "retentionOptInMigrated"
         /// The watched folder the "Shelf my screenshots" switch remembered.
-        /// That switch is gone — Settings ▸ Folders offers the screenshots
+        /// That switch is gone — Settings ▸ Watched Folders offers the screenshots
         /// folder and nothing more — so this is removed rather than carried
         /// anywhere: it pointed at one row's security bookmark, and a stale
         /// pointer at a bookmark is exactly the kind of trace perch does not

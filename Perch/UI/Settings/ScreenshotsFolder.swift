@@ -13,7 +13,7 @@ import Foundation
 /// screenshots one" by comparing it against whatever this answered, so a wrong
 /// guess silently attached the screenshots row to a folder someone had added
 /// for another reason. Nothing compares against it now — the suggestion in
-/// Settings ▸ Folders only ever offers a folder to add — but being right is
+/// Settings ▸ Watched Folders only ever offers a folder to add — but being right is
 /// still what makes that suggestion worth showing at all.
 ///
 /// So the answer comes from three places, in order:
@@ -68,12 +68,18 @@ enum ScreenshotsFolder {
         return decoded.screenshotsFolder
     }
 
-    /// The folder to open the picker at, doing both reads. Every input is
-    /// injectable and there is no defaulted overload of the pure one on
-    /// purpose: an overload that silently fell back to the real machine would
-    /// make every test's answer depend on the Mac running it.
-    static func resolve(configURL: URL = RiceFiles.configFile, home: URL = RiceFiles.home) -> URL {
-        resolve(systemValue: systemValue(), riceValue: riceValue(from: configURL), home: home)
+    /// The folder to open the picker at, reading the drop. `systemValue`
+    /// defaults to the real one and is a parameter so a test can hand in
+    /// nothing and still exercise the drop's path through here — on a Mac that
+    /// sets a screenshot location, which outranks the drop, there is otherwise
+    /// no way to reach it. The pure overload below takes both and defaults
+    /// neither, so no test's answer can depend on the machine running it.
+    static func resolve(
+        configURL: URL = RiceFiles.configFile,
+        home: URL = RiceFiles.home,
+        systemValue: String? = systemValue()
+    ) -> URL {
+        resolve(systemValue: systemValue, riceValue: riceValue(from: configURL), home: home)
     }
 
     /// The same decision with the reading already done — pure, and the one
@@ -90,10 +96,21 @@ enum ScreenshotsFolder {
     /// the plist write), but both of these keys get set by hand — `defaults
     /// write`, a text editor — and `~/Pictures` is what a person types.
     private static func expand(_ path: String, home: URL) -> URL {
-        // Some scripts set `location` to a file URL. Taking it as a path would
+        // Some scripts set `location` to a file URL. Taking one as a path would
         // make a folder literally named "file:" under the home.
-        if path.hasPrefix("file://"), let url = URL(string: path), url.isFileURL {
-            return URL(fileURLWithPath: url.path, isDirectory: true)
+        //
+        // Unwrapped by hand rather than through `URL(string:)`: a value with an
+        // unencoded space is not a legal URL, the parse fails, and the fall
+        // through to the home-relative branch below produces exactly the
+        // `<home>/file:/Users/…` this is here to prevent.
+        if path.hasPrefix("file://") {
+            let body = String(path.dropFirst("file://".count))
+            let decoded = body.removingPercentEncoding ?? body
+            // `file://localhost/…` names the only host a file URL can name.
+            let posix = decoded.hasPrefix("/") ? decoded[...] : decoded.drop(while: { $0 != "/" })
+            if posix.hasPrefix("/") {
+                return URL(fileURLWithPath: String(posix), isDirectory: true)
+            }
         }
         if path == "~" {
             return home

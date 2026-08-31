@@ -81,7 +81,7 @@
 	     macOS 26.6, with two signed one-line probes in real app bundles: sandboxed
 	     without this domain the read is nil, sandboxed with it the real path comes
 	     back. It is read for exactly one purpose
-	     — aiming the folder picker in Settings ▸ Folders at the folder the
+	     — aiming the folder picker in Settings ▸ Watched Folders at the folder the
 	     person is looking for — so reading it grants nothing and a wrong answer
 	     would only cost a navigation. Guessing instead was worse than it looks:
 	     the offered folder is also how Settings decided a folder was "the

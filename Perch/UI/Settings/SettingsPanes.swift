@@ -229,14 +229,25 @@ struct ShelfPane: View {
 struct WatchedFoldersPane: View {
     @ObservedObject var folderWatch: FolderWatchCenter
 
-    /// Where this Mac saves screenshots, read once when the pane appears rather
-    /// than from a body accessor — same spirit as ShelfTheme re-reading the drop
-    /// when the shelf opens, and no file watcher anywhere.
+    /// Where this Mac saves screenshots, and that path in the canonical form
+    /// `FolderWatchCenter` dedupes on — both worked out in one detached read
+    /// when the pane appears, rather than from a body accessor. Same spirit as
+    /// ShelfTheme re-reading the drop when the shelf opens, and no file watcher
+    /// anywhere.
     ///
-    /// Nil until the read lands, and the suggestion below renders nothing while
-    /// it is: a card that says "Desktop" and then corrects itself to "Downloads"
+    /// The canonical path rides along so `body` never has to resolve symlinks
+    /// itself: that is a filesystem call, and this pane is not the place to
+    /// make an exception to "blocking file work stays off the main actor".
+    ///
+    /// Nil until the read lands, and the offer below renders nothing while it
+    /// is: a card that says "Desktop" and then corrects itself to "Downloads"
     /// is worse than one that arrives a beat late.
-    @State private var screenshotsFolder: URL?
+    private struct ScreenshotsOffer: Sendable {
+        let url: URL
+        let canonicalPath: String
+    }
+
+    @State private var offer: ScreenshotsOffer?
 
     var body: some View {
         SettingsPaneLayout(title: SettingsPane.folders.title, subtitle: SettingsPane.folders.summary) {
@@ -298,7 +309,15 @@ struct WatchedFoldersPane: View {
         }
         // Off main: the reads are small, but the pane is not the place to make
         // an exception to "blocking file work stays off the main actor".
-        .task { screenshotsFolder = await Task.detached(priority: .utility) { ScreenshotsFolder.resolve() }.value }
+        .task {
+            offer = await Task.detached(priority: .utility) {
+                let url = ScreenshotsFolder.resolve()
+                return ScreenshotsOffer(
+                    url: url,
+                    canonicalPath: url.standardizedFileURL.resolvingSymlinksInPath().path
+                )
+            }.value
+        }
     }
 
     // MARK: Shelf my screenshots
@@ -313,18 +332,14 @@ struct WatchedFoldersPane: View {
     /// whichever row happened to sit on the folder it had guessed at, including
     /// one added deliberately through "Watch a Folder…".
     ///
-    /// `watchedFolderID` answers nil for the first moments after launch, before
-    /// any bookmark has resolved, so this can briefly offer a folder that is
-    /// already watched. Harmless in both directions: `rows` publishes when the
+    /// `watches(canonicalPath:)` answers false for the first moments after
+    /// launch, before any bookmark has resolved, so this can briefly offer a
+    /// folder that is already watched. Harmless in both directions: `rows` publishes when the
     /// watcher attaches and the card goes, and taking the offer meanwhile adopts
     /// the existing folder rather than adding a second one.
     private var screenshotsSuggestion: URL? {
-        guard let screenshotsFolder,
-              folderWatch.watchedFolderID(for: screenshotsFolder) == nil
-        else {
-            return nil
-        }
-        return screenshotsFolder
+        guard let offer, !folderWatch.watches(canonicalPath: offer.canonicalPath) else { return nil }
+        return offer.url
     }
 
     /// The panel is the whole permission model, so even a folder perch can name
@@ -336,16 +351,11 @@ struct WatchedFoldersPane: View {
     /// offered: it is an ordinary watched folder from the moment it lands, and
     /// nothing here treats it differently afterwards.
     private func watchScreenshots(at folder: URL) {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = folder
-        panel.prompt = "Watch"
-        panel.message = "Perch will copy new screenshots from this folder onto the shelf."
-        NSApp.activate()
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        folderWatch.addFolder(at: url)
+        watch(runFolderPanel(
+            openingAt: folder,
+            allowsMultiple: false,
+            message: "Perch will copy new screenshots from this folder onto the shelf."
+        ))
     }
 
     /// `~`-abbreviated for display only, against the real home — inside the
@@ -367,15 +377,31 @@ struct WatchedFoldersPane: View {
     /// the watcher keeps (as an app-scoped bookmark), so there is
     /// nothing to pre-authorize and nothing typed in by hand.
     private func addWatchedFolder() {
+        watch(runFolderPanel(
+            openingAt: nil,
+            allowsMultiple: true,
+            message: "Perch will copy new files from this folder onto the shelf."
+        ))
+    }
+
+    /// Both doors into this pane are the same panel — the offer only opens it
+    /// somewhere in particular and takes one folder. Empty when it was
+    /// cancelled, which grants nothing and changes nothing.
+    private func runFolderPanel(openingAt directory: URL?, allowsMultiple: Bool, message: String) -> [URL] {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
-        panel.allowsMultipleSelection = true
+        panel.allowsMultipleSelection = allowsMultiple
+        panel.directoryURL = directory
         panel.prompt = "Watch"
-        panel.message = "Perch will copy new files from this folder onto the shelf."
+        panel.message = message
         NSApp.activate()
-        guard panel.runModal() == .OK else { return }
-        for url in panel.urls {
+        guard panel.runModal() == .OK else { return [] }
+        return panel.urls
+    }
+
+    private func watch(_ urls: [URL]) {
+        for url in urls {
             folderWatch.addFolder(at: url)
         }
     }
