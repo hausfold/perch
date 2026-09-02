@@ -71,6 +71,8 @@ and take the reading before the next lane builds. That file collects the rest of
 the recipes that read wrong on the first run — priming a watched folder before
 testing catch-up, APFS clones making a 3 GB drop instant, `--level info` on `log
 stream` — and is worth a look before any hands-on pass.
+[`docs/demo-video.md`](./docs/demo-video.md) is the 60-second team demo's shot
+list, and it inherits those same watch-outs.
 
 Don't pass `CODE_SIGNING_ALLOWED=NO` to the **iOS** build you intend to run:
 it strips the App Group entitlement and the app aborts at launch. Simulator
