@@ -342,6 +342,15 @@ struct RiceThemeDefaults: Decodable, Equatable {
     /// predate accents.
     var accent: String? = nil
 
+    /// The proportional family the shelf sets its text in — a family *name*,
+    /// not a file. Absent means macOS's own, which is what perch drew before
+    /// this key existed. Colour is not the only thing a desktop has an opinion
+    /// about, and `haus.fonts.sans.name` is where this one comes from; a
+    /// standalone install writes it here by hand, like the accent. Perch
+    /// installs no fonts, so a family this Mac doesn't have falls back to the
+    /// system face silently — see `ShelfFont`.
+    var fontFamily: String? = nil
+
     static func load(from url: URL = RiceFiles.configFile) -> RiceThemeDefaults? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(RiceThemeDefaults.self, from: data)

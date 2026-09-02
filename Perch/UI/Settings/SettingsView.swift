@@ -54,6 +54,7 @@ struct SettingsView: View {
         )
         .background(SettingsWindowConfigurator(defaultSize: Self.defaultWindowSize))
         .navigationTitle(Self.windowTitle)
+        .perchType()
     }
 
     static let windowTitle = "Perch Settings"
@@ -149,9 +150,9 @@ private struct SettingsSidebarFooter: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Perch")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(ShelfFont.size(12, weight: .semibold))
                     Text(version)
-                        .font(.system(size: 11))
+                        .font(ShelfFont.size(11))
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)

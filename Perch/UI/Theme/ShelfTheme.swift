@@ -12,16 +12,27 @@ import SwiftUI
 @MainActor
 final class ShelfTheme: ObservableObject {
     @Published private(set) var palette: RicePalette
+    /// The family the shelf's text is set in, or nil for macOS's own.
+    ///
+    /// Published as well as pushed into `ShelfFont`, and both are needed: the
+    /// static is what a view body reads (threading this through fifteen view
+    /// structs' environments would be the alternative), and the `@Published`
+    /// is what makes the panel re-render when a rebuild changes it while perch
+    /// is running. A static alone would change the family and redraw nothing.
+    @Published private(set) var fontFamily: String?
 
     private var appearanceObserver: NSKeyValueObservation?
     // nonisolated(unsafe) so deinit may unregister it; written once in init.
     private nonisolated(unsafe) var distributedObserver: NSObjectProtocol?
 
     init(observingSystemAppearance: Bool = true) {
+        let defaults = RiceThemeDefaults.load()
         palette = RiceTheme.palette(
             systemIsLight: RiceTheme.systemIsLight,
-            defaults: RiceThemeDefaults.load()
+            defaults: defaults
         )
+        fontFamily = ShelfFont.resolve(defaults?.fontFamily)
+        ShelfFont.adopt(defaults?.fontFamily)
         guard observingSystemAppearance else { return }
 
         // Two sources for one event, because neither is guaranteed on its own:
@@ -52,10 +63,16 @@ final class ShelfTheme: ObservableObject {
     /// palette actually changed — an unchanged republish would invalidate every
     /// shelf view for nothing, including mid-drag.
     func refresh() {
+        let defaults = RiceThemeDefaults.load()
         let resolved = RiceTheme.palette(
             systemIsLight: RiceTheme.systemIsLight,
-            defaults: RiceThemeDefaults.load()
+            defaults: defaults
         )
+        // The family is adopted whether or not anything changed: `ShelfFont`
+        // holds no history, and adopting the same name twice costs nothing.
+        let family = ShelfFont.resolve(defaults?.fontFamily)
+        ShelfFont.adopt(defaults?.fontFamily)
+        if family != fontFamily { fontFamily = family }
         guard resolved != palette else { return }
         palette = resolved
     }
