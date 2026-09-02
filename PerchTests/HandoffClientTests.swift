@@ -58,6 +58,43 @@ final class HandoffClientTests: XCTestCase {
         return url
     }
 
+    /// The whole `add` loop, run for its side effect: one file on the shelf,
+    /// through the same four steps the tool takes. What the read verbs are then
+    /// asked about.
+    @discardableResult
+    private func shelve(
+        _ name: String,
+        contents: String,
+        in fixture: Fixture
+    ) async throws -> ShelfItem {
+        let source = try makeSource(name, contents: contents, in: fixture)
+        let request = try fixture.client.openRequest(displayNames: [name])
+        await fixture.receiver.scanOnce()
+        let response = try XCTUnwrap(
+            fixture.client.waitForAnswer(request.id, deadline: Date().addingTimeInterval(1))
+        )
+        let item = try XCTUnwrap(
+            fixture.client.acceptedItems(in: request, response: response).first
+        )
+        let staged = try fixture.client.stage(
+            sourceURL: source,
+            item: item,
+            requestID: request.id
+        )
+        try fixture.client.finish(
+            FinderActionCompletion(stagedItems: [staged], failedItemIDs: []),
+            for: request.id
+        )
+        await fixture.receiver.scanOnce()
+        return try XCTUnwrap(fixture.store.items.first { $0.id == item.id })
+    }
+
+    private func answerURL(for requestID: UUID, in fixture: Fixture) -> URL {
+        fixture.client.mailbox.rootURL
+            .appending(path: requestID.uuidString, directoryHint: .isDirectory)
+            .appending(path: FinderActionProtocol.responseFilename)
+    }
+
     /// The whole loop the `perch` tool runs: ask by name, wait for the receipt,
     /// copy only what was admitted, publish, and let the app adopt it.
     func testCommandLineHandoffBecomesAShelfItem() async throws {
@@ -68,7 +105,7 @@ final class HandoffClientTests: XCTestCase {
         await fixture.receiver.scanOnce()
 
         let response = try XCTUnwrap(
-            fixture.client.waitForAdmission(request.id, deadline: Date().addingTimeInterval(1))
+            fixture.client.waitForAnswer(request.id, deadline: Date().addingTimeInterval(1))
         )
         let accepted = fixture.client.acceptedItems(in: request, response: response)
         XCTAssertEqual(accepted.count, 1)
@@ -112,7 +149,7 @@ final class HandoffClientTests: XCTestCase {
         )
         await fixture.receiver.scanOnce()
         let response = try XCTUnwrap(
-            fixture.client.waitForAdmission(request.id, deadline: Date().addingTimeInterval(1))
+            fixture.client.waitForAnswer(request.id, deadline: Date().addingTimeInterval(1))
         )
         let accepted = fixture.client.acceptedItems(in: request, response: response)
         XCTAssertEqual(accepted.map(\.displayName), ["item0.txt", "item1.txt", "item2.txt"])
@@ -128,7 +165,7 @@ final class HandoffClientTests: XCTestCase {
         let request = try fixture.client.openRequest(displayNames: ["secret.txt"])
         await fixture.receiver.scanOnce()
         let response = try XCTUnwrap(
-            fixture.client.waitForAdmission(request.id, deadline: Date().addingTimeInterval(1))
+            fixture.client.waitForAnswer(request.id, deadline: Date().addingTimeInterval(1))
         )
         let staged = try fixture.client.stage(
             sourceURL: source,
@@ -167,6 +204,117 @@ final class HandoffClientTests: XCTestCase {
         XCTAssertTrue(fixture.store.pendingTransfers.isEmpty)
         XCTAssertTrue(fixture.store.items.isEmpty)
         XCTAssertTrue(try fixture.client.mailbox.snapshots().isEmpty)
+    }
+
+
+    // MARK: - The read verbs
+
+    /// `perch list`: the shelf the panel is showing, in the panel's order, with
+    /// the pin a person at a terminal can act on. It reserves nothing and
+    /// changes nothing.
+    func testListAnswersWithTheShelfTheAppIsShowing() async throws {
+        let fixture = try makeFixture()
+        let first = try await shelve("notes.txt", contents: "one", in: fixture)
+        let second = try await shelve("shot.png", contents: "two", in: fixture)
+        fixture.store.setPinned(true, for: second)
+
+        let request = try fixture.client.openRequest(kind: .list)
+        await fixture.receiver.scanOnce()
+        let response = try XCTUnwrap(
+            fixture.client.waitForAnswer(request.id, deadline: Date().addingTimeInterval(1))
+        )
+        let entries = try XCTUnwrap(response.entries)
+
+        XCTAssertEqual(entries.map(\.id), [first.id, second.id])
+        XCTAssertEqual(entries.map(\.displayName), ["notes.txt", "shot.png"])
+        XCTAssertEqual(entries.map(\.isPinned), [false, true])
+        XCTAssertEqual(entries.map(\.byteCount), fixture.store.items.map(\.byteCount))
+        XCTAssertTrue(response.acceptedItemIDs.isEmpty, "a list reserves no slots")
+        XCTAssertEqual(fixture.store.items.count, 2, "reading the shelf does not change it")
+
+        // The sender closes its own transaction: an app that dropped the
+        // directory the moment it answered would race the reader of that answer.
+        await fixture.receiver.scanOnce()
+        XCTAssertFalse(try fixture.client.mailbox.snapshots().isEmpty)
+        fixture.client.acknowledge(request.id)
+        await fixture.receiver.scanOnce()
+        XCTAssertTrue(try fixture.client.mailbox.snapshots().isEmpty)
+    }
+
+    /// The answer names items and says nothing about where anything lives — not
+    /// the original, and not the staged copy either.
+    func testAListedShelfCarriesNamesAndNoPaths() async throws {
+        let fixture = try makeFixture()
+        try await shelve("secret.txt", contents: "shh", in: fixture)
+
+        let request = try fixture.client.openRequest(kind: .list)
+        await fixture.receiver.scanOnce()
+
+        let json = String(
+            decoding: try Data(contentsOf: answerURL(for: request.id, in: fixture)),
+            as: UTF8.self
+        )
+        XCTAssertTrue(json.contains("secret.txt"))
+        XCTAssertFalse(json.contains(fixture.sourceRoot.path))
+        XCTAssertFalse(json.contains(fixture.shelfRoot.path))
+        XCTAssertFalse(json.contains("file://"))
+    }
+
+    /// `perch rm`: the same removal the shelf's own menu performs — the item
+    /// goes, and the bytes Perch staged for it go with it. The original was
+    /// never Perch's to touch.
+    func testRemoveTakesTheItemAndTheBytesPerchStaged() async throws {
+        let fixture = try makeFixture()
+        let source = try makeSource("original.txt", contents: "bye", in: fixture)
+        let item = try await shelve("stale.txt", contents: "bye", in: fixture)
+        let stagedURL = try XCTUnwrap(fixture.store.stagedURL(for: item))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: stagedURL.path))
+
+        let request = try fixture.client.openRequest(kind: .remove, targetItemIDs: [item.id])
+        await fixture.receiver.scanOnce()
+        let response = try XCTUnwrap(
+            fixture.client.waitForAnswer(request.id, deadline: Date().addingTimeInterval(1))
+        )
+
+        XCTAssertEqual(try XCTUnwrap(response.entries).map(\.id), [item.id])
+        XCTAssertEqual(try XCTUnwrap(response.entries).map(\.displayName), ["stale.txt"])
+        XCTAssertTrue(fixture.store.items.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stagedURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+
+        fixture.client.acknowledge(request.id)
+        await fixture.receiver.scanOnce()
+        XCTAssertTrue(try fixture.client.mailbox.snapshots().isEmpty)
+    }
+
+    /// An id the shelf no longer has is simply absent from the answer — that is
+    /// how the tool reports it and still exits having removed the rest. And the
+    /// answer is written once: a rescan before the sender acknowledges must not
+    /// recompute it into "nothing was removed".
+    func testRemoveAnswersWithWhatItTookAndOnlyOnce() async throws {
+        let fixture = try makeFixture()
+        let kept = try await shelve("keep.txt", contents: "keep", in: fixture)
+        let gone = try await shelve("gone.txt", contents: "gone", in: fixture)
+
+        let request = try fixture.client.openRequest(
+            kind: .remove,
+            targetItemIDs: [gone.id, UUID()]
+        )
+        await fixture.receiver.scanOnce()
+        let response = try XCTUnwrap(
+            fixture.client.waitForAnswer(request.id, deadline: Date().addingTimeInterval(1))
+        )
+        XCTAssertEqual(try XCTUnwrap(response.entries).map(\.id), [gone.id])
+        XCTAssertEqual(fixture.store.items.map(\.id), [kept.id])
+
+        let answered = try Data(contentsOf: answerURL(for: request.id, in: fixture))
+        await fixture.receiver.scanOnce()
+        XCTAssertEqual(
+            try Data(contentsOf: answerURL(for: request.id, in: fixture)),
+            answered,
+            "the response on disk is what makes a read verb idempotent across scans"
+        )
+        XCTAssertEqual(fixture.store.items.map(\.id), [kept.id])
     }
 
     /// The unsandboxed lookup the tool uses answers with the group container's

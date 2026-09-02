@@ -44,7 +44,7 @@ current with the rest of the desktop.
 
 ## in this repo
 
-- [`docs/cli.md`](docs/cli.md) — `perch add`, its exit codes, and the mailbox protocol behind it
+- [`docs/cli.md`](docs/cli.md) — `perch add`, `list`, `rm`, their exit codes, and the mailbox protocol behind them
 - [`ai/SKILL.md`](ai/SKILL.md) — the agent surface, so *"put this in my shelf"* works first try
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — the invariants, and the seams that hold them
 - [`AGENTS.md`](AGENTS.md) — building it, testing it, shipping it

@@ -1,9 +1,10 @@
 import Foundation
 
 /// The *sender's* half of the App Group mailbox — the way anything that isn't
-/// the app hands it bytes. The `perch` command line tool is the only sender
-/// left; a Finder Action extension spoke it too until 2026-08-23, which is
-/// where these `FinderAction*` names come from.
+/// the app hands it bytes, and since the read verbs, asks it what it is
+/// holding. The `perch` command line tool is the only sender left; a Finder
+/// Action extension spoke it too until 2026-08-23, which is where these
+/// `FinderAction*` names come from.
 /// `FinderActionMailbox` is the filesystem mechanics; this is the
 /// protocol played out in order — publish names, wait for Perch's admission
 /// receipt, copy only what it reserved, then publish the relative paths.
@@ -12,6 +13,11 @@ import Foundation
 /// is copied — a running app is the only thing that can promise to adopt them —
 /// and a source URL never crosses into the App Group: only display names go in
 /// the request, only relative staged paths come back.
+///
+/// `list` and `remove` are the same transaction with its middle removed: open,
+/// read the answer, acknowledge. They copy nothing, so there is nothing to
+/// reserve — but they still close their transaction, because a request Perch
+/// deleted the instant it answered would race the sender reading that answer.
 struct HandoffClient: Sendable {
     let mailbox: FinderActionMailbox
 
@@ -68,9 +74,16 @@ struct HandoffClient: Sendable {
             )
     }
 
-    /// Publish the batch Perch is being asked to admit. Names only — the caller
-    /// keeps its own mapping from each item to whatever it will read bytes from.
-    func openRequest(displayNames: [String], now: Date = Date()) throws -> FinderActionRequest {
+    /// Publish a request. For an `add` that is the batch Perch is being asked to
+    /// admit — names only, and the caller keeps its own mapping from each item
+    /// to whatever it will read bytes from. The read verbs carry no names at
+    /// all: `list` asks a question, and `remove` names ids the shelf gave out.
+    func openRequest(
+        kind: FinderActionKind = .add,
+        displayNames: [String] = [],
+        targetItemIDs: [UUID] = [],
+        now: Date = Date()
+    ) throws -> FinderActionRequest {
         let request = FinderActionRequest(
             id: UUID(),
             createdAt: now,
@@ -80,15 +93,19 @@ struct HandoffClient: Sendable {
                     displayName: FinderActionProtocol.safeFilename(name),
                     attachmentIndex: index
                 )
-            }
+            },
+            kind: kind,
+            targetItemIDs: targetItemIDs
         )
         try mailbox.createRequest(request)
         return request
     }
 
-    /// Block until Perch answers with the slots it reserved, or the deadline
-    /// passes. A nil answer means no Perch is listening on this account.
-    func waitForAdmission(
+    /// Block until Perch answers, or the deadline passes. For an `add` the
+    /// answer is the admission receipt — the slots it reserved, written before
+    /// a byte is copied; for a read verb it carries the entries. A nil answer
+    /// means no Perch is listening on this account.
+    func waitForAnswer(
         _ requestID: UUID,
         deadline: Date,
         poll: TimeInterval = 0.1
@@ -164,6 +181,19 @@ struct HandoffClient: Sendable {
     /// its response while we were timing out, and an empty completion is what
     /// releases those slots on its next scan.
     func abandon(_ requestID: UUID) {
+        closeWithEmptyCompletion(requestID)
+    }
+
+    /// Close a read verb's transaction: the answer has been read, and Perch may
+    /// drop the directory. The same empty completion `abandon` writes, because
+    /// it is the same statement — the sender is done and nothing was staged —
+    /// and it is the sender's job to say it: Perch cannot delete a request the
+    /// moment it answers without racing the reader of that answer.
+    func acknowledge(_ requestID: UUID) {
+        closeWithEmptyCompletion(requestID)
+    }
+
+    private func closeWithEmptyCompletion(_ requestID: UUID) {
         try? mailbox.writeCompletion(
             FinderActionCompletion(stagedItems: [], failedItemIDs: []),
             for: requestID
