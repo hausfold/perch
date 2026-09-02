@@ -43,8 +43,10 @@ enum BugReport {
     /// it exists so the day someone adds a log tail here the door still opens.
     static let maximumURLLength = 6000
 
-    /// What the form's "Version and macOS" field asks for, verbatim, plus the
-    /// install cohort.
+    /// What the form's `perch doctor` field asks for: the four facts that
+    /// verb's header pair carries — version, install cohort, macOS build, Mac
+    /// model — from the same `PerchDiagnostics` the verb reads, so a pasted
+    /// `doctor` and a filed issue can't disagree about which Mac this is.
     ///
     /// Deliberately three short lines. This lands in a public issue and a
     /// reporter reads it before they hit Submit — anything they would want to

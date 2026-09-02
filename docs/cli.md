@@ -133,9 +133,9 @@ doctor: ready
 ```
 
 `✓` fine, `!` worth knowing, `✗` blocking; exit 3 if anything is `✗`. The first
-two lines carry every fact the bug form's "Version and macOS" field asks for —
-version, cohort, macOS build, Mac model — from the same `PerchDiagnostics/` the
-app quotes into that form, so a pasted `doctor` and a filed issue can't disagree
+two lines are what the bug form's `perch doctor` field asks for — version,
+cohort, macOS build, Mac model — from the same `PerchDiagnostics/` the app
+quotes into that form, so a pasted `doctor` and a filed issue can't disagree
 about which Mac this is. Not the same bytes: `BugReport` lays those four facts
 out over three lines for the form, this lays them over two for a terminal.
 
