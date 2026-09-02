@@ -23,6 +23,7 @@ grant, no telemetry, and no Dock icon.
 
 ```sh
 brew install --cask hausfold/tap/perch
+perch skill install   # optional — teach this Mac's coding agents about the shelf
 ```
 
 macOS 14 or newer, signed and notarized. The phone half is free on the App
@@ -45,7 +46,7 @@ current with the rest of the desktop.
 ## in this repo
 
 - [`docs/cli.md`](docs/cli.md) — `perch add`, `list`, `rm`, their exit codes, and the mailbox protocol behind them
-- [`ai/SKILL.md`](ai/SKILL.md) — the agent surface, so *"put this in my shelf"* works first try
+- [`ai/SKILL.md`](ai/SKILL.md) — the agent surface, so *"put this in my shelf"* works first try; `perch skill` prints it, `perch skill install` puts it where your agent will find it
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — the invariants, and the seams that hold them
 - [`AGENTS.md`](AGENTS.md) — building it, testing it, shipping it
 

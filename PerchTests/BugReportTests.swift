@@ -92,9 +92,10 @@ final class BugReportTests: XCTestCase {
     }
 
     /// The block is quoted into a public GitHub issue, which makes it prose a
-    /// stranger reads — and `InstallKind.rice.rawValue` is `rice`, the old word
-    /// for a desktop that the family's naming rule keeps out of anything new.
-    /// `unknown` is the other one: it reads as a malfunction, not a cohort.
+    /// stranger reads — and the desktop cohort's Swift CASE is still spelled
+    /// `rice`, the old word for a desktop that the family's naming rule keeps
+    /// out of anything new. `unknown` is the other one: it reads as a
+    /// malfunction, not a cohort.
     func testNoCohortReachesAPublicIssueAsACodeIdentifier() {
         for kind in InstallKind.allCases {
             XCTAssertFalse(kind.displayName.isEmpty, "\(kind) has no wording")
@@ -102,6 +103,16 @@ final class BugReportTests: XCTestCase {
             XCTAssertNotEqual(kind.displayName, "unknown", "`unknown` reads as a malfunction")
         }
         XCTAssertEqual(InstallKind.rice.displayName, "haus desktop")
+    }
+
+    /// The raw values are published too, now: `perch doctor --json` prints one
+    /// as `install`. So the same rule reaches them — nothing an agent quotes
+    /// back to a person may be the old word.
+    func testNoCohortReachesAMachineReaderAsTheOldWordEither() {
+        for kind in InstallKind.allCases {
+            XCTAssertNotEqual(kind.rawValue, "rice", "`rice` is our vocabulary, not an API's")
+        }
+        XCTAssertEqual(InstallKind.rice.rawValue, "haus")
     }
 
     func testTheLiveModelAndOSReadBackFromSysctl() {
