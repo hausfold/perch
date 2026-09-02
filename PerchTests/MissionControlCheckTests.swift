@@ -19,7 +19,7 @@ final class MissionControlCheckTests: XCTestCase {
     /// rather than silently letting every drag fail.
     ///
     /// `false` is the haus case: the desktop writes that key whenever
-    /// `haus.shelf.enable` is on, so a rice install must never see the strip or
+    /// `haus.shelf.enable` is on, so a haus install must never see the strip or
     /// the menu row.
     func testExplicitValuesWin() {
         XCTAssertTrue(MissionControlCheck.isArmed(dockPreference: true))

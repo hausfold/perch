@@ -32,7 +32,7 @@ import os
 // in Perch.entitlements.
 //
 // The haus desktop turns the Dock trigger off whenever `haus.shelf.enable` is
-// on, so a rice install reads `false` here and never sees any of this.
+// on, so a haus install reads `false` here and never sees any of this.
 
 @MainActor
 final class MissionControlCheck: ObservableObject {

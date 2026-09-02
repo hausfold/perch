@@ -11,13 +11,13 @@ import os.log
 /// ```text
 /// compiled-in defaults
 ///   ‹ ~/Library/Containers/…/Application Support/Perch/settings.json   ← Settings writes this
-///     ‹ ~/.config/perch/config.json                                     ← the rice declares this
+///     ‹ ~/.config/perch/config.json                                     ← haus declares this
 /// ```
 ///
 /// Settings writes the **container** file, which perch owns outright and needs
-/// no entitlement to touch. The rice drop layers on top: any key it names wins,
+/// no entitlement to touch. The haus drop layers on top: any key it names wins,
 /// and Settings renders that row read-only saying where the value comes from.
-/// Perch never writes the rice drop — its sandbox exception for
+/// Perch never writes the haus drop — its sandbox exception for
 /// `~/.config/perch/` is read-only and stays that way, because widening it to
 /// read-write is the kind of temporary exception App Review reads as a
 /// sandbox that isn't one. Declaring a setting is therefore a machine-level
@@ -59,7 +59,7 @@ struct AppConfig: Equatable, Sendable {
     /// answer (`SMAppService.mainApp.status`), so unlike every other key here
     /// there is nothing for perch to store — a copy in a file could only
     /// disagree with the system. What a file *can* do is declare the intent,
-    /// which is what a rice is for: name it in `~/.config/perch/config.json`
+    /// which is what haus is for: name it in `~/.config/perch/config.json`
     /// and perch registers or unregisters the login item to match on every
     /// launch, and Settings shows the switch read-only.
     ///
@@ -86,7 +86,7 @@ struct AppConfig: Equatable, Sendable {
 
         /// Every key perch reads as a setting.
         ///
-        /// What makes it necessary: the rice drop is a *shared* file. It
+        /// What makes it necessary: the haus drop is a *shared* file. It
         /// already carries `themeDark`, `themeLight`, `accent` and
         /// `screenshotsFolder`, and it will carry more. Locking a Settings row
         /// because the file names *some* key would grey out the whole window
@@ -105,7 +105,7 @@ struct AppConfig: Equatable, Sendable {
     /// A partial file is the normal case — the point of a settings file is
     /// that you write the one line you care about — and the `defaults`
     /// parameter is also how the two layers compose: decode the container file
-    /// over the compiled-in defaults, then the rice drop over that, and
+    /// over the compiled-in defaults, then the haus drop over that, and
     /// precedence falls out of the same three lines.
     init(json: [String: Any], defaults: AppConfig = AppConfig()) {
         self = defaults
@@ -181,10 +181,10 @@ final class ConfigFileStore: @unchecked Sendable {
     /// declaration is applied.
     ///
     /// Kept apart from `config` because it is what gets written back. Writing
-    /// the composed value instead would copy the rice's answers into the user's
+    /// the composed value instead would copy haus's answers into the user's
     /// own file on the first unrelated toggle, and they would then outlive the
-    /// declaration that put them there: remove the rice's key and the setting
-    /// would not come back, it would stay stuck at whatever the rice last said.
+    /// declaration that put them there: remove haus's key and the setting
+    /// would not come back, it would stay stuck at whatever haus last said.
     /// For `retentionDays` that turns "the machine declares 30 days" into "this
     /// user chose to have their shelf deleted on a timer", permanently, without
     /// anyone deciding it.
@@ -194,7 +194,7 @@ final class ConfigFileStore: @unchecked Sendable {
     /// know — something a newer build writes, or a note someone left in there
     /// — survives a toggle instead of being quietly deleted.
     private var raw: [String: Any] = [:]
-    /// The same for the rice drop, which perch reads and never writes. Kept
+    /// The same for the haus drop, which perch reads and never writes. Kept
     /// whole because the theme keys live in it too and none of them are ours.
     private var declared: [String: Any] = [:]
 
@@ -227,7 +227,7 @@ final class ConfigFileStore: @unchecked Sendable {
     /// answer to "why can't I change this" is on screen next to the switch.
     var declarationURL: URL? { declaration }
 
-    /// The settings the rice drop names — the ones Settings renders read-only.
+    /// The settings the haus drop names — the ones Settings renders read-only.
     /// Intersected with `AppConfig.Key.all`, so the theme keys that share that
     /// file lock nothing.
     func declaredKeys() -> Set<String> {
@@ -387,7 +387,7 @@ final class ConfigFileStore: @unchecked Sendable {
 
 /// Why a write didn't land.
 enum ConfigWriteError: LocalizedError, Equatable {
-    /// The rice drop names this setting, so perch's copy of it is not the one
+    /// The haus drop names this setting, so perch's copy of it is not the one
     /// that counts. Refused rather than written, because a write that landed
     /// would be overruled by the very next read — a switch that moves and
     /// springs back is worse than one that never moves.

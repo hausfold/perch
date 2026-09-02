@@ -1,7 +1,7 @@
 name: release
 
 # Tag v<date> (CalVer, e.g. v2026.07.26) -> build Perch.app -> GitHub release
-# with a zipped bundle -> Homebrew cask bump + rice flake-pin bump. Cut tags with
+# with a zipped bundle -> Homebrew cask bump + haus flake-pin bump. Cut tags with
 # `bench release perch` from the workshop; it enforces that the tag matches
 # VERSION and that everything is pushed.
 #
@@ -230,11 +230,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      # Perch is also a flake input of the rice (hausfold/hausfold), which
+      # Perch is also a flake input of haus (hausfold/hausfold), which
       # installs the app through Nix instead of Homebrew. That flake wraps this
       # release ZIP, pinned by version + sha256 in nix/release.nix — the exact
       # same pair the cask carries. Keep the two in lockstep: rewrite the pin on
-      # main so a downstream `bench ship` ripples the new release into the rice's
+      # main so a downstream `bench ship` ripples the new release into haus's
       # lock. The version/sha lines are CI-owned; humans never bump them.
       - uses: actions/checkout@v4
         with:

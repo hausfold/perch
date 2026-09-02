@@ -75,7 +75,7 @@ final class AppSettings: ObservableObject {
     }
 
     /// macOS's answer, not a stored one: `SMAppService` holds this setting and
-    /// perch only asks. A declaration in the rice drop is applied to the system
+    /// perch only asks. A declaration in the haus drop is applied to the system
     /// at launch and whenever that file changes — see `AppConfig.launchAtLogin`.
     @Published private(set) var launchAtLogin = false
     @Published private(set) var launchAtLoginError: String?
@@ -84,7 +84,7 @@ final class AppSettings: ObservableObject {
     /// than leaving a switch that moved over a file that didn't.
     @Published private(set) var writeError: String?
 
-    /// The settings the rice drop declares. Republished so the window redraws
+    /// The settings the haus drop declares. Republished so the window redraws
     /// its read-only rows when that file changes under a running perch.
     @Published private(set) var declaredKeys: Set<String> = []
 
@@ -173,7 +173,7 @@ final class AppSettings: ObservableObject {
 
     // MARK: - Launch at login
 
-    /// The switch. Refused while the rice drop declares the answer, which is
+    /// The switch. Refused while the haus drop declares the answer, which is
     /// belt-and-braces: Settings already renders that row read-only.
     func setLaunchAtLogin(_ enabled: Bool) {
         guard !isDeclared(AppConfig.Key.launchAtLogin) else {
@@ -257,7 +257,7 @@ final class AppSettings: ObservableObject {
     /// setting somebody made.
     ///
     /// **A file wins wherever it speaks.** Only keys `settings.json` does not
-    /// name are filled in, and a key the rice drop declares is never filled in
+    /// name are filled in, and a key the haus drop declares is never filled in
     /// at all: a value someone typed into a file — or that their desktop
     /// generated — is a later, more deliberate decision than a switch they
     /// flipped in a previous build, and a migration that overwrote it would

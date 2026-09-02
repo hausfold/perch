@@ -10,7 +10,7 @@
   prebuilt,
 }:
 
-# Package Perch.app so the rice (and anyone) can install it through Nix instead
+# Package Perch.app so haus (and anyone) can install it through Nix instead
 # of Homebrew — perch's handle in the flake-lock chain.
 #
 # Normally we fetch the CI-built release ZIP rather than compiling: perch is an
@@ -19,7 +19,7 @@
 # resolution (pounce dodges this only by being plain `swiftc` with zero
 # packages). The ZIP is already Developer-ID signed + Apple notarized, which is
 # exactly what a stable permissions grant wants — so unpack it verbatim and let
-# the rice place it at a fixed path (no re-sign dance).
+# haus place it at a fixed path (no re-sign dance).
 #
 # The one exception is `bench try` feel-testing a source branch: it builds the
 # app in your login session (where xcodebuild works) and overrides `prebuilt` to
@@ -33,7 +33,7 @@ in
 
 stdenvNoCC.mkDerivation {
   pname = "perch";
-  # Tag the dev build so its store path (and the rice's install marker) differ
+  # Tag the dev build so its store path (and haus's install marker) differ
   # from the release — activation then re-copies when you flip between them.
   version = if useDev then "${version}-dev" else version;
 
@@ -93,7 +93,7 @@ stdenvNoCC.mkDerivation {
     # Safe to declare again now that perch is MIT. It was left out
     # while the repo was FSL-1.1-ALv2: nixpkgs has no FSL license, and anything
     # that isn't a free license flips the package unfree, which breaks the
-    # rice's install for anyone without allowUnfree.
+    # haus's install for anyone without allowUnfree.
     license = lib.licenses.mit;
     platforms = lib.platforms.darwin;
     sourceProvenance = [ lib.sourceTypes.binaryNativeCode ];

@@ -211,7 +211,7 @@ never rethrown — it embeds the original path. The pending model separates
 phases, so a later provider-specific progress source does not require a model
 rewrite.
 
-### Following the rice theme
+### Following the haus theme
 
 The shelf paints from a `RicePalette` — one of four compiled-in nebelung
 variants, or any `role → "#hex"` file in `~/.config/perch/themes/`, which shadows
@@ -222,8 +222,8 @@ the environment so every panel and tile repaints together.
 
 Both paths sit outside the app container, which costs one read-only
 home-relative sandbox exception and forces two details: the real home comes from
-`getpwuid` (inside the sandbox `NSHomeDirectory()` is the container), and the
-rice must drop **real files**, since the sandbox resolves a symlink into
+`getpwuid` (inside the sandbox `NSHomeDirectory()` is the container), and
+haus must drop **real files**, since the sandbox resolves a symlink into
 `/nix/store` before it checks the path and denies it.
 
 ### Where a setting lives
@@ -238,7 +238,7 @@ Two files, and the order between them is the design:
 ```text
 compiled-in defaults
   ‹ …/Application Support/Perch/settings.json   ← Settings writes this
-    ‹ ~/.config/perch/config.json                ← the rice declares this
+    ‹ ~/.config/perch/config.json                ← haus declares this
 ```
 
 `ConfigFileStore` (`Perch/App/AppConfigFile.swift`) loads both, follows both,
@@ -252,14 +252,14 @@ stays read-only. Widening it so both layers could be one file would trade a
 narrow exception for a home-relative *write* grant — the kind App Review reads
 as a sandbox that isn't one.
 
-So the rice's half is a **declaration**: any key it names wins, and Settings
+So haus's half is a **declaration**: any key it names wins, and Settings
 renders that row read-only with a padlock and a line saying which file decided.
 Refusal happens in the store, before anything in memory moves — a switch that
 accepts a change and springs back on the next read is worse than one that never
 moves. The store keeps the container layer separate from the composed answer and
 writes only the former, so an unrelated toggle never copies the declaration into
-the user's own file: remove the rice's key and the setting the user chose comes
-back, rather than staying frozen at whatever the rice last said. The keys are perch's own (`showOnAllDisplays`, `retentionDays`,
+the user's own file: remove haus's key and the setting the user chose comes
+back, rather than staying frozen at whatever haus last said. The keys are perch's own (`showOnAllDisplays`, `retentionDays`,
 `mobileEnabled`, `automaticUpdateChecks`, `launchAtLogin`); the theme keys
 sharing that file declare nothing, or every haus desktop would open a greyed-out
 Settings window.
@@ -328,8 +328,8 @@ from inside, a pass from outside, on the same bytes). A failure at any step
 leaves the installed app alone and relaunches it.
 
 Which cohort perch is in is resolved from the bundle path
-plus two out-of-band receipts — the rice's `perch.installed-from` marker and
-brew's Caskroom directory — with the rice's theme drop as a third signal if the
+plus two out-of-band receipts — haus's `perch.installed-from` marker and
+brew's Caskroom directory — with haus's theme drop as a third signal if the
 receipts ever stop being readable from inside the container. The poll — and the
 release ZIP that one click downloads — are the app's only *outbound internet*
 traffic and the only reason it holds `com.apple.security.network.client`; a

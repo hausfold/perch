@@ -10,7 +10,7 @@ final class SelfUpdateTests: XCTestCase {
     // MARK: - Who gets the click
     //
     // The trap: a cohort whose bytes belong to a package manager. Self-updating
-    // a rice or cask install replaces a bundle `haus update` / `brew upgrade`
+    // a haus or cask install replaces a bundle `haus update` / `brew upgrade`
     // owns, and the next activation silently puts the old build back — an
     // update that un-happens is worse than one that never offered.
 

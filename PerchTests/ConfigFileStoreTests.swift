@@ -5,7 +5,7 @@ import XCTest
 /// The settings files are the source of truth, which makes these the tests that
 /// say what "source of truth" actually means here: a partial file is normal, a
 /// broken one changes nothing, a write keeps what perch didn't write, an edit
-/// made while perch runs reaches the app — and the rice drop, which perch may
+/// made while perch runs reaches the app — and the haus drop, which perch may
 /// only ever read, wins over the file perch writes.
 final class ConfigFileStoreTests: XCTestCase {
     private var directory: URL!
@@ -136,7 +136,7 @@ final class ConfigFileStoreTests: XCTestCase {
         wait(for: [changed], timeout: 5)
     }
 
-    // MARK: - The file the rice declares
+    // MARK: - The file haus declares
 
     func testADeclarationWinsOverPerchsOwnFile() throws {
         try write(#"{ "retentionDays": 7, "mobileEnabled": false }"#, to: file)
@@ -167,7 +167,7 @@ final class ConfigFileStoreTests: XCTestCase {
 
     /// The bug this exists for, and it is the destructive one: a write used to
     /// serialize the *composed* config, so toggling any unrelated switch copied
-    /// the rice's answers into the user's own file — where they outlived the
+    /// haus's answers into the user's own file — where they outlived the
     /// declaration that put them there. For `retentionDays` that turns "this
     /// machine declares 30 days" into "this user chose a timer that deletes
     /// their shelf", permanently, with nobody deciding it.
@@ -198,7 +198,7 @@ final class ConfigFileStoreTests: XCTestCase {
         XCTAssertEqual(store.current().retentionDays, 14)
     }
 
-    /// The rice drop is a shared file: the theme keys have lived in it since
+    /// The haus drop is a shared file: the theme keys have lived in it since
     /// before any of this existed. Locking a Settings row because that file
     /// names *something* would grey out the whole window on every haus desktop.
     func testTheThemeKeysInThatFileDeclareNothing() throws {
