@@ -228,9 +228,8 @@ and model, container, and whether a shelf answers, with `--json` for a caller.
 It is the only verb that needs no running app, and it deliberately never
 launches one — a doctor that starts the patient cannot report on the patient.
 ⚠️ Its first two lines are the block `.github/ISSUE_TEMPLATE/bug.yml` asks a
-reporter to fill in by hand; that template is **generated from
-hausfold/workshop**, so pointing it at `perch doctor` is a change in that repo,
-not this one.
+reporter to paste; that template is **generated from hausfold/workshop**, so its
+wording changes there, not here.
 
 ## Release & downstream
 

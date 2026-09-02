@@ -151,10 +151,10 @@ not be written, and a Perch that is running but predates the verb doctor knocks
 with — that last one answers with no entries, and calling it "not running" would
 send someone hunting for a process that is right there.
 
-Every row of the report except the first two lines names a **local path** —
-which bundle, which container. That is the point of the rows, and it is also why
-the *whole* output is not the thing to paste into a public issue: the header
-pair is (it carries no path), the check rows are yours.
+The check rows name **local paths** — which bundle, which container. That is the
+point of those rows, and it is also why the *whole* output is not the thing to
+paste into a public issue: the header pair is (it carries no path), the check
+rows are yours.
 
 `--json` answers with every key always present:
 `{version, bundleID, app, launchServicesApp, tool, install, installName,
