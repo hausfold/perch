@@ -59,6 +59,30 @@ jobs:
           scripts/assert-no-instrumentation.sh \
             DerivedData/Build/Products/Release/Perch.app
 
+      # `skill` and `doctor` are the only verbs that answer with no app running,
+      # which is what makes them checkable here — and what lets them rot: no
+      # other test in the suite compiles PerchCLI at all. This pins the bytes
+      # `skill` prints and the exit codes both verbs promise in docs/cli.md,
+      # ai/SKILL.md and --help, against the binary that would actually ship.
+      - name: The shell-free verbs answer as documented
+        run: |
+          scripts/check-cli-surface.sh \
+            DerivedData/Build/Products/Release/Perch.app/Contents/MacOS/perch-cli
+
+  skills:
+    name: Agent skills
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Both failures here are invisible at runtime, which is the whole reason
+      # they are a build step. A skill with broken frontmatter installs, lists
+      # and is never loaded; a stale GeneratedSkills.swift means `perch skill`
+      # prints something other than the file every other consumer ships.
+      - name: SKILL.md guards
+        run: scripts/check-skills.sh ai perch
+      - name: The embedded copy matches ai/**/SKILL.md
+        run: scripts/embed-skills.sh --check
+
   build-ios:
     name: iOS companion build
     runs-on: macos-26

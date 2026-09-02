@@ -4,7 +4,9 @@
 an agent. It is the same road a drag takes: the same admission handshake (so
 nothing is copied that no shelf is there to adopt), the same staging pipeline,
 the same "never touch the original" guarantee. `perch list` and `perch rm` are
-the other direction: what is on the shelf, and taking something off it.
+the other direction: what is on the shelf, and taking something off it. Two more
+verbs never touch the shelf at all — `perch doctor` reports on this Mac, and
+`perch skill` hands a coding agent the routing document for all of it.
 
 ```sh
 perch add report.pdf shot.png
@@ -14,6 +16,9 @@ perch add --json build/app.zip
 perch list
 perch rm 6B0F2C7E-4C1D-4D8E-9E39-6E9F6F7B4A21
 perch list --json | jq -r '.items[] | select(.pinned | not) | .id' | perch rm -
+
+perch doctor
+perch skill install
 ```
 
 ## Where the binary is
@@ -45,23 +50,31 @@ app's own binary, and the "app" you launch is then the CLI printing its usage.
 perch add [options] <path>...
 perch list [options]
 perch rm [options] <item-id>...
+perch doctor [--json] [--wait <seconds>]
+perch skill [--json] [<name>]
+perch skill install [--json] [--client <name>] [--dir <path>]
 
-  --wait <seconds>  how long to wait for Perch to answer (default 15)
+  --wait <seconds>  how long to wait for Perch to answer (default 15; doctor 2)
   --no-launch       fail instead of launching Perch when it isn't running
   --json            report the result as JSON on stdout
   --quiet, -q       don't print a line per item (add, rm)
   -                 read newline-separated operands from stdin (add, rm)
   --                treat every remaining argument as an operand
+  --client <name>   write into one client's skills dir (skill install)
+  --dir <path>      write into this directory instead (skill install)
 
 perch --version     print the installed release
 perch help          usage
 ```
 
-Every verb reaches the *running* app, and every one of them will launch it and
-wait if it isn't running — `--no-launch` is how a script says it would rather
-fail. `list` prints one line per tile, id first, because the id is what `rm`
-takes; an empty shelf prints nothing on stdout and says so on stderr, so a pipe
-reads as empty and a person still gets an answer.
+Every *shelf* verb — `add`, `list`, `rm` — reaches the running app, and each of
+them will launch it and wait if it isn't running; `--no-launch` is how a script
+says it would rather fail. `doctor` and `skill` are the two that don't, and
+`doctor` will not launch anything even when asked.
+
+`list` prints one line per tile, id first, because the id is what `rm` takes; an
+empty shelf prints nothing on stdout and says so on stderr, so a pipe reads as
+empty and a person still gets an answer.
 
 `rm` takes ids, never names: two tiles can share a display name, and no removal
 should have to guess which one was meant. It removes pinned items too — naming
@@ -73,8 +86,12 @@ only ever deletes the copy Perch staged. The original was never Perch's.
 | 0 | every path landed / the shelf was printed / every named item is off it |
 | 1 | usage error, a path that isn't there, or an id that didn't come off the shelf |
 | 2 | Perch turned items away (nothing refuses an offer today — the code stays because the receipt can say no) |
-| 3 | no Perch answered in time, or the one that did is older than the verb |
-| 4 | the exchange broke — the container couldn't be written, or, for `add`, a copy failed after admission |
+| 3 | no Perch answered in time, or the one that did is older than the verb; from `doctor`, at least one blocking finding |
+| 4 | the exchange broke — the container couldn't be written, or, for `add`, a copy failed after admission, or, for `skill install`, a file couldn't be written |
+
+`skill` uses 1 for a name perch doesn't ship or a machine with no agent client
+on it, 2 for a `SKILL.md` that exists with different bytes and was left alone,
+and 4 when a write it *did* attempt failed.
 
 An `add` batch with a bad path, or an `rm` batch with something that isn't a
 UUID, is refused whole before anything is submitted — a half-typo'd batch should
@@ -95,6 +112,100 @@ always present, `contentType` and `bytes` null when Perch doesn't know them,
 `addedAt` an ISO-8601 stamp. There is no path in it: staged or original, where
 the bytes live is the app's business, and `add`'s `path` is only your own
 argument echoed back on your own stdout.
+
+## `perch doctor`
+
+The one verb that answers with no Perch running — and it never starts one, on
+purpose: a doctor that starts the patient cannot report on the patient.
+
+```
+$ perch doctor
+perch 2026.08.31 (Homebrew cask)
+macOS 26.0.1 (25A354) on Mac16,10
+
+✓ app        /Applications/Perch.app
+✓ launches   /Applications/Perch.app
+✓ install    Installed with Homebrew — updates come from brew upgrade --cask perch.
+✓ container  /Users/you/Library/Group Containers/88M28542LQ.com.hausfold.perch
+✓ shelf      answering — 3 items on it
+
+doctor: ready
+```
+
+`✓` fine, `!` worth knowing, `✗` blocking; exit 3 if anything is `✗`. The first
+two lines carry every fact the bug form's "Version and macOS" field asks for —
+version, cohort, macOS build, Mac model — from the same `PerchDiagnostics/` the
+app quotes into that form, so a pasted `doctor` and a filed issue can't disagree
+about which Mac this is. Not the same bytes: `BugReport` lays those four facts
+out over three lines for the form, this lays them over two for a terminal.
+
+Three of the rows earn their place by naming a trap rather than a state. **`app`
+vs `launches`** are the bundle this tool ships inside and the copy Launch
+Services would open; on a Mac that has ever built perch they routinely differ,
+because every `xcodebuild` registers the app it built and nothing unregisters it
+(AGENTS.md). **`install`** is the update cohort, and it is the answer to "how do
+I update this" — `brew upgrade --cask perch`, `haus update`, a flake bump, or
+one click in the app, and only the cohort knows which. And **`shelf` tells three
+answers apart** that all look like silence: nothing running, a mailbox that could
+not be written, and a Perch that is running but predates the verb doctor knocks
+with — that last one answers with no entries, and calling it "not running" would
+send someone hunting for a process that is right there.
+
+Every row of the report except the first two lines names a **local path** —
+which bundle, which container. That is the point of the rows, and it is also why
+the *whole* output is not the thing to paste into a public issue: the header
+pair is (it carries no path), the check rows are yours.
+
+`--json` answers with every key always present:
+`{version, bundleID, app, launchServicesApp, tool, install, installName,
+updateCommand, os, model, container, containerPresent, running, shelfItems, ok,
+checks}`, where `checks` is `[{name, status, detail}]` and `status` is
+`ok`/`note`/`bad`. `install` is the machine token (`homebrew`, `direct`, `haus`,
+`nix`, `unknown`); `installName` is the same thing written for a person.
+
+The knock is one `list` through the mailbox with a 2-second deadline and no
+launch — the tool's own documented liveness test, since only a running app can
+answer it. `--wait` raises the deadline on a loaded Mac. The transaction is
+closed either way; a doctor never leaves a request behind.
+
+## `perch skill`
+
+A3 of the family agent surface (the workshop's `docs/agent-surface.md`): the
+tool teaches an agent about itself, from a machine with no checkout.
+
+```
+perch skill                 print ai/SKILL.md, byte for byte
+perch skill <name>          print one of perch's other skills (there is one today)
+perch skill --json          the same, as {name, body}
+perch skill install         write every skill into every agent client found here
+perch skill install --client claude|codex|opencode|pi
+perch skill install --dir PATH
+```
+
+**The skill is baked into the binary**, not read from beside it — perch ships as
+a cask's `.app`, a read-only Nix store path and a ZIP somebody drags, and the
+tool on `PATH` is only ever a symlink into the bundle, so every "read the file
+next to me" scheme is right for exactly one of those doors. Embedded, the
+version that answers `--version` is the version that answers `skill`.
+`scripts/embed-skills.sh` does the baking into the committed
+`PerchCLI/GeneratedSkills.swift`, and CI fails on a stale one.
+
+`install` writes `<skills dir>/<skill name>/SKILL.md` — named for the skill, not
+for the tool — into every client whose own config directory exists
+(`~/.claude`, `~/.codex`, `~/.config/opencode`, `~/.pi/agent`; `$HOME` is
+honoured, because that is the home the client will read at). It **refuses rather
+than clobbers**, and says which kind of refusal it is:
+
+| what it finds | what it does | exit |
+|---|---|---|
+| nothing there | writes it, prints `wrote <path>` | 0 |
+| our bytes already | prints `current <path>` | 0 |
+| a symlink | leaves it — on a haus machine `haus.ai.skill` owns that path, and the Nix store is read-only | 0 |
+| a real file with different bytes | leaves it, names the path | 2 |
+| a directory it cannot write | says why, on stderr | 4 |
+
+The haus case is the happy path, not a failure: the skill is already installed
+and current, from the same source. Saying so beats an `EPERM`.
 
 ## How it works, and why it isn't a URL scheme
 
@@ -164,5 +275,12 @@ after an `add` and what lets the app drop a read verb's directory.
 [`ai/SKILL.md`](../ai/SKILL.md) is this page's counterpart for a coding agent on
 a machine with no checkout — the routing document that makes *"put this in my
 shelf"* work first try. It quotes the verbs, flags and exit codes above, so
-**change it in the same PR that changes any of them.** It is bound by the
-family standard, the workshop's `docs/agent-surface.md`.
+**change it in the same PR that changes any of them**, and re-run
+`scripts/embed-skills.sh` so `perch skill` prints what you wrote. It is bound by
+the family standard, the workshop's `docs/agent-surface.md`.
+
+Three copies of that file ship, and they are byte-identical by construction: the
+committed source, `pkgs.perch-skill` (`nix/skill.nix`, which haus installs), and
+the string literal inside the binary. `scripts/check-skills.sh` guards the
+frontmatter and the shape; `scripts/embed-skills.sh --check` guards the literal.
+Both run in CI, and the Nix build runs the first.

@@ -110,7 +110,11 @@ entry (`Perch/Config/Info.plist`, `ShelfServicesProvider`).
 
 Shared sources, compiled into their consumers directly: `PerchWire/` (wire
 protocol + crypto + the staging layer both platforms use), `PerchMobileCore/`
-(iOS-only shelf/pairing/delivery, app + extension), and `PerchFinderBridge/`
+(iOS-only shelf/pairing/delivery, app + extension), `PerchDiagnostics/` (Mac app
++ CLI: `InstallKind`, the four-door update cohort, and `SystemProfile`, the
+macOS/model pair — both are quoted in the bug form *and* printed by `perch
+doctor`, which has to answer them with no app running, so neither side can ask
+the other), and `PerchFinderBridge/`
 (Mac App Group mailbox; `HandoffClient` is the sender half, and since the
 extension went the CLI is the only sender. The `FinderAction*` names and the
 on-disk `FinderActionRequests` directory stay — an installed `perch` tool
@@ -182,17 +186,51 @@ It is bound by the family standard, [the workshop's
 names **the phrases a user says**, not the features perch has. A description
 written as a feature summary is true, well written, and never loads.
 
-`nix/skill.nix` ships it as `pkgs.perch-skill` (`$out/perch/SKILL.md`), which is
-how haus's AI room will install it into every agent client on a machine; the
-build fails if the frontmatter is missing or unterminated, or if the file grows
-past 150 lines, because each of those produces a skill that installs, lists and
-is never loaded — indistinguishable from the agent not knowing perch exists.
-Standalone users will get the identical bytes from `perch skill install` once
-that verb lands.
+**It ships three times, and the three are byte-identical by construction.** The
+committed source; `pkgs.perch-skill` (`nix/skill.nix`, `$out/<skill>/SKILL.md`),
+which is how haus's AI room installs it into every agent client on a machine;
+and a Swift string literal inside the CLI, which is what `perch skill` prints and
+`perch skill install` writes. Embedded rather than read off disk because perch
+ships as a cask's `.app`, a read-only Nix store path and a dragged ZIP, and the
+tool on `PATH` is only ever a symlink into the bundle — every "read the file
+beside me" scheme is right for exactly one of those doors.
+
+Two scripts keep that true, and **both run in CI** (`.github/workflows/build.yml`,
+the `skills` job) because every failure they catch is invisible at runtime:
+
+- `scripts/check-skills.sh ai perch` — frontmatter present and closed, `name:`
+  matching the directory it installs into, a one-physical-line `description` of
+  at least 80 characters, ≤150 lines, and exactly one trailing newline (the two
+  shipping mechanisms disagree on a file with two). `nix/skill.nix` runs this
+  same script rather than carrying its own copy of the greps. It **discovers**
+  `ai/*/SKILL.md`, so a second skill needs no edit here.
+- `scripts/embed-skills.sh` — regenerates the committed
+  `PerchCLI/GeneratedSkills.swift`; `--check` fails when it is stale. Run it in
+  the same commit as any `ai/SKILL.md` edit. It is committed rather than built
+  by a script phase so an `xcodebuild` from a release tarball needs no shell
+  script to have run first.
+- `scripts/check-cli-surface.sh <perch-cli>` — runs both verbs against a real
+  binary and checks the bytes and the exit codes they promise. **It is the only
+  test of any kind that exercises `PerchCLI`**: `PerchTests` compiles the app,
+  not the tool, so nothing else in the suite would notice `perch skill` printing
+  the wrong file or `skill install` returning 0 on a write it could not do. The
+  macOS job runs it against the Release bundle's embedded `perch-cli`. It never
+  runs a bare `skill install` — that writes into the real `$HOME`.
 
 **Every claim in it must be runnable.** When you change a verb, a flag or an
-exit code, change `ai/SKILL.md` in the same PR — a stale line there is a
-confidently-wrong instruction with a nice format.
+exit code, change `ai/SKILL.md` in the same PR *and* re-run
+`scripts/embed-skills.sh` — a stale line there is a confidently-wrong
+instruction with a nice format, and a stale generated file is one the binary
+would print anyway.
+
+`perch doctor` is the other half of the surface: version, install cohort, macOS
+and model, container, and whether a shelf answers, with `--json` for a caller.
+It is the only verb that needs no running app, and it deliberately never
+launches one — a doctor that starts the patient cannot report on the patient.
+⚠️ Its first two lines are the block `.github/ISSUE_TEMPLATE/bug.yml` asks a
+reporter to fill in by hand; that template is **generated from
+hausfold/workshop**, so pointing it at `perch doctor` is a change in that repo,
+not this one.
 
 ## Release & downstream
 

@@ -77,34 +77,13 @@ enum BugReport {
         )
     }
 
-    /// `26.0.1 (25A354)` — the pair Apple's own bug reports ask for, because a
-    /// build number distinguishes two OSes that answer the same to a user.
-    static var currentOperatingSystem: String {
-        let version = ProcessInfo.processInfo.operatingSystemVersion
-        let short = "\(version.majorVersion).\(version.minorVersion)"
-            + (version.patchVersion > 0 ? ".\(version.patchVersion)" : "")
-        guard let build = sysctl("kern.osversion") else { return short }
-        return "\(short) (\(build))"
-    }
+    /// The two system lines, both from `PerchDiagnostics/SystemProfile.swift` —
+    /// shared with `perch doctor` so a pasted doctor and a filed issue spell
+    /// the same Mac the same way. Kept as properties here because this is the
+    /// name the form's field is written against.
+    static var currentOperatingSystem: String { SystemProfile.operatingSystem }
 
-    /// `Mac16,10`. The marketing name would read better and is not available
-    /// without a network round trip to Apple, so this is the identifier — which
-    /// is what a maintainer would look up anyway.
-    static var currentModel: String { sysctl("hw.model") ?? "unknown Mac" }
-
-    /// `sysctlbyname`, not a `sysctl` subprocess: perch is sandboxed and the
-    /// two keys read here are both allowed to a sandboxed process, while
-    /// spawning `/usr/sbin/sysctl` is not.
-    private static func sysctl(_ name: String) -> String? {
-        var size = 0
-        guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
-        var buffer = [UInt8](repeating: 0, count: size)
-        guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else { return nil }
-        // sysctl reports the length *including* the NUL, which `String(decoding:)`
-        // would keep as a U+0000 on the end of the model identifier.
-        let value = String(decoding: buffer.prefix(while: { $0 != 0 }), as: UTF8.self)
-        return value.isEmpty ? nil : value
-    }
+    static var currentModel: String { SystemProfile.model }
 
     /// Where the menu row goes, and whether the diagnostics had to travel by
     /// pasteboard instead of in the query.

@@ -16,6 +16,13 @@ import Foundation
 /// They deliberately go through the mailbox rather than reading the app's own
 /// staging directory: the shelf is the app's to own, and an answer that came
 /// from anywhere else could disagree with the tiles on the notch.
+///
+/// `doctor` and `skill` are the two verbs that are *not* about the shelf, and
+/// they live in `Doctor.swift` and `Skills.swift`. Neither needs a running app:
+/// doctor reports on this Mac (and refuses to launch anything, so that what it
+/// reports stays true), and skill prints the routing document baked into this
+/// binary. This file keeps the dispatch, the exit codes and the usage text, so
+/// there is one place that says what `perch` can be asked.
 struct PerchTool {
     enum ExitCode: Int32 {
         /// Every path asked for landed on the shelf; the shelf was printed;
@@ -36,8 +43,8 @@ struct PerchTool {
         case failed = 4
     }
 
-    /// What the tool can ask the shelf for. `help` and `version` never open a
-    /// transaction, so they aren't here.
+    /// What the tool can ask the shelf for. `help`, `version`, `doctor` and
+    /// `skill` never open a transaction, so they aren't here.
     private enum Verb: String {
         case add
         case list
@@ -99,11 +106,17 @@ struct PerchTool {
             return runList(rest)
         case "rm":
             return runRemove(rest)
+        // Neither of these opens a transaction: `doctor` knocks once and never
+        // launches anything, and `skill` never touches the mailbox at all.
+        case "doctor":
+            return Doctor.run(rest)
+        case "skill":
+            return Skills.run(rest)
         case "-h", "--help", "help":
             printUsage(to: .standardOutput)
             return .success
         case "-V", "--version", "version":
-            print(version)
+            print(PerchAppBundle.version)
             return .success
         default:
             complain("unknown command '\(verb)'")
@@ -348,46 +361,8 @@ struct PerchTool {
         "the Perch that answered is older than `\(verb.rawValue)` — update it."
     }
 
-    /// Prefer whatever Launch Services considers the installed Perch — that is
-    /// the copy holding this account's permissions — and fall back to the app
-    /// bundle this tool is embedded in, which is how a dev build (its own
-    /// bundle identifier, unknown to Launch Services) still finds itself.
-    private func perchAppURL() -> URL? {
-        if let installed = NSWorkspace.shared.urlForApplication(
-            withBundleIdentifier: FinderActionProtocol.appBundleIdentifier
-        ) {
-            return installed
-        }
-        return enclosingAppBundle?.bundleURL
-    }
-
-    /// The `.app` this tool ships inside, found by walking up from its own
-    /// *resolved* executable path rather than by trusting `Bundle.main`.
-    ///
-    /// Every installer puts the tool on `PATH` as a **symlink** into the
-    /// bundle — `nix/package.nix` here, the cask's `binary` stanza, haus's
-    /// shelf room — because it is signed and notarized as part of the app and
-    /// a copy outside it would be nested code torn out of that seal. Invoked
-    /// through such a link, `Bundle.main` is the *link's* directory: no
-    /// Info.plist, no `.app` extension. That made `perch --version` print
-    /// `unknown` on every install that isn't the raw in-bundle path, and left
-    /// this launch fallback with nothing to open.
-    private var enclosingAppBundle: Bundle? {
-        guard let executable = Bundle.main.executableURL?.resolvingSymlinksInPath() else {
-            return nil
-        }
-        // …/Perch.app/Contents/MacOS/perch-cli → …/Perch.app
-        let app =
-            executable
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        guard app.pathExtension == "app" else { return nil }
-        return Bundle(url: app)
-    }
-
     private func launchPerch() {
-        guard let url = perchAppURL() else { return }
+        guard let url = PerchAppBundle.launchTarget else { return }
         let configuration = NSWorkspace.OpenConfiguration()
         // The shelf is a menu-bar app; a script adding a file should not steal
         // the front-most window from whatever the user is doing.
@@ -531,16 +506,6 @@ struct PerchTool {
         ]
     }
 
-    private func object(_ payload: [String: Any]) -> String {
-        guard let data = try? JSONSerialization.data(
-            withJSONObject: payload,
-            options: [.prettyPrinted, .sortedKeys]
-        ) else {
-            return "{}"
-        }
-        return String(decoding: data, as: UTF8.self)
-    }
-
     // MARK: - Arguments
 
     private struct ParseError: Error {
@@ -619,14 +584,6 @@ struct PerchTool {
             .filter { !$0.isEmpty }
     }
 
-    private var version: String {
-        enclosingAppBundle?.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
-    }
-
-    private func complain(_ message: String) {
-        FileHandle.standardError.write(Data("perch: \(message)\n".utf8))
-    }
-
     private enum Stream {
         case standardOutput
         case standardError
@@ -637,26 +594,39 @@ struct PerchTool {
         usage: perch add [options] <path>...
                perch list [options]
                perch rm [options] <item-id>...
+               perch doctor [--json] [--wait <seconds>]
+               perch skill [--json] [<name>]
+               perch skill install [--json] [--client <name>] [--dir <path>]
 
-        add   copies files onto the running Perch shelf. Originals are only read.
-        list  prints what is on the shelf, id first — those ids are what rm takes.
-        rm    takes items off the shelf. The bytes it staged go; yours never do.
+        add     copies files onto the running Perch shelf. Originals are only read.
+        list    prints what is on the shelf, id first — those ids are what rm takes.
+        rm      takes items off the shelf. The bytes it staged go; yours never do.
+        doctor  what this Mac can say about perch — version, install, container,
+                whether the shelf answers. Needs no shelf running, and starts none.
+        skill   prints the agent skill baked into this binary. `skill install`
+                writes it into every agent client here (claude, codex, opencode, pi).
 
         options:
-          --wait <seconds>  how long to wait for Perch to answer (default 15)
+          --wait <seconds>  how long to wait for Perch to answer (15; doctor 2)
           --no-launch       fail instead of launching Perch when it isn't running
           --json            report the result as JSON on stdout
           --quiet, -q       don't print a line per item (add, rm)
           -                 read newline-separated operands from stdin (add, rm)
           --                treat every remaining argument as an operand
+          --client <name>   write into one client's skills dir (skill install)
+          --dir <path>      write into this directory instead (skill install)
 
         other commands:
           perch --version   print the installed release
           perch help        this text
 
         exit status:
-          0 done   1 usage, missing path, or an item that wasn't removed
-          2 refused   3 no Perch answered   4 the exchange broke
+          0 done
+          1 usage, a missing path, an unknown skill, or an item that wasn't removed
+          2 Perch refused the items — or `skill install` would have overwritten a
+            SKILL.md that differs, and left it alone
+          3 no Perch answered; for doctor, something blocking
+          4 the exchange broke — or a skill could not be written
         """
         switch stream {
         case .standardOutput:
