@@ -4,7 +4,7 @@ import XCTest
 /// The folder Settings ▸ Watched Folders offers to watch. None of this is a permission
 /// — the grant still comes from the panel, and the offer only ever *adds* a
 /// folder — so what these pin is the precedence: macOS's own answer first, the
-/// rice drop as a fallback, the Desktop when neither speaks, and never a path
+/// haus drop as a fallback, the Desktop when neither speaks, and never a path
 /// built out of perch's working directory.
 final class ScreenshotsFolderTests: XCTestCase {
     private var home: URL!
@@ -40,7 +40,7 @@ final class ScreenshotsFolderTests: XCTestCase {
         )
     }
 
-    /// haus writes the rice key by *setting* the system one, so the two agree
+    /// haus writes its own key by *setting* the system one, so the two agree
     /// until somebody changes the location afterwards — at which point the
     /// later, more deliberate act is the system's.
     func testTheDropAnswersWhenTheSystemIsSilent() {
@@ -53,7 +53,7 @@ final class ScreenshotsFolderTests: XCTestCase {
     }
 
     /// An empty string is a key someone cleared, not an answer — from either
-    /// source, and an empty system value must not shadow a good rice one.
+    /// source, and an empty system value must not shadow a good haus one.
     func testEmptyValuesAreNotAnswers() {
         XCTAssertEqual(resolve(system: "", rice: ""), home.appending(path: "Desktop").path)
         XCTAssertEqual(resolve(system: "", rice: "~/Shots"), home.appending(path: "Shots").path)

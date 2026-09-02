@@ -4,7 +4,7 @@ import os
 
 // MARK: - Update check (hourly release poll + cohort-aware nudge)
 //
-// Perch ships through four doors — the rice (a Nix-built, notarized bundle the
+// Perch ships through four doors — haus (a Nix-built, notarized bundle the
 // activation script copies to /Applications), a Homebrew cask, a drag-install
 // from the release ZIP, and a bare Nix store path — so the nudge's one job is to
 // name the RIGHT next step for THIS install rather than hand everyone the same
@@ -27,7 +27,7 @@ import os
 //            container, and nothing shells out.
 //   surface  the obvious surface is a UNUserNotificationCenter banner. Perch
 //            asks the system for no permissions it can avoid (see the Mission
-//            Control note in the rice's modules/shelf) and notifications are one
+//            Control note in haus's modules/shelf) and notifications are one
 //            of them, so the only surfaces are passive: a strip at the bottom of
 //            the expanded shelf, and a row in the menu bar menu. Neither
 //            interrupts anything; both wait until you look.
@@ -75,7 +75,7 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
     }
 
     /// Whether perch may replace this copy of itself. Only the cohort that owns
-    /// its own bytes: a rice or cask install swapped from under its package
+    /// its own bytes: a haus or cask install swapped from under its package
     /// manager would be reverted by the next `haus update` or `brew upgrade`,
     /// and a Nix store path is read-only besides. `.unknown` is left out
     /// because it is, by definition, a copy running from somewhere perch cannot
@@ -126,13 +126,13 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
 
     // MARK: Detection
     //
-    // Path prefixes alone can't tell the cohorts apart: the rice copies the
+    // Path prefixes alone can't tell the cohorts apart: haus copies the
     // bundle to `/Applications/Perch.app` (modules/shelf, postActivation) and a
-    // cask's `app` stanza MOVES it to the same path — so rice, cask, and
+    // cask's `app` stanza MOVES it to the same path — so haus, cask, and
     // drag-install are byte-identical locations. Out-of-band receipts break the
     // tie:
     //
-    //   rice   /Library/Application Support/haus/perch.installed-from —
+    //   haus   /Library/Application Support/haus/perch.installed-from —
     //          written by the activation script with the store path it copied.
     //   cask   <brew prefix>/Caskroom/perch — brew's own staging directory,
     //          which survives the app being moved to /Applications.
@@ -140,7 +140,7 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
     // Both of those live outside perch's container, so under the sandbox the
     // reads may simply be denied — `fileExists` then answers false for a receipt
     // that is really there. That is why there is a third, always-readable
-    // signal: `~/.config/perch/config.json`, the rice's theme drop, which the
+    // signal: `~/.config/perch/config.json`, haus's theme drop, which the
     // entitlements already grant read access to (RicePalette.swift). It is only
     // consulted when neither receipt could be seen, and it only ever promotes an
     // ambiguous /Applications install from `.direct` to `.rice` — the cohort
@@ -175,12 +175,12 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
             || bundlePath.hasPrefix(home + "/Applications/")
         guard installed else { return .unknown }
 
-        // The rice reinstalls on every activation, so its marker outranks a
+        // haus reinstalls on every activation, so its marker outranks a
         // leftover cask receipt from a machine that has been both.
         if hasRiceMarker, bundlePath == "/Applications/Perch.app" { return .rice }
         if hasCaskReceipt { return .homebrew }
-        // Sandbox fallback: neither receipt was readable. A rice theme drop at
-        // the rice's own install path means the rice put this here.
+        // Sandbox fallback: neither receipt was readable. A haus theme drop at
+        // haus's own install path means haus put this here.
         if hasRiceThemeDrop, bundlePath == "/Applications/Perch.app" { return .rice }
         return .direct
     }

@@ -193,7 +193,7 @@ final class ShelfRetentionTests: XCTestCase {
     }
 
     /// The file is a later, more deliberate decision than a switch flipped in a
-    /// previous build — most of all when the *rice* wrote it, where a migration
+    /// previous build — most of all when *haus* wrote it, where a migration
     /// that won would take a machine whose settings are declared and quietly
     /// hand it the old ones instead.
     func testTheFileWinsOverAStaleUserDefaultsValue() throws {

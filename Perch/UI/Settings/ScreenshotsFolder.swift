@@ -20,7 +20,7 @@ import Foundation
 ///
 /// 1. `com.apple.screencapture`'s `location`: what macOS itself uses. Absent on
 ///    a stock Mac, and absent is not silence — it means the Desktop.
-/// 2. `screenshotsFolder` in the rice config drop (`~/.config/perch/config.json`,
+/// 2. `screenshotsFolder` in the haus config drop (`~/.config/perch/config.json`,
 ///    the same file the theme keys arrive in). haus writes it from
 ///    `haus.screenshots.location` when `haus.shelf.watchScreenshots` is on. It
 ///    is a fallback rather than the answer because macOS's own key is the thing
@@ -37,7 +37,7 @@ enum ScreenshotsFolder {
     nonisolated static let captureDomain = "com.apple.screencapture"
     nonisolated static let captureKey = "location"
 
-    /// The rice's half of the answer, decoded on its own rather than folded
+    /// haus's half of the answer, decoded on its own rather than folded
     /// into `RiceThemeDefaults`: that struct is the theme contract, and this
     /// key is a machine fact that has nothing to do with colour.
     private struct RiceScreenshots: Decodable {

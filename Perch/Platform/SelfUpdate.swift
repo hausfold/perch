@@ -26,7 +26,7 @@ import os
 // authority than the shelf does. The handoff — what to install, what to replace
 // — is `UpdateHandoff.swift`, compiled into both halves.
 //
-// Cohort-gated at the door: `InstallKind.canSelfUpdate`. A rice or cask install
+// Cohort-gated at the door: `InstallKind.canSelfUpdate`. A haus or cask install
 // that took this path would replace a bundle its package manager owns and be
 // silently reverted by the next `haus update` — with a `.direct` install there
 // is nothing upstream to disagree with.

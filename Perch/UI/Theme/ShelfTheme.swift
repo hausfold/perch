@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The live palette, resolved from the macOS appearance and what the rice wrote,
+/// The live palette, resolved from the macOS appearance and what haus wrote,
 /// and re-resolved whenever either could have changed.
 ///
 /// Owned by `AppRuntime` and observed by every shelf panel, so a light/dark flip
@@ -48,7 +48,7 @@ final class ShelfTheme: ObservableObject {
         }
     }
 
-    /// Re-read the appearance and the rice's config, and publish only if the
+    /// Re-read the appearance and haus's config, and publish only if the
     /// palette actually changed — an unchanged republish would invalidate every
     /// shelf view for nothing, including mid-drag.
     func refresh() {

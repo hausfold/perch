@@ -39,7 +39,7 @@
 	     Perch/Mobile/). Nothing else ever listens. -->
 	<key>com.apple.security.network.server</key>
 	<true/>
-	<!-- The rice's drop: ~/.config/perch/{config.json,themes/*.json}, which
+	<!-- haus's drop: ~/.config/perch/{config.json,themes/*.json}, which
 	     lives outside the container. Read-only, one directory, and the only
 	     path perch reaches for that a drag or a file picker did not hand it.
 	     Three readers, all of that one directory: Perch/UI/Theme/RicePalette.swift

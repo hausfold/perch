@@ -31,7 +31,7 @@
     in
     {
       # Consume perch from anywhere: `overlays.default` puts `perch` into pkgs.
-      # The rice adds this overlay and installs pkgs.perch in place of the cask.
+      # haus adds this overlay and installs pkgs.perch in place of the cask.
       overlays.default = final: prev: {
         perch = final.callPackage ./nix/package.nix {
           inherit (release) version sha256;

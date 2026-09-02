@@ -6,15 +6,15 @@ import SwiftUI
 /// dropped in `~/.config/perch/themes/`.
 ///
 /// **Why this exists.** The shelf used to be white-on-black with one sage
-/// literal, so `haus.theme.flavor` was a lie for perch: a latte rice still
+/// literal, so `haus.theme.flavor` was a lie for perch: a latte desktop still
 /// got a black glass panel. The four nebelung variants are now compiled in (a
-/// perch installed without the rice still has them all) and the rice names the
+/// perch installed without haus still has them all) and haus names the
 /// dark/light pair in `~/.config/perch/config.json`. Same model as pounce's
 /// `Theme.swift`.
 ///
 /// Only the seven roles the shelf actually paints with are carried. A nebelung
 /// `*.hex.json` file has all twenty-three; the rest are ignored, which is what
-/// lets the rice write those files here verbatim.
+/// lets haus write those files here verbatim.
 struct RicePalette: Equatable {
     let name: String
 
@@ -32,7 +32,7 @@ struct RicePalette: Equatable {
     /// **What the shelf accents with** — the ember's pips, a pinned tile, the
     /// filled button on a notice. Defaults to the palette's `green`, which under
     /// stock nebelung is `#abe1a6`: perch's own mark green, the exact sage of
-    /// the app icon. `accented(by:)` moves it elsewhere when the rice (or a
+    /// the app icon. `accented(by:)` moves it elsewhere when haus (or a
     /// hand-written `config.json`) asks — see `RiceThemeDefaults.accent`.
     private(set) var accent: Color
 
@@ -189,7 +189,7 @@ struct RicePalette: Equatable {
     static let defaultLightName = "nebelung-latte"
 
     /// Resolve a theme name to a palette. A **user file shadows a built-in of
-    /// the same name**: `~/.config/perch/themes/nebelung.json` (what the rice
+    /// the same name**: `~/.config/perch/themes/nebelung.json` (what haus
     /// installs) wins over the tables below, so a nebelung palette bump reaches
     /// a perch that hasn't been rebuilt. Built-ins are the floor, not the
     /// ceiling. An unknown name or malformed file falls back to nebelung.
@@ -267,9 +267,9 @@ extension RicePalette {
     ])!
 }
 
-// MARK: - Where the rice writes
+// MARK: - Where haus writes
 
-/// The rice-owned theme files. `~/.config/perch/` is outside the app sandbox
+/// The haus-owned theme files. `~/.config/perch/` is outside the app sandbox
 /// container, which costs perch one `temporary-exception.files
 /// .home-relative-path.read-only` entitlement (see `Config/Perch.entitlements`)
 /// — read-only, one directory, and the only path perch reaches for that a file
@@ -324,11 +324,11 @@ enum RiceFiles {
 /// separately by `ScreenshotsFolder`, and any key from `AppConfig.Key`
 /// **declares** the matching Settings switch — read-only in the window, and the
 /// last word over perch's own `settings.json`. Every side ignores the keys that
-/// are not its own. Delete it (or the rice's `theme` option) and the compiled-in
+/// are not its own. Delete it (or haus's `theme` option) and the compiled-in
 /// nebelung pair applies, accented with its own green.
 ///
 /// There is no accent picker in Settings and there won't be: the shelf is a
-/// five-second surface, and "follow the rice" is the feature. This file is the
+/// five-second surface, and "follow haus" is the feature. This file is the
 /// hidden setting — a standalone install can write it by hand, where a literal
 /// `"#rrggbb"` is accepted as well as a role name.
 struct RiceThemeDefaults: Decodable, Equatable {
@@ -348,12 +348,12 @@ struct RiceThemeDefaults: Decodable, Equatable {
     }
 }
 
-/// Turns the two inputs perch has — the macOS appearance and whatever the rice
+/// Turns the two inputs perch has — the macOS appearance and whatever haus
 /// wrote — into one palette. Precedence: **config.json › compiled-in nebelung**,
 /// with the system appearance choosing which half of the pair applies.
 ///
 /// There is deliberately no in-app theme picker: the shelf is a five-second
-/// surface with no room for one, and "follow the rice" is the whole feature.
+/// surface with no room for one, and "follow haus" is the whole feature.
 enum RiceTheme {
     /// Is macOS itself in Light Mode? `NSApp.appearance` is nil unless something
     /// forced an app-wide appearance, so while it is nil `effectiveAppearance`

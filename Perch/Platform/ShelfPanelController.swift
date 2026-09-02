@@ -116,7 +116,7 @@ final class ShelfPanelController: NSObject {
     func expand() {
         collapseTask?.cancel()
         guard !viewState.isExpanded else { return }
-        // Cheapest moment to notice the rice changed underneath us: the panel is
+        // Cheapest moment to notice haus changed underneath us: the panel is
         // about to become visible and nothing is mid-drag. Two small file reads.
         theme.refresh()
         // Same moment, same reason: someone may have renamed a staged file in

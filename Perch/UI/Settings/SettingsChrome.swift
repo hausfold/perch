@@ -135,7 +135,7 @@ struct SettingsRow<Control: View>: View {
 
 // MARK: - When a file owns the answer
 
-/// The note under a card whose rows the rice drop declares.
+/// The note under a card whose rows the haus drop declares.
 ///
 /// It says the two things a greyed-out switch can't: *which* file decided, and
 /// that perch will follow it the moment it changes — so the answer to "why

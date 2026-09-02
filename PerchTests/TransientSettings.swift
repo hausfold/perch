@@ -9,7 +9,7 @@ import Foundation
 /// both fall back to `ConfigFileStore.shared`, which reads the *real*
 /// `…/Application Support/Perch/settings.json` and the *real*
 /// `~/.config/perch/config.json` of whichever Mac is running the suite — so a
-/// shelf test would quietly pass or fail on somebody's rice, and an
+/// shelf test would quietly pass or fail on somebody's desktop, and an
 /// `xcodebuild test` would arm file watchers on the live install's settings.
 /// That is the same reason `ScreenshotsFolder` has no defaulted `riceValue`
 /// overload.

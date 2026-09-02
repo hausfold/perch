@@ -90,7 +90,7 @@ struct ShelfPanelView: View {
         .environment(\.rice, rice)
         // AppKit's own furniture inside the panel — the staging spinner, the
         // tile context menus — follows the color scheme rather than our palette,
-        // so a latte rice must not leave dark controls behind on a light shelf.
+        // so a latte desktop must not leave dark controls behind on a light shelf.
         .preferredColorScheme(rice.isLight ? .light : .dark)
     }
 
@@ -813,7 +813,7 @@ private struct FileTile: View {
                 .symbolRenderingMode(.hierarchical)
                 // Pinned wears the shelf's accent — its own mark color, the same
                 // one the ember burns — rather than the *system* accent, which
-                // is the one color on the panel the rice doesn't pick.
+                // is the one color on the panel haus doesn't pick.
                 .foregroundStyle(item.isPinned ? rice.onAccent : rice.text.opacity(0.72))
                 .frame(width: 24, height: 24)
                 .background(

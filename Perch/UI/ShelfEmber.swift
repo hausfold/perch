@@ -24,11 +24,11 @@ struct ShelfEmber: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.rice) private var rice
 
-    /// The shelf's accent — `#abe1a6` unless the rice moved it, which is
+    /// The shelf's accent — `#abe1a6` unless haus moved it, which is
     /// perch's mark green: deliberately the muted sage of the app icon and not
     /// a saturated green, which at this size and this close to the camera would
     /// read as the system's recording indicator. A latte palette swaps in its
-    /// own darker one for the same reason, against a bright desktop; a rice
+    /// own darker one for the same reason, against a bright desktop; haus
     /// that picked another accent gets that hue's equivalent.
     private var ember: Color { rice.accent }
     private static let pipSize: CGFloat = 5

@@ -5,7 +5,7 @@ final class UpdateCheckTests: XCTestCase {
 
     // MARK: - Cohort detection
     //
-    // The trap these pin: the rice (modules/shelf, postActivation) and a
+    // The trap these pin: haus (modules/shelf, postActivation) and a
     // Homebrew cask BOTH end up at /Applications/Perch.app, so the path alone
     // can't tell them apart from a drag-install. The receipts do — when the
     // sandbox lets them be read.
@@ -34,7 +34,7 @@ final class UpdateCheckTests: XCTestCase {
         )
     }
 
-    /// A machine that has been both keeps taking updates from the rice: its
+    /// A machine that has been both keeps taking updates from haus: its
     /// activation script reinstalls the bundle on every rebuild.
     func testRiceMarkerOutranksALeftoverCaskReceipt() {
         XCTAssertEqual(
@@ -75,7 +75,7 @@ final class UpdateCheckTests: XCTestCase {
         }
     }
 
-    /// A marker is only the rice's when the bundle sits where the rice puts it.
+    /// A marker is only haus's when the bundle sits where haus puts it.
     func testUserApplicationsIsNotClaimedByTheRiceMarker() {
         XCTAssertEqual(
             InstallKind.detect(
@@ -102,8 +102,8 @@ final class UpdateCheckTests: XCTestCase {
 
     /// The sandbox backstop: both receipts live outside perch's container, so
     /// `fileExists` may answer false for a receipt that is really there. The
-    /// rice's theme drop — the one path the entitlements do grant — then stands
-    /// in for the marker, and only at the rice's own install path.
+    /// haus's theme drop — the one path the entitlements do grant — then stands
+    /// in for the marker, and only at haus's own install path.
     func testTheRiceThemeDropStandsInForAnUnreadableMarker() {
         XCTAssertEqual(
             InstallKind.detect(
@@ -116,7 +116,7 @@ final class UpdateCheckTests: XCTestCase {
             .rice
         )
         // A drop next to a drag-install in ~/Applications proves nothing: the
-        // rice only ever installs to /Applications.
+        // haus only ever installs to /Applications.
         XCTAssertEqual(
             InstallKind.detect(
                 bundlePath: "/Users/testuser/Applications/Perch.app",

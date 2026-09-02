@@ -22,7 +22,7 @@ final class RicePaletteTests: XCTestCase {
 
     /// A full nebelung variant file — every catppuccin role, of which perch
     /// uses seven. The extra keys must be ignored, not rejected: this is the
-    /// file the rice copies out of nebelung verbatim.
+    /// file haus copies out of nebelung verbatim.
     private var nebelungFile: [String: String] {
         [
             "text": "d7d7d7", "subtext1": "c3c3c3", "subtext0": "aeaeae",
@@ -113,7 +113,7 @@ final class RicePaletteTests: XCTestCase {
         XCTAssertNil(RicePalette.loaded("", in: themes))
     }
 
-    // MARK: - What the rice writes
+    // MARK: - What haus writes
 
     func testConfigNamesThePairAndTheAppearancePicksTheHalf() {
         let defaults = RiceThemeDefaults(
@@ -162,7 +162,7 @@ final class RicePaletteTests: XCTestCase {
             RiceThemeDefaults(themeDark: "nebelung", themeLight: "nebelung-latte")
         )
 
-        // A future rice key perch does not know about must not break the file.
+        // A future haus key perch does not know about must not break the file.
         try Data(#"{"themeDark":"nebelung","accent":"mauve"}"#.utf8).write(to: url)
         XCTAssertEqual(RiceThemeDefaults.load(from: url)?.themeDark, "nebelung")
 
@@ -180,7 +180,7 @@ final class RicePaletteTests: XCTestCase {
             themesDirectory: themes
         )
         // The file wins over the built-in, so the "light" slot really is what
-        // the rice dropped there — including its polarity.
+        // haus dropped there — including its polarity.
         XCTAssertEqual(light.name, "nebelung-latte")
         XCTAssertFalse(light.isLight)
     }
@@ -272,7 +272,7 @@ final class RicePaletteTests: XCTestCase {
             .write(to: url)
         XCTAssertEqual(RiceThemeDefaults.load(from: url)?.accent, "mauve")
 
-        // A rice that predates the option, or a standalone install: no key.
+        // A desktop that predates the option, or a standalone install: no key.
         try Data(#"{"themeDark":"nebelung"}"#.utf8).write(to: url)
         XCTAssertNil(RiceThemeDefaults.load(from: url)?.accent)
     }
