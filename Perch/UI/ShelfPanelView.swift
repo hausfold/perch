@@ -92,6 +92,14 @@ struct ShelfPanelView: View {
         // tile context menus — follows the color scheme rather than our palette,
         // so a latte desktop must not leave dark controls behind on a light shelf.
         .preferredColorScheme(rice.isLight ? .light : .dark)
+        // The family itself is read statically (`AppFont`), and what makes
+        // it live *here* is `theme`: `ShelfTheme.fontFamily` is `@Published`,
+        // so a rebuild that changes the family under a running perch
+        // invalidates this body the same way a palette change does. Settings
+        // and the pairing window observe no theme and need none — both are
+        // opened on demand, and a body built after the resolve reads the new
+        // family on the way up.
+        .perchType()
     }
 
     private var collapsedShelf: some View {
@@ -231,7 +239,7 @@ struct ShelfPanelView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Text(itemCountDescription)
-                .font(.body.weight(.semibold))
+                .font(AppFont.body.weight(.semibold))
                 .foregroundStyle(rice.text)
             Spacer(minLength: 8)
             if store.items.count > 1 {
@@ -273,7 +281,7 @@ struct ShelfPanelView: View {
             Image(systemName: "square.stack.3d.up.fill")
                 .font(.subheadline.weight(.semibold))
             Text("Drag all \(store.items.count)")
-                .font(.body.weight(.medium))
+                .font(AppFont.body.weight(.medium))
         }
         .foregroundStyle(rice.text.opacity(0.82))
         .padding(.horizontal, 12)
@@ -350,7 +358,7 @@ struct ShelfPanelView: View {
             Image(systemName: "arrow.down.to.line")
                 .font(.system(size: 28, weight: .light))
             Text("Drop here")
-                .font(.title3.weight(.semibold))
+                .font(AppFont.title3.weight(.semibold))
         }
         .foregroundStyle(state.isDropActive ? rice.text : rice.overlay0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -426,18 +434,23 @@ struct ShelfPanelView: View {
 
     private func errorBanner(_ error: String) -> some View {
         HStack(spacing: 8) {
+            // The two symbols keep Apple's metrics and only the sentence takes
+            // the family — a caption on the HStack would have sized the
+            // triangle and the close X by whatever face someone named.
             Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption)
             Text(error)
+                .font(AppFont.caption)
                 .lineLimit(2)
             Spacer()
             Button {
                 store.latestError = nil
             } label: {
                 Image(systemName: "xmark")
+                    .font(.caption)
             }
             .buttonStyle(.plain)
         }
-        .font(.caption)
         .foregroundStyle(rice.onRed)
         .padding(10)
         .background(rice.red.opacity(0.88), in: RoundedRectangle(cornerRadius: 12))
@@ -474,13 +487,13 @@ private struct UpdateStrip: View {
                     .foregroundStyle(rice.accent)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Perch \(pending) is out")
-                        .font(.callout.weight(.semibold))
+                        .font(AppFont.callout.weight(.semibold))
                         .foregroundStyle(rice.text)
                     // An install in progress outranks both; a note (a copied
                     // command, or why the last install failed) takes over from
                     // the standing hint while it's live.
                     Text(check.installPhase?.text ?? check.statusNote ?? check.installKind.actionHint)
-                        .font(.caption)
+                        .font(AppFont.caption)
                         .foregroundStyle(rice.subtext0)
                         .lineLimit(1)
                     if let fraction = check.installPhase?.progress {
@@ -495,7 +508,7 @@ private struct UpdateStrip: View {
                     check.performUpdate()
                 } label: {
                     Text(check.actionButtonLabel)
-                        .font(.caption.weight(.semibold))
+                        .font(AppFont.caption.weight(.semibold))
                         .foregroundStyle(rice.onAccent)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
@@ -517,7 +530,7 @@ private struct UpdateStrip: View {
                     .font(.callout)
                     .foregroundStyle(rice.overlay0)
                 Text(note)
-                    .font(.caption)
+                    .font(AppFont.caption)
                     .foregroundStyle(rice.subtext0)
                     .lineLimit(1)
                 Spacer(minLength: 8)
@@ -616,11 +629,11 @@ private struct MissionControlStrip: View {
                 // top", so the truncated quote identifies it. The pane is what
                 // the button walks you to; the tooltip carries both in full.
                 Text("Mission Control is eating your drags")
-                    .font(.callout.weight(.semibold))
+                    .font(AppFont.callout.weight(.semibold))
                     .foregroundStyle(rice.text)
                     .lineLimit(1)
                 Text("Turn off “Drag windows to top…”")
-                    .font(.caption)
+                    .font(AppFont.caption)
                     .foregroundStyle(rice.subtext0)
                     .lineLimit(1)
                     .help("Turn off “Drag windows to top of screen to enter Mission Control”, under Mission Control in System Settings ▸ Desktop & Dock.")
@@ -630,7 +643,7 @@ private struct MissionControlStrip: View {
                 check.openSettings()
             } label: {
                 Text("Open Settings")
-                    .font(.caption.weight(.semibold))
+                    .font(AppFont.caption.weight(.semibold))
                     .foregroundStyle(rice.onAccent)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
@@ -689,7 +702,7 @@ private struct ShelfHeaderButton: View {
                 Image(systemName: systemImage)
                     .font(.subheadline.weight(.semibold))
                 Text(title)
-                    .font(.body.weight(.medium))
+                    .font(AppFont.body.weight(.medium))
             }
             .foregroundStyle((tint ?? rice.text).opacity(hovering ? 1 : 0.82))
             .padding(.horizontal, 12)
@@ -753,7 +766,7 @@ private struct FileTile: View {
                 size: Self.previewSize
             )
             Text(item.displayName)
-                .font(.callout)
+                .font(AppFont.callout)
                 .lineLimit(2, reservesSpace: true)
                 .multilineTextAlignment(.center)
                 .frame(width: 104)
@@ -854,11 +867,11 @@ private struct FileTile: View {
     @ViewBuilder private var sizeLabel: some View {
         if let byteCount = item.byteCount {
             Text(ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
-                .font(.footnote)
+                .font(AppFont.footnote)
                 .foregroundStyle(rice.subtext0)
         } else {
             Text(item.kind == .folder ? "Folder" : "Item")
-                .font(.footnote)
+                .font(AppFont.footnote)
                 .foregroundStyle(rice.subtext0)
         }
     }
@@ -891,12 +904,12 @@ private struct PendingTile: View {
             }
             .frame(width: 62, height: 62)
             Text(transfer.displayName)
-                .font(.footnote)
+                .font(AppFont.footnote)
                 .lineLimit(2, reservesSpace: true)
                 .multilineTextAlignment(.center)
                 .frame(width: 104)
             Text(phaseLabel)
-                .font(.caption)
+                .font(AppFont.caption)
                 .foregroundStyle(rice.subtext0)
         }
         .foregroundStyle(rice.text)
