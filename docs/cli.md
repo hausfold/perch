@@ -71,16 +71,16 @@ only ever deletes the copy Perch staged. The original was never Perch's.
 | Exit | Meaning |
 |---|---|
 | 0 | every path landed / the shelf was printed / every named item is off it |
-| 1 | usage error, a path that isn't there, or an id the shelf doesn't have |
+| 1 | usage error, a path that isn't there, or an id that didn't come off the shelf |
 | 2 | Perch turned items away (nothing refuses an offer today — the code stays because the receipt can say no) |
 | 3 | no Perch answered in time, or the one that did is older than the verb |
-| 4 | the exchange broke after Perch answered — for `add`, a copy failed |
+| 4 | the exchange broke — the container couldn't be written, or, for `add`, a copy failed after admission |
 
 An `add` batch with a bad path, or an `rm` batch with something that isn't a
 UUID, is refused whole before anything is submitted — a half-typo'd batch should
 not spend shelf slots, or removals, deciding that. An id that is well-formed but
-no longer on the shelf is different: `rm` removes the rest, names the stranger on
-stderr, and exits 1, the way `rm(1)` does.
+didn't come off the shelf is different: `rm` removes the rest, names that one on
+stderr — or in `--json`'s `missing` — and exits 1, the way `rm(1)` does.
 
 `--json` answers with the whole result, one object:
 

@@ -125,9 +125,10 @@ its own answer. They are second clients of semantics the paired phone already
 has over the wire (`shelfListRequest`/`removeItem`), not new shelf behaviour,
 and `rm` performs the identical `ShelfStore.remove` the panel's own menu does.
 A request naming no verb is an `add`, because that is what every request
-written before them is; a verb this build doesn't know is *answered*, with no
-entries, so a newer sender learns to say so and one strange request can't stall
-the queue behind it. `list` deliberately does not read the staging manifest
+written before them is; a request naming a verb this build doesn't know is *answered*,
+with no entries, rather than thrown on — that is how a newer sender learns to
+say so, and it keeps an unknown verb from stalling the transactions queued
+behind it. `list` deliberately does not read the staging manifest
 directly, though an unsandboxed tool could: an answer assembled anywhere but
 the running app can disagree with the tiles on the notch.
 

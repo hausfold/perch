@@ -317,6 +317,59 @@ final class HandoffClientTests: XCTestCase {
         XCTAssertEqual(fixture.store.items.map(\.id), [kept.id])
     }
 
+    /// A sender that gave up wrote the same empty completion an abandoned `add`
+    /// writes — and has already told its caller nothing happened. A `perch rm`
+    /// that timed out must not take the tile off the notch a scan later.
+    func testAReadVerbWhoseSenderGaveUpIsNeverActedOn() async throws {
+        let fixture = try makeFixture()
+        let item = try await shelve("keep.txt", contents: "keep", in: fixture)
+
+        let request = try fixture.client.openRequest(kind: .remove, targetItemIDs: [item.id])
+        fixture.client.abandon(request.id)
+        await fixture.receiver.scanOnce()
+
+        XCTAssertEqual(fixture.store.items.map(\.id), [item.id])
+        XCTAssertNil(
+            try fixture.client.mailbox.readResponse(for: request.id),
+            "a request nobody is waiting on is not worth answering"
+        )
+        XCTAssertTrue(
+            try fixture.client.mailbox.snapshots().isEmpty,
+            "and it is dropped now, not left to the ten-minute sweep"
+        )
+    }
+
+    /// `ShelfStore.remove` surfaces a failure to the person at the shelf and
+    /// leaves the tile where it is. The answer has to say what actually went,
+    /// or the tool reports a removal its caller can still see.
+    func testARemovalThatFailedIsNotReportedAsRemoved() async throws {
+        let fixture = try makeFixture()
+        let item = try await shelve("stuck.txt", contents: "stuck", in: fixture)
+        let container = try XCTUnwrap(fixture.store.stagedURL(for: item))
+            .deletingLastPathComponent()
+        // A container nothing may write to is the simplest honest way to make
+        // the staged delete fail on the first step.
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o500],
+            ofItemAtPath: container.path
+        )
+        addTeardownBlock {
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: container.path
+            )
+        }
+
+        let request = try fixture.client.openRequest(kind: .remove, targetItemIDs: [item.id])
+        await fixture.receiver.scanOnce()
+        let response = try XCTUnwrap(
+            fixture.client.waitForAnswer(request.id, deadline: Date().addingTimeInterval(1))
+        )
+
+        XCTAssertEqual(try XCTUnwrap(response.entries), [], "nothing went, so nothing is claimed")
+        XCTAssertEqual(fixture.store.items.map(\.id), [item.id])
+    }
+
     /// The unsandboxed lookup the tool uses answers with the group container's
     /// documented path, and refuses rather than creating one Perch has not made.
     func testUnsandboxedLookupRefusesToCreateTheContainer() throws {

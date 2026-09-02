@@ -157,6 +157,16 @@ final class FinderActionReceiver {
             return
         }
 
+        // A completion with no answer behind it is a sender that gave up: its
+        // `--wait` ran out and it wrote the same empty completion an abandoned
+        // `add` writes. It has already told its caller that nothing happened,
+        // so acting now would make that a lie — a `perch rm` that reported a
+        // timeout must not take the tile off the notch a scan later.
+        guard snapshot.completion == nil else {
+            try? await remove(snapshot.request.id, from: mailbox)
+            return
+        }
+
         // Acting first and answering second is the only honest order: an answer
         // written before the shelf changed could describe a removal that then
         // failed. A write that fails after the fact drops the transaction, and
@@ -186,8 +196,12 @@ final class FinderActionReceiver {
         var removed: [FinderActionEntry] = []
         for id in itemIDs {
             guard let item = store.items.first(where: { $0.id == id }) else { continue }
-            removed.append(Self.entry(item))
             store.remove(item)
+            // `ShelfStore.remove` reports a failure to the person at the shelf
+            // and leaves the tile where it is. The answer says what actually
+            // went, so a sender is never told a removal it can still see.
+            guard !store.items.contains(where: { $0.id == id }) else { continue }
+            removed.append(Self.entry(item))
         }
         return removed
     }

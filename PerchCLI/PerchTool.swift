@@ -21,7 +21,8 @@ struct PerchTool {
         /// Every path asked for landed on the shelf; the shelf was printed;
         /// every named item is off it.
         case success = 0
-        /// Bad usage, a path that isn't there, or an id that isn't on the shelf.
+        /// Bad usage, a path that isn't there, or an id that didn't come off
+        /// the shelf.
         case usage = 1
         /// Perch is running but turned items away. Nothing in a free, uncapped
         /// perch refuses an offer today; the code stays because the admission
@@ -30,8 +31,8 @@ struct PerchTool {
         /// No Perch answered in time — or the one that did is too old to know
         /// the verb, which is the same recovery: get a current Perch running.
         case unavailable = 3
-        /// The exchange broke after Perch answered. For `add` that is the only
-        /// way it happens: the items were admitted and a copy failed.
+        /// The exchange broke: the container could not be written, or — the
+        /// only way `add` gets here — the items were admitted and a copy failed.
         case failed = 4
     }
 
@@ -260,9 +261,9 @@ struct PerchTool {
             }
             let missing = ids.filter { id in !removed.contains { $0.id == id } }
             report(removed: removed, missing: missing, options: options)
-            // An id that was already gone is the `rm(1)` bargain: whatever was
-            // there is off the shelf, and the status still says you named
-            // something that wasn't.
+            // An id that didn't come back is the `rm(1)` bargain: everything
+            // that could go is off the shelf, and the status still says one of
+            // the ids didn't.
             return missing.isEmpty ? .success : .usage
         }
     }
@@ -451,14 +452,21 @@ struct PerchTool {
         }
         let width = entries.map(\.displayName.count).max() ?? 0
         for entry in entries {
-            // Padded by hand: `padding(toLength:)` measures UTF-16 and would
-            // truncate a name whose emoji count for more than one unit.
-            let gap = String(repeating: " ", count: max(0, width - entry.displayName.count))
-            var line = "\(entry.id.uuidString)  \(entry.displayName)\(gap)"
+            var trailing: [String] = []
             if let byteCount = entry.byteCount {
-                line += "  " + ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file)
+                trailing.append(
+                    ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file)
+                )
             }
-            if entry.isPinned { line += "  pinned" }
+            if entry.isPinned { trailing.append("pinned") }
+            var line = "\(entry.id.uuidString)  \(entry.displayName)"
+            if !trailing.isEmpty {
+                // Padded by hand: `padding(toLength:)` measures UTF-16 and would
+                // truncate a name whose emoji count for more than one unit. Only
+                // when something follows, so no line ends in whitespace.
+                line += String(repeating: " ", count: max(0, width - entry.displayName.count))
+                line += "  " + trailing.joined(separator: "  ")
+            }
             print(line)
         }
     }
@@ -477,7 +485,9 @@ struct PerchTool {
             for entry in removed { print("removed \(entry.displayName)") }
         }
         for id in missing {
-            complain("no such item on the shelf: \(id.uuidString)")
+            // Absent from the answer, which is either "never on the shelf" or
+            // "Perch could not take it off" — the shelf itself says which.
+            complain("not removed: \(id.uuidString) — it isn't on the shelf")
         }
     }
 
@@ -645,8 +655,8 @@ struct PerchTool {
           perch help        this text
 
         exit status:
-          0 done   1 usage, missing path, or unknown item   2 refused
-          3 no Perch answered   4 the exchange broke
+          0 done   1 usage, missing path, or an item that wasn't removed
+          2 refused   3 no Perch answered   4 the exchange broke
         """
         switch stream {
         case .standardOutput:

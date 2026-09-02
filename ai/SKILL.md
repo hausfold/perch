@@ -25,7 +25,7 @@ and keeps waiting — you don't have to start it yourself.
 | see what's on the shelf | `perch list` |
 | read the shelf as data | `perch list --json` |
 | take one item off | `perch rm <item-id>` |
-| clear the shelf | `perch list --json \| jq -r '.items[].id' \| perch rm -` |
+| clear the shelf (pins survive) | `perch list --json \| jq -r '.items[] \| select(.pinned \| not) \| .id' \| perch rm -` |
 | shelf something and read the result | `perch add --json build/app.zip` |
 | shelf quietly (scripts) | `perch add -q <path>...` |
 | refuse to auto-launch Perch | `perch add --no-launch <path>...` |
@@ -49,18 +49,19 @@ only ever learns the display name.
 `list` prints `{"items":[…]}` and `rm` prints `{"removed":[…],"missing":[…]}`,
 where an item is `{id, name, kind, contentType, bytes, addedAt, pinned}` —
 every key always present, `contentType` and `bytes` null when Perch doesn't
-know them. `missing` holds the ids you named that weren't on the shelf. There
-is no path in any of it: where the bytes live is the app's business.
+know them. `missing` holds the ids that didn't come off the shelf, and under
+`--json` it is the *only* place they are reported. There is no path in any of
+it: where the bytes live is the app's business.
 
 ## Exit codes — check these, they mean different recoveries
 
 | | meaning | what to do |
 |---|---|---|
 | 0 | it worked: paths landed / the shelf was printed / the items are off it | say what's on the shelf now |
-| 1 | usage error, a path that doesn't exist, or an id the shelf doesn't have | fix it; for `add` **nothing was submitted**, for `rm` the *other* ids were still removed |
+| 1 | usage error, a path that doesn't exist, or an id that didn't come off the shelf | fix it; for `add` **nothing was submitted**, for `rm` the *other* ids were still removed |
 | 2 | Perch turned items away | report it; don't retry the same batch. Nothing refuses today — if you see this, something new is happening |
-| 3 | no Perch answered in time, **or** Perch has never been opened on this Mac | retry with `--wait 30`; if it repeats, the user must launch Perch once by hand |
-| 4 | the exchange broke after Perch answered — for `add`, a copy failed | check the source is readable; partial batch |
+| 3 | no Perch answered in time, Perch has never been opened on this Mac, **or** the Perch running is older than the verb | read the message: "older than `list`" means the app needs updating, nothing else will help. Otherwise retry with `--wait 30`, then the user must launch Perch once by hand |
+| 4 | the exchange broke — for `add`, the items were admitted and a copy failed | check the source is readable; partial batch |
 
 An `add` batch containing one bad path is refused **whole**, before anything is
 submitted. So a `1` from `add` never means "some of them made it". An `rm`
