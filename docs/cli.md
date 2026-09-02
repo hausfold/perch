@@ -133,9 +133,9 @@ doctor: ready
 ```
 
 `✓` fine, `!` worth knowing, `✗` blocking; exit 3 if anything is `✗`. The first
-two lines carry every fact the bug form's "Version and macOS" field asks for —
-version, cohort, macOS build, Mac model — from the same `PerchDiagnostics/` the
-app quotes into that form, so a pasted `doctor` and a filed issue can't disagree
+two lines are what the bug form's `perch doctor` field asks for — version,
+cohort, macOS build, Mac model — from the same `PerchDiagnostics/` the app
+quotes into that form, so a pasted `doctor` and a filed issue can't disagree
 about which Mac this is. Not the same bytes: `BugReport` lays those four facts
 out over three lines for the form, this lays them over two for a terminal.
 
@@ -151,10 +151,10 @@ not be written, and a Perch that is running but predates the verb doctor knocks
 with — that last one answers with no entries, and calling it "not running" would
 send someone hunting for a process that is right there.
 
-Every row of the report except the first two lines names a **local path** —
-which bundle, which container. That is the point of the rows, and it is also why
-the *whole* output is not the thing to paste into a public issue: the header
-pair is (it carries no path), the check rows are yours.
+The check rows name **local paths** — which bundle, which container. That is the
+point of those rows, and it is also why the *whole* output is not the thing to
+paste into a public issue: the header pair is (it carries no path), the check
+rows are yours.
 
 `--json` answers with every key always present:
 `{version, bundleID, app, launchServicesApp, tool, install, installName,
