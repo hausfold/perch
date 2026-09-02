@@ -31,10 +31,95 @@ enum FinderActionProtocol {
     }
 }
 
+/// What a sender is asking for. The mailbox carried exactly one verb until the
+/// read verbs landed, so a request with no `kind` at all is an `add` — that is
+/// every request a `perch` tool older than them writes.
+enum FinderActionKind: String, Codable, Sendable {
+    /// Reserve slots, then adopt the bytes the sender stages. The only verb
+    /// that copies anything.
+    case add
+    /// Answer with what is on the shelf. Reads nothing, stages nothing.
+    case list
+    /// Take the named items off the shelf, exactly as the shelf's own menu
+    /// does. The ids come from a `list`; a sender never invents one.
+    case remove
+}
+
 struct FinderActionRequest: Codable, Sendable, Identifiable {
     let id: UUID
     let createdAt: Date
     let items: [FinderActionItem]
+    /// `nil` when the sender named a verb this build has never heard of — a
+    /// dev-build tool talking to an older installed app. It is decoded rather
+    /// than thrown on deliberately: one unparseable request.json stalls every
+    /// other transaction in the directory behind it.
+    let kind: FinderActionKind?
+    /// The shelf items a `.remove` names. Empty for every other verb: these are
+    /// ids the sender was told about, never items it is offering.
+    let targetItemIDs: [UUID]
+
+    init(
+        id: UUID,
+        createdAt: Date,
+        items: [FinderActionItem],
+        kind: FinderActionKind? = .add,
+        targetItemIDs: [UUID] = []
+    ) {
+        self.id = id
+        self.createdAt = createdAt
+        self.items = items
+        self.kind = kind
+        self.targetItemIDs = targetItemIDs
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        items = try container.decode([FinderActionItem].self, forKey: .items)
+        if let raw = try container.decodeIfPresent(String.self, forKey: .kind) {
+            kind = FinderActionKind(rawValue: raw)
+        } else {
+            kind = .add
+        }
+        targetItemIDs = try container.decodeIfPresent([UUID].self, forKey: .targetItemIDs) ?? []
+    }
+}
+
+/// One shelf tile as a sender sees it: what the answer to `perch list` is made
+/// of, and what a `remove` reports back about what it took.
+///
+/// A deliberate twin of PerchWire's `RemoteEntry`, which says the same thing to
+/// a paired phone — the CLI target doesn't compile PerchWire, and the two
+/// audiences differ anyway (a phone can't act on a pin; a person at a terminal
+/// can). Names only, like everything else that crosses this boundary: no path
+/// of any kind, original or staged, belongs in the container.
+struct FinderActionEntry: Codable, Sendable, Equatable, Identifiable {
+    let id: UUID
+    let displayName: String
+    let kind: String
+    let contentTypeIdentifier: String?
+    let byteCount: Int64?
+    let addedAt: Date
+    let isPinned: Bool
+
+    init(
+        id: UUID,
+        displayName: String,
+        kind: String,
+        contentTypeIdentifier: String?,
+        byteCount: Int64?,
+        addedAt: Date,
+        isPinned: Bool
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.kind = kind
+        self.contentTypeIdentifier = contentTypeIdentifier
+        self.byteCount = byteCount
+        self.addedAt = addedAt
+        self.isPinned = isPinned
+    }
 }
 
 struct FinderActionItem: Codable, Sendable, Identifiable, Equatable {
@@ -47,6 +132,20 @@ struct FinderActionItem: Codable, Sendable, Identifiable, Equatable {
 
 struct FinderActionResponse: Codable, Sendable, Equatable {
     let acceptedItemIDs: [UUID]
+    /// What a read verb answers with: the whole shelf for a `.list`, and for a
+    /// `.remove` exactly the items that were taken off it — so a sender learns
+    /// which of the ids it named were still there.
+    ///
+    /// `nil` is load-bearing. An app that predates the read verbs answers every
+    /// request the only way it knows, with accepted ids and nothing else, and
+    /// this absence is how the tool tells "no shelf answered" apart from "this
+    /// shelf doesn't know the verb".
+    let entries: [FinderActionEntry]?
+
+    init(acceptedItemIDs: [UUID], entries: [FinderActionEntry]? = nil) {
+        self.acceptedItemIDs = acceptedItemIDs
+        self.entries = entries
+    }
 }
 
 struct FinderActionCompletion: Codable, Sendable, Equatable {

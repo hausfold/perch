@@ -17,10 +17,12 @@ collect several items and then drag the group to one destination.
   menu for text and links. (An Action Extension shipped alongside it through
   2026-08-23 and was removed — measured on macOS 26, it drew in the same
   submenu rather than under Quick Actions, and shelved nothing when clicked.)
-- A `perch add` command line tool, shipped inside the app bundle and put on
-  `PATH` by whatever installed it, so a script or an agent can stage files
-  without a human present — same admission, same staging, same untouched
-  originals, with an exit status a pipeline can branch on.
+- A `perch` command line tool, shipped inside the app bundle and put on
+  `PATH` by whatever installed it, so a script or an agent can work the shelf
+  without a human present: `add` stages files — same admission, same staging,
+  same untouched originals — and `list` and `rm` read it back and prune it, so
+  everything the panel can do has a verb. An exit status a pipeline can branch
+  on, and `--json` for a caller that would rather parse than scrape.
 - Watched folders: user-picked folders (Downloads, the screenshot folder)
   whose new files are copied onto the shelf automatically — existing contents
   seeded silently, half-written downloads held until they settle, originals
@@ -65,6 +67,9 @@ collect several items and then drag the group to one destination.
     Folders; there is no extension to enable.
 11. Run `perch add` on those three files: it exits 0 and three tiles land. Quit
     Perch and run it again: it launches the shelf and the file still lands.
+    `perch list` names those same three tiles in the panel's order; `perch rm`
+    on one id takes that tile off the notch as you watch and leaves the
+    original where it was.
 12. Watch a folder holding two files; neither lands. Download into it and one
     tile appears only after the download completes; the original stays put.
     Quit perch, drop a file in, relaunch — that file lands too, exactly once.

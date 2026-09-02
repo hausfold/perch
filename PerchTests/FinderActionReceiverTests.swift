@@ -152,6 +152,87 @@ final class FinderActionReceiverTests: XCTestCase {
         XCTAssertTrue(try fixture.mailbox.snapshots().isEmpty)
     }
 
+    // MARK: - Verbs this build didn't write
+
+    /// Hand-written request JSON, the way a sender that isn't this build writes
+    /// it. The only way to test what happens to a field we would never encode.
+    private func writeRawRequest(_ fields: [String: Any], in fixture: Fixture) throws -> UUID {
+        let id = UUID()
+        var payload = fields
+        payload["id"] = id.uuidString
+        payload["createdAt"] = Date().timeIntervalSince1970 * 1000
+        let directory = fixture.mailboxRoot
+            .appending(path: id.uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: payload).write(
+            to: directory.appending(path: FinderActionProtocol.requestFilename),
+            options: [.atomic]
+        )
+        return id
+    }
+
+    /// A request from a `perch` tool older than the read verbs names no verb at
+    /// all. The mailbox had exactly one, so that request is an add and still
+    /// lands — an installed tool writes to this directory, and it need not be
+    /// the one this app shipped with.
+    func testARequestWithoutAKindIsStillAnAdd() async throws {
+        let fixture = try makeFixture()
+        let itemID = UUID()
+        let requestID = try writeRawRequest(
+            [
+                "items": [
+                    ["id": itemID.uuidString, "displayName": "legacy.txt", "attachmentIndex": 0],
+                ],
+            ],
+            in: fixture
+        )
+
+        await fixture.receiver.scanOnce()
+
+        let response = try XCTUnwrap(fixture.mailbox.readResponse(for: requestID))
+        XCTAssertEqual(response.acceptedItemIDs, [itemID])
+        XCTAssertNil(response.entries)
+        XCTAssertEqual(fixture.store.pendingTransfers.map(\.displayName), ["legacy.txt"])
+    }
+
+    /// The other direction: a verb from a *newer* sender. It is answered with
+    /// no entries — which is how that sender learns this shelf can't serve it —
+    /// rather than throwing, because one unparseable request would otherwise
+    /// stall every transaction sitting behind it in the directory.
+    func testAnUnknownVerbIsAnsweredAndLetsTheQueueThrough() async throws {
+        let fixture = try makeFixture()
+        let strangerID = try writeRawRequest(["kind": "purge", "items": []], in: fixture)
+        let offered = FinderActionItem(id: UUID(), displayName: "after.txt", attachmentIndex: 0)
+        try fixture.mailbox.createRequest(
+            FinderActionRequest(id: UUID(), createdAt: Date(), items: [offered])
+        )
+
+        await fixture.receiver.scanOnce()
+
+        let answer = try XCTUnwrap(fixture.mailbox.readResponse(for: strangerID))
+        XCTAssertNil(answer.entries, "no entries is how a sender learns the verb is unknown here")
+        XCTAssertTrue(answer.acceptedItemIDs.isEmpty)
+        XCTAssertEqual(
+            fixture.store.pendingTransfers.map(\.displayName),
+            ["after.txt"],
+            "the request behind it was served in the same pass"
+        )
+    }
+
+    /// An empty shelf answers with an empty list, never with the absence that
+    /// means "this build doesn't know the verb". The tool branches on exactly
+    /// that difference.
+    func testAnEmptyShelfListsAsEmptyRatherThanUnknown() async throws {
+        let fixture = try makeFixture()
+        let request = FinderActionRequest(id: UUID(), createdAt: Date(), items: [], kind: .list)
+        try fixture.mailbox.createRequest(request)
+
+        await fixture.receiver.scanOnce()
+
+        let response = try XCTUnwrap(fixture.mailbox.readResponse(for: request.id))
+        XCTAssertEqual(response.entries, [])
+    }
+
     func testMailboxRejectsPathsOutsideItsRequestDirectory() throws {
         let fixture = try makeFixture()
         XCTAssertThrowsError(

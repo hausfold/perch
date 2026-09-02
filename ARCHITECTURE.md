@@ -117,6 +117,21 @@ from a copy of the tool the app was not shipped with.
    commits the visible `ShelfItem`, and removes the request. Ten-minute stale
    transactions release reservations and are discarded.
 
+`perch list` and `perch rm` are the same transaction with steps 3 and 4 cut
+out: the request names a verb, the app answers in one turn with the entries —
+the whole shelf, or exactly the items it removed — and the sender acknowledges,
+which is what lets the app drop the directory rather than racing the reader of
+its own answer. They are second clients of semantics the paired phone already
+has over the wire (`shelfListRequest`/`removeItem`), not new shelf behaviour,
+and `rm` performs the identical `ShelfStore.remove` the panel's own menu does.
+A request naming no verb is an `add`, because that is what every request
+written before them is; a request naming a verb this build doesn't know is *answered*,
+with no entries, rather than thrown on — that is how a newer sender learns to
+say so, and it keeps an unknown verb from stalling the transactions queued
+behind it. `list` deliberately does not read the staging manifest
+directly, though an unsandboxed tool could: an answer assembled anywhere but
+the running app can disagree with the tiles on the notch.
+
 The shared group is `88M28542LQ.com.hausfold.perch`, the Team-ID-prefixed form
 for a directly distributed macOS app. It is deliberately separate from the iOS
 companion's App Store group.
