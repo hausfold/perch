@@ -93,9 +93,12 @@ struct ShelfPanelView: View {
         // so a latte desktop must not leave dark controls behind on a light shelf.
         .preferredColorScheme(rice.isLight ? .light : .dark)
         // The family itself is read statically (`ShelfFont`), and what makes
-        // it live is `theme`: `ShelfTheme.fontFamily` is `@Published`, so a
-        // rebuild that changes the family under a running perch invalidates
-        // this body the same way a palette change does.
+        // it live *here* is `theme`: `ShelfTheme.fontFamily` is `@Published`,
+        // so a rebuild that changes the family under a running perch
+        // invalidates this body the same way a palette change does. Settings
+        // and the pairing window observe no theme and need none — both are
+        // opened on demand, and a body built after the resolve reads the new
+        // family on the way up.
         .perchType()
     }
 
@@ -431,18 +434,23 @@ struct ShelfPanelView: View {
 
     private func errorBanner(_ error: String) -> some View {
         HStack(spacing: 8) {
+            // The two symbols keep Apple's metrics and only the sentence takes
+            // the family — a caption on the HStack would have sized the
+            // triangle and the close X by whatever face someone named.
             Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption)
             Text(error)
+                .font(ShelfFont.caption)
                 .lineLimit(2)
             Spacer()
             Button {
                 store.latestError = nil
             } label: {
                 Image(systemName: "xmark")
+                    .font(.caption)
             }
             .buttonStyle(.plain)
         }
-        .font(ShelfFont.caption)
         .foregroundStyle(rice.onRed)
         .padding(10)
         .background(rice.red.opacity(0.88), in: RoundedRectangle(cornerRadius: 12))

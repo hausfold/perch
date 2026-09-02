@@ -150,6 +150,11 @@ extension View {
     /// A no-op while no family is named: `EnvironmentValues.font` is optional,
     /// and pushing `.body` into it would flatten the per-control defaults
     /// SwiftUI picks for a settings window nobody asked to restyle.
+    ///
+    /// When somebody *has* named one, that flattening is the deal rather than
+    /// an oversight: a `Toggle`'s label or a `.controlSize(.small)` button's
+    /// title is unreachable any other way, and it renders at body size as the
+    /// price. Naming a family means everything is in it.
     @MainActor
     func perchType() -> some View {
         environment(\.font, ShelfFont.family == nil ? nil : ShelfFont.body)

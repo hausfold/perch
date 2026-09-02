@@ -235,6 +235,20 @@ polarity and the macOS appearance picks the half; `ShelfTheme` re-resolves on
 launch, on the light/dark switch, and as the shelf opens, and publishes through
 the environment so every panel and tile repaints together.
 
+Colour is not the only thing that file carries. `fontFamily` names the
+proportional family the shelf, Settings and the pairing window set their text
+in — `ShelfFont` is the only place it becomes a `Font`, and absent, it is
+SwiftUI's own `.system(…)`. It rides the same resolve as the palette but not
+the same channel: the family is a `@MainActor` static on `ShelfFont` rather
+than an environment value, because the alternative is an `@Environment`
+property on every view struct that sets a font. `ShelfTheme` publishes it too,
+which is what re-renders the panel when a rebuild changes it under a running
+perch. Symbols keep `.system` (an SF Symbol handed a text face is scaled by
+that face's metrics) and so does anything `.monospaced()`.
+
+There is no picker for it, for the reason there is none for the accent: the
+shelf is a five-second surface, and "follow haus" is the feature.
+
 Both paths sit outside the app container, which costs one read-only
 home-relative sandbox exception and forces two details: the real home comes from
 `getpwuid` (inside the sandbox `NSHomeDirectory()` is the container), and
