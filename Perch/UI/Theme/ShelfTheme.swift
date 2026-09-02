@@ -14,7 +14,7 @@ final class ShelfTheme: ObservableObject {
     @Published private(set) var palette: RicePalette
     /// The family the shelf's text is set in, or nil for macOS's own.
     ///
-    /// Published as well as pushed into `ShelfFont`, and both are needed: the
+    /// Published as well as pushed into `AppFont`, and both are needed: the
     /// static is what a view body reads (threading this through fifteen view
     /// structs' environments would be the alternative), and the `@Published`
     /// is what makes the panel re-render when a rebuild changes it while perch
@@ -31,8 +31,8 @@ final class ShelfTheme: ObservableObject {
             systemIsLight: RiceTheme.systemIsLight,
             defaults: defaults
         )
-        fontFamily = ShelfFont.resolve(defaults?.fontFamily)
-        ShelfFont.adopt(defaults?.fontFamily)
+        fontFamily = AppFont.resolve(defaults?.fontFamily)
+        AppFont.adopt(defaults?.fontFamily)
         guard observingSystemAppearance else { return }
 
         // Two sources for one event, because neither is guaranteed on its own:
@@ -68,10 +68,10 @@ final class ShelfTheme: ObservableObject {
             systemIsLight: RiceTheme.systemIsLight,
             defaults: defaults
         )
-        // The family is adopted whether or not anything changed: `ShelfFont`
+        // The family is adopted whether or not anything changed: `AppFont`
         // holds no history, and adopting the same name twice costs nothing.
-        let family = ShelfFont.resolve(defaults?.fontFamily)
-        ShelfFont.adopt(defaults?.fontFamily)
+        let family = AppFont.resolve(defaults?.fontFamily)
+        AppFont.adopt(defaults?.fontFamily)
         if family != fontFamily { fontFamily = family }
         guard resolved != palette else { return }
         palette = resolved

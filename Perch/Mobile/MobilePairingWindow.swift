@@ -56,7 +56,7 @@ struct MobilePairingView: View {
                 // The pairing finished (or was closed elsewhere); nothing to
                 // show but the outcome.
                 Text(receiver.lastEvent ?? "Pairing finished.")
-                    .font(ShelfFont.title3)
+                    .font(AppFont.title3)
                     .padding(40)
             }
         }
@@ -68,9 +68,9 @@ struct MobilePairingView: View {
     @ViewBuilder
     private func offerContent(_ window: MobileReceiver.PairingWindow) -> some View {
         Text("Pair an iPhone or iPad")
-            .font(ShelfFont.title2.weight(.semibold))
+            .font(AppFont.title2.weight(.semibold))
         Text("Open Perch on the phone, tap **Pair a Mac**, and point it at this code. Both screens will then show the same six digits.")
-            .font(ShelfFont.callout)
+            .font(AppFont.callout)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
 
@@ -84,12 +84,12 @@ struct MobilePairingView: View {
 
         Link("Don't have it yet? Get it free on the App Store",
              destination: Self.companionAppStoreURL)
-            .font(ShelfFont.caption)
+            .font(AppFont.caption)
             .multilineTextAlignment(.center)
 
         VStack(spacing: 6) {
             Text("No camera handy? Paste this into the phone instead:")
-                .font(ShelfFont.caption)
+                .font(AppFont.caption)
                 .foregroundStyle(.secondary)
             HStack {
                 Text(window.encodedOffer.prefix(28) + "…")
@@ -103,16 +103,16 @@ struct MobilePairingView: View {
             }
         }
         Text("This code works once and dies with this window.")
-            .font(ShelfFont.caption2)
+            .font(AppFont.caption2)
             .foregroundStyle(.tertiary)
     }
 
     @ViewBuilder
     private func approvalContent(_ approval: MobileReceiver.PairingApproval) -> some View {
         Text("“\(approval.deviceName)” wants to pair")
-            .font(ShelfFont.title2.weight(.semibold))
+            .font(AppFont.title2.weight(.semibold))
         Text("Approve only if the phone shows these same six digits.")
-            .font(ShelfFont.callout)
+            .font(AppFont.callout)
             .foregroundStyle(.secondary)
         Text(approval.code)
             .font(.system(size: 44, weight: .bold, design: .monospaced))

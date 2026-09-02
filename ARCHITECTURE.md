@@ -237,9 +237,9 @@ the environment so every panel and tile repaints together.
 
 Colour is not the only thing that file carries. `fontFamily` names the
 proportional family the shelf, Settings and the pairing window set their text
-in — `ShelfFont` is the only place it becomes a `Font`, and absent, it is
+in — `AppFont` is the only place it becomes a `Font`, and absent, it is
 SwiftUI's own `.system(…)`. It rides the same resolve as the palette but not
-the same channel: the family is a `@MainActor` static on `ShelfFont` rather
+the same channel: the family is a `@MainActor` static on `AppFont` rather
 than an environment value, because the alternative is an `@Environment`
 property on every view struct that sets a font. `ShelfTheme` publishes it too,
 which is what re-renders the panel when a rebuild changes it under a running

@@ -24,7 +24,12 @@ import SwiftUI
 ///
 /// **A family that isn't installed falls back silently**, because that is what
 /// CoreText does with a name it can't resolve, and perch installs no fonts.
-enum ShelfFont {
+///
+/// Named the same as trill's and pounce's, deliberately: `SettingsChrome.swift`
+/// is a copy shared by shape across the three, so the helper its lines call has
+/// to be spelled identically or the copies stop being diffable — which is the
+/// only thing keeping the three settings windows one shape.
+enum AppFont {
     /// The family in force, or nil for the system font.
     ///
     /// Written by `ShelfTheme` and by nothing else: resolution touches a file,
@@ -157,6 +162,6 @@ extension View {
     /// price. Naming a family means everything is in it.
     @MainActor
     func perchType() -> some View {
-        environment(\.font, ShelfFont.family == nil ? nil : ShelfFont.body)
+        environment(\.font, AppFont.family == nil ? nil : AppFont.body)
     }
 }

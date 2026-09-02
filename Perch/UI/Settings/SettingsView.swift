@@ -150,9 +150,9 @@ private struct SettingsSidebarFooter: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Perch")
-                        .font(ShelfFont.size(12, weight: .semibold))
+                        .font(AppFont.size(12, weight: .semibold))
                     Text(version)
-                        .font(ShelfFont.size(11))
+                        .font(AppFont.size(11))
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)

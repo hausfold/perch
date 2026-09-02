@@ -6,11 +6,11 @@ import XCTest
 /// and everything interesting about it happens before a `Font` exists: what
 /// counts as "no family", and which names mean macOS's own. Those are the
 /// answers a view body can't be asked for, so they are pure and they live here.
-final class ShelfFontTests: XCTestCase {
+final class AppFontTests: XCTestCase {
     func testAnUnnamedFamilyIsTheSystemFont() {
-        XCTAssertNil(ShelfFont.resolve(nil))
-        XCTAssertNil(ShelfFont.resolve(""))
-        XCTAssertNil(ShelfFont.resolve("   "))
+        XCTAssertNil(AppFont.resolve(nil))
+        XCTAssertNil(AppFont.resolve(""))
+        XCTAssertNil(AppFont.resolve("   "))
     }
 
     /// The case a desktop generating this file actually hits: it writes the
@@ -19,14 +19,14 @@ final class ShelfFontTests: XCTestCase {
     /// optical size and weight SwiftUI picks per text style, so "left at the
     /// default" would render subtly unlike leaving the key out.
     func testTheSystemFontsOwnNamesResolveToTheSystemFont() {
-        XCTAssertNil(ShelfFont.resolve(".AppleSystemUIFont"))
-        XCTAssertNil(ShelfFont.resolve("system"))
-        XCTAssertNil(ShelfFont.resolve("-apple-system"))
+        XCTAssertNil(AppFont.resolve(".AppleSystemUIFont"))
+        XCTAssertNil(AppFont.resolve("system"))
+        XCTAssertNil(AppFont.resolve("-apple-system"))
     }
 
     func testANamedFamilyIsPassedThroughVerbatimAndTrimmed() {
-        XCTAssertEqual(ShelfFont.resolve("Atkinson Hyperlegible"), "Atkinson Hyperlegible")
-        XCTAssertEqual(ShelfFont.resolve("  Inter \n"), "Inter")
+        XCTAssertEqual(AppFont.resolve("Atkinson Hyperlegible"), "Atkinson Hyperlegible")
+        XCTAssertEqual(AppFont.resolve("  Inter \n"), "Inter")
     }
 
     /// The claim the whole change rests on: a perch nobody named a family for
@@ -34,10 +34,10 @@ final class ShelfFontTests: XCTestCase {
     /// look-alike. `Font` is `Equatable`, so this is checkable.
     func testWithNoFamilyEveryCallIsTheFontPerchAlreadyDrew() {
         for style: Font.TextStyle in [.caption2, .caption, .footnote, .subheadline, .callout, .body, .headline, .title3, .title2] {
-            XCTAssertEqual(ShelfFont.style(style, family: nil), .system(style))
+            XCTAssertEqual(AppFont.style(style, family: nil), .system(style))
         }
-        XCTAssertEqual(ShelfFont.size(19, weight: .semibold, family: nil), .system(size: 19, weight: .semibold))
-        XCTAssertEqual(ShelfFont.size(11, family: nil), .system(size: 11))
+        XCTAssertEqual(AppFont.size(19, weight: .semibold, family: nil), .system(size: 19, weight: .semibold))
+        XCTAssertEqual(AppFont.size(11, family: nil), .system(size: 11))
     }
 
     /// With one named, the style keeps macOS's own point size for that style
@@ -46,21 +46,21 @@ final class ShelfFontTests: XCTestCase {
     /// system face gives `.headline` away free.
     func testANamedFamilyKeepsTheStylesOwnSizeAndWeight() {
         XCTAssertEqual(
-            ShelfFont.style(.headline, family: "Helvetica"),
-            .custom("Helvetica", size: ShelfFont.pointSize(of: .headline), relativeTo: .headline).weight(.semibold)
+            AppFont.style(.headline, family: "Helvetica"),
+            .custom("Helvetica", size: AppFont.pointSize(of: .headline), relativeTo: .headline).weight(.semibold)
         )
         XCTAssertEqual(
-            ShelfFont.style(.callout, family: "Helvetica"),
-            .custom("Helvetica", size: ShelfFont.pointSize(of: .callout), relativeTo: .callout).weight(.regular)
+            AppFont.style(.callout, family: "Helvetica"),
+            .custom("Helvetica", size: AppFont.pointSize(of: .callout), relativeTo: .callout).weight(.regular)
         )
-        XCTAssertEqual(ShelfFont.size(22, family: "Helvetica"), .custom("Helvetica", fixedSize: 22))
-        XCTAssertNotEqual(ShelfFont.style(.body, family: "Helvetica"), .system(.body))
+        XCTAssertEqual(AppFont.size(22, family: "Helvetica"), .custom("Helvetica", fixedSize: 22))
+        XCTAssertNotEqual(AppFont.style(.body, family: "Helvetica"), .system(.body))
     }
 
     func testOnlyHeadlineCarriesAWeightOfItsOwn() {
-        XCTAssertEqual(ShelfFont.weight(of: .headline), .semibold)
+        XCTAssertEqual(AppFont.weight(of: .headline), .semibold)
         for style: Font.TextStyle in [.caption2, .caption, .footnote, .subheadline, .callout, .body, .title3, .title2] {
-            XCTAssertEqual(ShelfFont.weight(of: style), .regular)
+            XCTAssertEqual(AppFont.weight(of: style), .regular)
         }
     }
 

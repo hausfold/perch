@@ -20,9 +20,9 @@ struct SettingsPaneLayout<Content: View>: View {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(ShelfFont.size(19, weight: .semibold))
+                        .font(AppFont.size(19, weight: .semibold))
                     Text(subtitle)
-                        .font(ShelfFont.subheadline)
+                        .font(AppFont.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -113,7 +113,7 @@ struct SettingsRow<Control: View>: View {
                 Text(title)
                 if let subtitle {
                     Text(subtitle)
-                        .font(ShelfFont.subheadline)
+                        .font(AppFont.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -189,7 +189,7 @@ struct SettingsPlaceholderRow: View {
 
     var body: some View {
         Text(text)
-            .font(ShelfFont.subheadline)
+            .font(AppFont.subheadline)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 18)
@@ -206,7 +206,7 @@ struct SettingsFootnote: View {
 
     var body: some View {
         Text(text)
-            .font(ShelfFont.subheadline)
+            .font(AppFont.subheadline)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -229,7 +229,7 @@ struct SettingsNote: View {
                 .foregroundStyle(tint)
                 .frame(width: 16)
             Text(text)
-                .font(ShelfFont.subheadline)
+                .font(AppFont.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }

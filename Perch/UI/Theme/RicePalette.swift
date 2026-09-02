@@ -348,7 +348,7 @@ struct RiceThemeDefaults: Decodable, Equatable {
     /// about, and `haus.fonts.sans.name` is where this one comes from; a
     /// standalone install writes it here by hand, like the accent. Perch
     /// installs no fonts, so a family this Mac doesn't have falls back to the
-    /// system face silently — see `ShelfFont`.
+    /// system face silently — see `AppFont`.
     var fontFamily: String? = nil
 
     static func load(from url: URL = RiceFiles.configFile) -> RiceThemeDefaults? {
