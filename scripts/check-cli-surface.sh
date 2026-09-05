@@ -22,6 +22,10 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [ "$#" -eq 1 ] || { printf 'usage: check-cli-surface.sh <path-to-perch-cli>\n' >&2; exit 2; }
 cli="$1"
 [ -x "$cli" ] || { printf 'check-cli-surface.sh: not executable: %s\n' "$cli" >&2; exit 2; }
+# Absolute, because one case below runs from a scratch directory and a
+# DerivedData-relative path would stop resolving there (exit 127, not the
+# usage code the case is asking about).
+cli="$(cd "$(dirname "$cli")" && pwd)/$(basename "$cli")"
 
 status=0
 pass() { printf '  ok   %s\n' "$*"; }
@@ -100,6 +104,20 @@ chmod 700 "$tmp/c"
 expect 1 'an unknown client is a usage error' "$cli" skill install --client emacs
 expect 1 '--dir and --client together are refused' \
   "$cli" skill install --dir "$tmp/d" --client claude
+[ ! -e "$tmp/d" ] && pass 'and nothing was written to --dir' || fail '--dir was honoured and --client dropped'
+
+# An empty value is an unset shell variable, not a request. `--dir ""` used to
+# resolve against the working directory and write a perch/SKILL.md there, which
+# is why this runs from a scratch directory and looks for the file afterwards.
+here="$PWD"
+mkdir -p "$tmp/e" && cd "$tmp/e" || exit 2
+expect 1 'an empty --dir is a usage error' "$cli" skill install --dir ""
+expect 1 'an empty --client is a usage error' "$cli" skill install --client ""
+expect 1 'a --dir with nothing after it is a usage error' "$cli" skill install --dir
+expect 1 'a --client with nothing after it is a usage error' "$cli" skill install --client
+[ ! -e "$tmp/e/perch" ] && pass 'and nothing landed in the working directory' \
+  || fail 'an empty --dir wrote into the working directory'
+cd "$here" || exit 2
 
 printf 'perch doctor\n'
 
