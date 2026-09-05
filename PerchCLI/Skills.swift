@@ -138,11 +138,11 @@ enum Skills {
                 json = true
             case "--dir", "--client":
                 // An empty value is an unset shell variable, not a request:
-                // `--dir "$scratch"` with `scratch` unset used to resolve
-                // against the working directory and put a `perch/SKILL.md`
-                // there. Refused before anything is written, like a flag with
-                // nothing after it (A3 in the workshop's agent-surface
-                // standard).
+                // let through, `--dir "$scratch"` with `scratch` unset
+                // resolves against the working directory and puts a
+                // `perch/SKILL.md` there. Refused before anything is written,
+                // like a flag with nothing after it (A3 in the workshop's
+                // agent-surface standard).
                 guard index < arguments.endIndex, !arguments[index].isEmpty else {
                     complain("\(argument) needs a value")
                     return .usage
