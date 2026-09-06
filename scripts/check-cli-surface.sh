@@ -22,6 +22,10 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [ "$#" -eq 1 ] || { printf 'usage: check-cli-surface.sh <path-to-perch-cli>\n' >&2; exit 2; }
 cli="$1"
 [ -x "$cli" ] || { printf 'check-cli-surface.sh: not executable: %s\n' "$cli" >&2; exit 2; }
+# Absolute, because one case below runs from a scratch directory and a
+# DerivedData-relative path would stop resolving there (exit 127, not the
+# usage code the case is asking about).
+cli="$(cd "$(dirname "$cli")" && pwd)/$(basename "$cli")"
 
 status=0
 pass() { printf '  ok   %s\n' "$*"; }
@@ -100,6 +104,24 @@ chmod 700 "$tmp/c"
 expect 1 'an unknown client is a usage error' "$cli" skill install --client emacs
 expect 1 '--dir and --client together are refused' \
   "$cli" skill install --dir "$tmp/d" --client claude
+[ ! -e "$tmp/d" ] && pass 'and nothing was written to --dir' || fail '--dir was honoured and --client dropped'
+
+# An empty value is an unset shell variable, not a request. Let through, an
+# empty --dir resolves against the working directory and writes a
+# perch/SKILL.md there, which is why this runs from a scratch directory and
+# looks for the file afterwards. HOME is fenced too: the one way a valueless
+# flag could regress is into the bare install, and that writes into the real
+# home.
+here="$PWD"
+mkdir -p "$tmp/e" "$tmp/home" && cd "$tmp/e" || exit 2
+expect 1 'an empty --dir is a usage error' env HOME="$tmp/home" "$cli" skill install --dir ""
+expect 1 'an empty --client is a usage error' env HOME="$tmp/home" "$cli" skill install --client ""
+expect 1 'a --dir with nothing after it is a usage error' env HOME="$tmp/home" "$cli" skill install --dir
+expect 1 'a --client with nothing after it is a usage error' env HOME="$tmp/home" "$cli" skill install --client
+[ ! -e "$tmp/e/perch" ] && [ -z "$(find "$tmp/home" -name SKILL.md)" ] \
+  && pass 'and nothing landed in the working directory or the home' \
+  || fail 'a valueless flag wrote somewhere'
+cd "$here" || exit 2
 
 printf 'perch doctor\n'
 

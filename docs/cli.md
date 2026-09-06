@@ -89,9 +89,12 @@ only ever deletes the copy Perch staged. The original was never Perch's.
 | 3 | no Perch answered in time, or the one that did is older than the verb; from `doctor`, at least one blocking finding |
 | 4 | the exchange broke — the container couldn't be written, or, for `add`, a copy failed after admission, or, for `skill install`, a file couldn't be written |
 
-`skill` uses 1 for a name perch doesn't ship or a machine with no agent client
-on it, 2 for a `SKILL.md` that exists with different bytes and was left alone,
-and 4 when a write it *did* attempt failed.
+`skill` uses 1 for a name perch doesn't ship, a machine with no agent client on
+it, `--dir` and `--client` together, or either flag with a missing or empty
+value (`--dir ""` is an unset variable, not a path); 2 for a `SKILL.md` that
+exists with different bytes and was left alone; and 4 when a write it *did*
+attempt failed. A symlink is none of those: something else installed it (on a
+haus machine, `haus.ai.skill`), it is named and left alone, and the run exits 0.
 
 An `add` batch with a bad path, or an `rm` batch with something that isn't a
 UUID, is refused whole before anything is submitted — a half-typo'd batch should
