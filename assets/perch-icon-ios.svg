@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="1024" height="1024">
+  <!-- perch, the iOS app icon. Source of record for
+       PerchIOS/Assets.xcassets/AppIcon.appiconset/icon_1024.png.
+       The same mark as perch-square.svg, with what iOS requires: the graphite
+       ground bleeds to the edge, because an iOS icon may not carry an alpha
+       channel and the system masks its own squircle over it; and the mark is
+       inset 9%, because the lower card runs off the tile and that mask would
+       clip it to a fragment at 60pt.
+       The tile clip is written in 0-100 and used from inside that inset, so it
+       resolves at 9 to 91 of the square, not at its edges. That is what crops
+       the lower card, and the ground behind it is the rect above, not the clip.
+       Shapes, colour roles and the rules they answer to are in the brand kit's
+       docs/design.md, under Components. The ears are the family path, used
+       verbatim: move, scale or recolour them, never redraw them. -->
+  <rect width="100" height="100" fill="#343434"/>
+  <clipPath id="perch-ios-tile"><rect width="100" height="100" rx="24"/></clipPath>
+  <g transform="translate(9 9) scale(0.82)">
+    <g clip-path="url(#perch-ios-tile)">
+      <g fill="#abe1a6" transform="translate(4 19) scale(0.72)">
+        <path d="M 18 13 Q 34 18 47 24 Q 34 35 30.5 57 Q 20 34 18 13 Z"/>
+        <path d="M 82 13 Q 66 18 53 24 Q 66 35 69.5 57 Q 80 34 82 13 Z"/>
+      </g>
+      <rect x="10" y="68" width="42" height="46" rx="6" fill="#494949" transform="rotate(-11 31 91)"/>
+      <rect x="46" y="64" width="42" height="48" rx="6" fill="#abe1a6" transform="rotate(7 67 88)"/>
+    </g>
+  </g>
+</svg>
