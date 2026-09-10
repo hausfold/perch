@@ -70,7 +70,9 @@ What bites:
   instrumented `perch` litters `default.profraw` wherever the shell sits.
   Coverage needs both `ENABLE_CODE_COVERAGE=YES -enableCodeCoverage YES … test`.
   `scripts/assert-no-instrumentation.sh` guards it: CI runs it on every macOS
-  Release build, before signing; run it on any bundle you install.
+  Release build, before signing, and those build steps pass no
+  `ENABLE_CODE_COVERAGE=NO` on purpose — the guard proves the project setting
+  holds on a stock `build`. Run it on any bundle you install.
 - Bundle ids derive from `PERCH_BUNDLE_ID` (`$(PERCH_BUNDLE_ID)`, `.cli`,
   `.tests`, `.ios`, `.ios.share`). Rename with that override, never
   `PRODUCT_BUNDLE_IDENTIFIER=` on the command line — it collapses every target
