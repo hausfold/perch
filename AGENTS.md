@@ -32,7 +32,7 @@ repo — change both in the same round.
 ```sh
 # macOS app + the whole test suite (includes the wire loopback tests)
 xcodebuild -project Perch.xcodeproj -scheme Perch \
-  -configuration Debug -destination 'platform=macOS' \
+  -configuration Debug -destination 'platform=macOS,arch=arm64' \
   -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO test
 
 # iOS companion + Share extension (simulator)
@@ -66,6 +66,17 @@ What bites:
   com.apple.quarantine /Applications/Perch.app`.
 - Never pass `CODE_SIGNING_ALLOWED=NO` to an **iOS** build you intend to run —
   it strips the App Group entitlement and the app aborts at launch.
+- **`arch=arm64` on the destination is load-bearing**, and every invocation in
+  `build.yml` and `release.yml` carries it. A bare `platform=macOS` matches two
+  destinations on an Apple Silicon Mac — `arch:arm64` and `arch:x86_64`, the
+  same "My Mac" id twice — and xcodebuild takes the first, so the slice is a
+  property of the machine rather than a decision. The project declares no
+  `ARCHS`, so `-showBuildSettings` resolves the universal `ARCHS_STANDARD` and
+  *confirms* the wrong answer; only the command line disagrees. Release builds
+  add `ARCHS=arm64` on top, and `scripts/assert-arm64-only.sh` walks the bundle
+  for Mach-Os and fails before signing — nothing downstream would notice, since
+  signing, notarization, stapling and `PerchSigning.payloadRequirement` are all
+  indifferent to arch.
 - `ENABLE_CODE_COVERAGE = NO` is set project-wide, both configurations — an
   instrumented `perch` litters `default.profraw` wherever the shell sits.
   Coverage needs both `ENABLE_CODE_COVERAGE=YES -enableCodeCoverage YES … test`.
