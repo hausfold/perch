@@ -8,7 +8,7 @@ collect several items and then drag the group to one destination.
 
 ## Required for v1
 
-- Native menu-bar app, sandbox-compatible, macOS 14+.
+- Native menu-bar app, sandbox-compatible, macOS 14+ on Apple Silicon.
 - Notch-derived geometry and a clear notchless-display fallback.
 - One public-API overlay per selected display.
 - Finder files and folders, file promises, images, URLs, and text.

@@ -26,8 +26,8 @@ brew install --cask hausfold/tap/perch
 perch skill install   # optional — teach this Mac's coding agents about the shelf
 ```
 
-macOS 14 or newer, signed and notarized. The phone half is free on the App
-Store — [**Perch Companion**](https://apps.apple.com/app/id6799443735) — and
+macOS 14 or newer on Apple Silicon, signed and notarized. The phone half is
+free on the App Store — [**Perch Companion**](https://apps.apple.com/app/id6799443735) — and
 pairs by scanning the Mac's code, over your own network or with no network at
 all.
 

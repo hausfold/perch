@@ -133,7 +133,7 @@ enum InstallKind: String, Codable, Equatable, CaseIterable {
         "/Library/Application Support/haus/perch.installed-from"
     ]
 
-    /// Homebrew's per-cask staging directory, on both Apple Silicon and Intel.
+    /// Homebrew's per-cask staging directory, in either prefix.
     static let caskReceiptPaths = [
         "/opt/homebrew/Caskroom/perch",
         "/usr/local/Caskroom/perch",
