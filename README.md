@@ -49,6 +49,7 @@ current with the rest of the desktop.
 - [`ai/SKILL.md`](ai/SKILL.md) — the agent surface, so *"put this in my shelf"* works first try; `perch skill` prints it, `perch skill install` puts it where your agent will find it
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — the invariants, and the seams that hold them
 - [`AGENTS.md`](AGENTS.md) — building it, testing it, shipping it
+- [`THANKS.md`](THANKS.md) — the founding testers, and what perch is built on
 
 ---
 
