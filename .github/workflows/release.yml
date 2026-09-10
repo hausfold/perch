@@ -68,6 +68,12 @@ jobs:
           echo "::add-mask::$SIGNER_NAME"
           rm -f "$RUNNER_TEMP/cert.p12"
 
+      # perch is Apple Silicon only, and this step is where that becomes true
+      # of the bytes. `ARCHS=arm64` is the half that does the work; the arch on
+      # the destination stops xcodebuild resolving `platform=macOS` to whichever
+      # of the machine's two matching destinations it lists first, which is how
+      # the slice came to be a property of the runner rather than a decision.
+      # scripts/assert-arm64-only.sh has the whole story and checks the result.
       - name: Build Release Perch.app (Developer ID, hardened runtime)
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
@@ -76,8 +82,10 @@ jobs:
             -scheme Perch \
             -configuration Release \
             -quiet \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath dd \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=NO \
             MARKETING_VERSION="$VERSION" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Developer ID Application" \
@@ -86,6 +94,14 @@ jobs:
             ENABLE_HARDENED_RUNTIME=YES \
             OTHER_CODE_SIGN_FLAGS="--timestamp" \
             build
+
+      # The slice list is a promise the cask, the flake, the README and the
+      # install page all make on this build's behalf, and nothing downstream
+      # would notice it broken: a bundle with the wrong arch signs, notarizes,
+      # staples and publishes exactly the same. Fail here, where the only cost
+      # is a red release run.
+      - name: The bundle is arm64, and only arm64
+        run: scripts/assert-arm64-only.sh dd/Build/Products/Release/Perch.app
 
       # Before signing, notarizing, stapling and publishing: a coverage-
       # instrumented build passes every one of those steps and still drops a

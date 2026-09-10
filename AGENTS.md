@@ -27,7 +27,7 @@ repo — change both in the same round.
 
 ## Build
 
-**Xcode 26 or newer, macOS 14 or newer.**
+**Xcode 26 or newer, macOS 14 or newer, Apple Silicon.**
 
 ```sh
 # macOS app + the whole test suite (includes the wire loopback tests)

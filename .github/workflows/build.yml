@@ -23,7 +23,7 @@ jobs:
             -project Perch.xcodeproj \
             -scheme Perch \
             -configuration Debug \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             test
@@ -33,7 +33,7 @@ jobs:
             -project Perch.xcodeproj \
             -scheme Perch \
             -configuration Debug \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             analyze
@@ -43,11 +43,21 @@ jobs:
             -project Perch.xcodeproj \
             -scheme Perch \
             -configuration Release \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath DerivedData \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_ALLOWED=NO \
             build
 
+      # The same slice guard the release runs, so the arm64 invariant is proven
+      # on every PR rather than only on a tag — where a red run costs a retag.
+      - name: The bundle is arm64, and only arm64
+        run: scripts/assert-arm64-only.sh DerivedData/Build/Products/Release/Perch.app
+
+      # ARCHS above is pinned to mirror the release build, which is a
+      # different concern from the one this paragraph is about.
+      #
       # Deliberately NOT passing ENABLE_CODE_COVERAGE=NO to the build above:
       # the point is to prove the project-level setting still holds on a stock
       # `build`. Xcode's default is YES and it leaks past `test` into `build`,

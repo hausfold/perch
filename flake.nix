@@ -19,10 +19,16 @@
   outputs =
     { self, nixpkgs, prebuilt }:
     let
-      systems = [
-        "aarch64-darwin"
-        "x86_64-darwin"
-      ];
+      # Apple Silicon only, matching the notarized zip this flake wraps: its
+      # release build names arm64 and asserts the slices before signing. Two
+      # separate reasons not to offer x86_64-darwin — the honest one is that
+      # the artifact has no x86_64 slice, and the loud one is that the nixpkgs
+      # pinned below dropped x86_64-darwin, so the attribute does not merely
+      # install something unlaunchable, it throws the moment anything evaluates
+      # it — `nix flake show --all-systems`, or a direct
+      # `nix eval .#packages.x86_64-darwin.perch`. A bare `nix flake show`
+      # omits other systems, which is why nothing had noticed.
+      systems = [ "aarch64-darwin" ];
       forAll = nixpkgs.lib.genAttrs systems;
       pkgsFor = system: import nixpkgs { inherit system; overlays = [ self.overlays.default ]; };
 

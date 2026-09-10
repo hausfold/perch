@@ -95,7 +95,10 @@ stdenvNoCC.mkDerivation {
     # that isn't a free license flips the package unfree, which breaks the
     # haus's install for anyone without allowUnfree.
     license = lib.licenses.mit;
-    platforms = lib.platforms.darwin;
+    # Apple Silicon only: the notarized zip carries an arm64 slice and no
+    # other, so `lib.platforms.darwin` would advertise an x86_64-darwin build
+    # that unpacks fine and never launches.
+    platforms = [ "aarch64-darwin" ];
     sourceProvenance = [ lib.sourceTypes.binaryNativeCode ];
   };
 }
