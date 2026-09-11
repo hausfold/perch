@@ -81,12 +81,23 @@ a companion, not a standalone.
   back anyway, that keyword is the next to strip.
 - **Category**: Productivity (secondary: Utilities)
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
-- **Support URL** and **Marketing URL**: `https://hausfold.co/docs/perch`
-- **Privacy policy URL**: `https://hausfold.co/perch/privacy` — the one URL App
+- **Support URL** and **Marketing URL**: `https://hausfold.co/docs/perch/`
+- **Privacy policy URL**: `https://hausfold.co/perch/privacy/` — the one URL App
   Store Connect *requires*, and the only one of the three still under
   `hausfold.co/perch`, which otherwise redirects to the docs tree. An unreachable
   support URL is a routine rejection: `curl -sIL` all three before a submission
   if the site has moved.
+  **Paste the trailing slash** — into the two URL *fields*. The Description and
+  the review notes name the URL in running prose, where bare reads better and
+  the field is plain text anyway — the bare form there is deliberate.
+  **Read the status code, not the hop count.** Slashless, each of the three
+  answers exactly one hop, so the count separates nothing. A **307** is
+  Cloudflare's `auto-trailing-slash` normalising a path — what `/docs/perch` and
+  `/perch/privacy` answer, harmless, and what the slashed form skips. A **301**
+  is a page that moved, and `/perch` and `/perch/` → `/docs/perch/` are the only
+  two here. Privacy sits outside them on purpose: hausfold.co's `_redirects`
+  matches those two paths exactly, above a ⚠️ never to widen them to `/perch/*`,
+  which would swallow the one URL App Store Connect requires.
   ⚠️ **Editing a listing field is a manual act.** A commit here changes the copy
   of record, not the listing. Both halves are still owed a check against App
   Store Connect: the Support and Marketing fields, which predate the redirect,
