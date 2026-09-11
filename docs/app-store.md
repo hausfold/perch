@@ -139,8 +139,9 @@ submission — so the block below *is* those seven answers. Paste it whole;
 shortening it to a summary is what earns a 2.1 Information Needed, and has.
 Item 1's recording is [its own section](#the-screen-recording-apple-asks-for).
 
-- **The Notes field caps at 4,000 characters, and the block below is over it** —
-  4,113 as committed. Measure before you paste and buy the space from something:
+- **The Notes field caps at 4,000 characters** and the block below is 3,909, so
+  anything you add has to buy its space from something else. Measure, don't
+  assume — it has been over:
   `awk '/^## Review notes/{f=1} f&&/^>/{sub(/^> ?/,"");print} f&&/^Also fill in:/{exit}' docs/app-store.md | wc -m`.
 - **It is a plain-text field**, which is why the block carries no Markdown
   emphasis and uses ALL-CAPS headings. `**bold**` pastes as literal asterisks in
@@ -164,8 +165,7 @@ Item 1's recording is [its own section](#the-screen-recording-apple-asks-for).
 > file. It begins at the Home Screen, launches the app, and shows the whole
 > flow: the local-network and camera prompts, adding items with no Mac present,
 > the Share extension, pairing, and delivery. It shows no registration, login,
-> purchase or user-generated-content flow because the app has none; see the last
-> paragraph.
+> purchase or user-generated-content flow because the app has none; see 4.
 >
 > 2. TESTED ON. iPhone 15 Pro, iOS 27.0 (physical device) — every flow,
 > including pairing and delivery over Wi-Fi. iPad Pro 13-inch (M5), iPadOS 26.5
@@ -189,7 +189,9 @@ Item 1's recording is [its own section](#the-screen-recording-apple-asks-for).
 > relaunch; or share to Perch from Photos, Safari or Files and find it on the
 > shelf. Each row reads "waiting" while no Mac is paired — nothing is ever
 > labelled sent when it hasn't been. Swipe a row to remove it. Nothing is gated
-> or paywalled. Pairing is optional, and the only part needing hardware we can't
+> or paywalled, and nothing a user adds is ever visible to anyone else — no feed,
+> no upload, no server, no other user — so there is no reporting or blocking
+> mechanism. Pairing is optional, and the only part needing hardware we can't
 > ship you: a Mac running Perch — on the same Wi-Fi, or simply nearby with Wi-Fi
 > on, since the two can also talk peer-to-peer — shows a QR code, the phone
 > scans it (or accepts the perch-pair:… string pasted as text), and both screens
@@ -216,12 +218,6 @@ Item 1's recording is [its own section](#the-screen-recording-apple-asks-for).
 > 7. REGULATED INDUSTRY OR PROTECTED THIRD-PARTY MATERIAL. Neither applies.
 > Perch is a general-purpose productivity utility; all code, text and artwork
 > are our own.
->
-> FREE, AND PRIVATE. No in-app purchases, no subscriptions, nothing to restore.
-> The Mac half is free too, and nothing is sold anywhere in Perch — there is no
-> checkout to steer anyone towards. Nothing a user adds is ever visible to
-> anyone else — no feed, no upload, no server, no other user — so there is no
-> reporting or blocking mechanism.
 
 Also fill in: no demo account needed, contact = `julien@hausfold.co` (not
 `support@…` on either domain). **Send yourself a test message before you type it
