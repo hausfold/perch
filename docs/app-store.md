@@ -83,12 +83,14 @@ a companion, not a standalone.
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
 - **Support URL** and **Marketing URL**: `https://hausfold.co/docs/perch`
 - **Privacy policy URL**: `https://hausfold.co/perch/privacy` — the one URL App
-  Store Connect *requires*, and the one that did not move into the docs tree. An
-  unreachable support URL is a routine rejection: `curl -sIL` all three before a
-  submission if the site has moved.
+  Store Connect *requires*, and the only one of the three still under
+  `hausfold.co/perch`, which otherwise redirects to the docs tree. An unreachable
+  support URL is a routine rejection: `curl -sIL` all three before a submission
+  if the site has moved.
   ⚠️ **Editing a listing field is a manual act.** A commit here changes the copy
-  of record, not the listing — the **Description** included, whose last paragraph
-  names one of these URLs.
+  of record, not the listing. Both halves are still owed a check against App
+  Store Connect: the Support and Marketing fields, which predate the redirect,
+  and the **Description**, whose last paragraph names a URL of its own.
 - **Keywords** (100 chars, comma-separated, no spaces):
   `shelf,airdrop,transfer,mac,send,share,files,drop,handoff,local,offline,nearby`
 
@@ -149,8 +151,10 @@ Item 1's recording is [its own section](#the-screen-recording-apple-asks-for).
 - **Items 1 and 2 are the only two that go stale.** Item 1 promises an attached
   recording (attach it, or cut the word); item 2 names the devices and OS
   versions *you actually ran* — naming a device you never booted is the one way
-  this block can lie. Saying "Simulator" out loud is fine, which is why item 2
-  lists **one** iPad rather than a plausible-looking spread. Paste 3–7 unchanged.
+  this block can lie. Saying "Simulator" out loud is fine, and item 2 lists
+  **one** iPad rather than a plausible-looking spread because one is what was
+  booted (iPad Pro 13-inch (M5), iPadOS 26.5, on 2026-08-16). Paste 3–7
+  unchanged.
 - **The rest is a claim about the code** — the UI strings, the framework list,
   the "no third-party SDK / no backend" claim, the crypto primitives. If you
   change what the app does, this text is part of the change.
@@ -315,7 +319,6 @@ xcodebuild -project Perch.xcodeproj -scheme PerchIOS -configuration Debug \
   -derivedDataPath DerivedData build
 xcrun simctl boot 'iPhone 17 Pro Max'
 xcrun simctl install booted DerivedData/Build/Products/Debug-iphonesimulator/PerchIOS.app
-xcrun simctl io booted screenshot shot.png
 ```
 
 `PERCH_AUTOSEND_TEXT` and `PERCH_PAIR_OFFER` (`PerchIOS/App/MobileAppModel.swift`)
@@ -328,6 +331,7 @@ need the `SIMCTL_CHILD_` prefix:
 SIMCTL_CHILD_PERCH_AUTOSEND_TEXT="Quarterly review notes" \
 SIMCTL_CHILD_PERCH_PAIR_OFFER="Julien's MacBook Pro" \
   xcrun simctl launch booted com.hausfold.perch.ios
+xcrun simctl io booted screenshot shot.png
 ```
 
 ## Privacy label
@@ -373,6 +377,18 @@ Three facts decide how this goes, and none of them is obvious from the UI.
   `perch-ios` is spent forever, which is why this one is `perch-ios-hausfold`.
   The SKU is private to your account and shows nowhere a user can see, so its
   ugliness is free.
+- **A record Apple won't delete is an acceptable resting state.** Removal is
+  refused in Ready for Review, Waiting for Review, In Review, Metadata Rejected
+  and Rejected, and a Rejected version is read-only — its Build section renders
+  with no remove control, so you cannot unstick it by dropping the build.
+  Support (Contact Us → App Store Connect → App Management) is the only path,
+  and naming the record that superseded it reads as tidy-up rather than a
+  decision. Meanwhile a dead record and a dead App ID cost nothing, expire
+  never, and cannot collide with the `com.hausfold.*` family. Teardown order is
+  set by two dependencies: an **App ID** can't be removed while a record points
+  at it, and an **App Group** can't be removed while an App ID enables it — but
+  un-ticking App Groups on a stuck App ID is allowed, which frees the group
+  without waiting. hausfold/ops' `todo/` tracks the one open case.
 
 ⚠️ **Moving the App Group, or either side's Keychain *service* strings, strands
 a real user's shelf.** Renaming the App Group changes `kSecAttrAccessGroup`, so
@@ -389,9 +405,11 @@ migration, or an honest release note saying re-pair.
 
 The order, if you do it: pull any live submission from review first (the version
 page → *Remove from Review*, free and reversible), land the code change — the
-four `PRODUCT_BUNDLE_IDENTIFIER` lines, both `.entitlements` files, and
-`MobileConfig.appGroupID` (the Mac's own id is `com.hausfold.perch`) — register
-the identifiers by hand (Appendix 1–2; automatic signing registers App IDs on
+`PERCH_BUNDLE_ID` override (never `PRODUCT_BUNDLE_IDENTIFIER=`, per AGENTS.md §
+Build, since all twelve lines derive from it), the App Group in all three
+`.entitlements` files, and `MobileConfig.appGroupID`; the Mac's own id is
+`com.hausfold.perch` — register the identifiers by hand (Appendix 1–2;
+automatic signing registers App IDs on
 the first local archive but **will not invent the App Group**), create the
 record, then `gh workflow run testflight.yml` and confirm the build lands under
 it.

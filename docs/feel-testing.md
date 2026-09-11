@@ -27,7 +27,7 @@ live, on a relaunch.
 
 Every `xcodebuild` registers the app it built with LaunchServices and nothing
 ever unregisters it, so a development Mac accumulates dozens of `Perch.app`
-records across lanes, bench and scratchpads — 40 records on this one, 6 of them
+records across lanes, bench and scratchpads — one count here found 40, 6 of them
 live bundles declaring the `addToShelf` Service, under two bundle ids. Duplicate
 Service rows and a Quick Action whose provider is some lane's build cache are
 both artifacts of that, and both have been misread as perch bugs. `pluginkit
@@ -101,7 +101,9 @@ two would mean two doors really render.
 reconsiders the deleted Finder extension. The evidence that closed it was
 gathered on a Mac carrying 40 registered copies, so it cannot tell "the appex is
 the dead row" from "the second row was another lane's build" — both predict what
-was seen. The extension is gone on a **product call** (it bought only
+was seen. The resolved duplicate above does not settle it retroactively either:
+that one was a `.dev` bundle, found on a Mac where the appex was already gone.
+The extension is gone on a **product call** (it bought only
 not-waking-an-app that owns the notch, and the classic Service demonstrably
 works), not on a discriminating measurement. If the question is reopened, the
 `pbs` dump is the instrument, not the nuke: it discriminates by identity instead
