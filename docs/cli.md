@@ -8,8 +8,8 @@ and `ai/SKILL.md` is the same surface for an agent with no checkout.
 `perch add` is the same road a drag takes: the same admission handshake (so
 nothing is copied that no shelf is there to adopt), the same staging pipeline,
 the same "never touch the original" guarantee. `list` and `rm` are that
-transaction with its middle removed. `doctor` and `skill` never touch the shelf
-at all.
+transaction with its middle removed. `skill` never opens the mailbox at all, and
+`doctor` opens it only to knock.
 
 ## Usage
 
@@ -27,7 +27,7 @@ perch skill install [--json] [--client <name>] [--dir <path>]
   --quiet, -q       don't print a line per item (add, rm)
   -                 read newline-separated operands from stdin (add, rm)
   --                treat every remaining argument as an operand
-  --client <name>   write into one client's skills dir (skill install)
+  --client <name>   claude|codex|opencode|pi (skill install)
   --dir <path>      write into this directory instead (skill install)
 
 perch --version     print the installed release
@@ -73,6 +73,7 @@ One object per verb:
 | `add` | `{"added":[…],"refused":[…],"failed":[…]}`, each entry `{name, path}` (`reason` on the last two) |
 | `list` | `{"items":[…]}` |
 | `rm` | `{"removed":[…],"missing":["<id>"]}` |
+| `skill` | `{name, body}` |
 
 An item is `{id, name, kind, contentType, bytes, addedAt, pinned}` — every key
 always present, `contentType` and `bytes` null when Perch doesn't know them,
