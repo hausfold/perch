@@ -37,7 +37,7 @@ final class WireLoopbackTests: XCTestCase {
         let server = WireServer(delegate: delegate)
         try server.start(identity: identity)
         defer { server.stop() }
-        let port = try XCTUnwrap(waitForPort(server))
+        let endpoint = try await loopbackEndpoint(for: server)
 
         // --- Pair ---
         let offer = PairingOffer(
@@ -46,7 +46,6 @@ final class WireLoopbackTests: XCTestCase {
             secret: WireCrypto.randomSecret()
         )
         delegate.setPairingSecret(offer.secret)
-        let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: port)!)
         let deviceID = UUID()
         let mac = try await WirePairingClient.pair(
             offer: offer,
@@ -109,8 +108,7 @@ final class WireLoopbackTests: XCTestCase {
         let server = WireServer(delegate: delegate)
         try server.start(identity: identity)
         defer { server.stop() }
-        let port = try XCTUnwrap(waitForPort(server))
-        let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: port)!)
+        let endpoint = try await loopbackEndpoint(for: server)
 
         let offer = PairingOffer(
             macID: identity.id,
@@ -183,8 +181,7 @@ final class WireLoopbackTests: XCTestCase {
         let server = WireServer(delegate: delegate)
         try server.start(identity: identity)
         defer { server.stop() }
-        let port = try XCTUnwrap(waitForPort(server))
-        let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: port)!)
+        let endpoint = try await loopbackEndpoint(for: server)
 
         let offer = PairingOffer(
             macID: identity.id,
@@ -230,8 +227,7 @@ final class WireLoopbackTests: XCTestCase {
         let server = WireServer(delegate: delegate)
         try server.start(identity: identity)
         defer { server.stop() }
-        let port = try XCTUnwrap(waitForPort(server))
-        let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: port)!)
+        let endpoint = try await loopbackEndpoint(for: server)
 
         let url = spoolDirectory.appending(path: "nope.txt")
         try Data("refused".utf8).write(to: url)
@@ -356,7 +352,7 @@ final class WireLoopbackTests: XCTestCase {
         case .served:
             XCTFail("A file that grew underfoot was never served whole")
         case nil:
-            XCTFail("The Mac must report a fetch the phone abandoned")
+            XCTFail("The Mac never reported the abandoned fetch in \(Self.stallBudget)")
         }
     }
 
@@ -442,8 +438,7 @@ final class WireLoopbackTests: XCTestCase {
         )
         let server = WireServer(delegate: delegate)
         try server.start(identity: identity)
-        let port = try XCTUnwrap(waitForPort(server))
-        let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: NWEndpoint.Port(rawValue: port)!)
+        let endpoint = try await loopbackEndpoint(for: server)
         let offer = PairingOffer(
             macID: identity.id,
             macName: identity.name,
@@ -468,12 +463,22 @@ final class WireLoopbackTests: XCTestCase {
         )
     }
 
+    /// How long the two polling waits in this class give up after.
+    ///
+    /// Both are failure-path budgets — a healthy run leaves either after a
+    /// poll or two, measured in milliseconds — so the only job of the number
+    /// is to outlast the worst stall a loaded CI worker can impose. Five
+    /// seconds was not enough: `testAFileThatGrewMidFetch…` gave up at exactly
+    /// 5.0s on hausfold/perch#137, a docs-only diff that cannot have caused
+    /// it, and passed on a plain re-run. Nothing passing pays for this.
+    private static let stallBudget: Duration = .seconds(30)
+
     /// A fetch outcome the Mac reports from its own task. When the phone stops
     /// reading part-way it has no idea when that lands, so poll for it.
     private func waitForOutcome(
         _ delegate: LoopbackDelegate,
         itemID: UUID,
-        timeout: Duration = .seconds(5)
+        timeout: Duration = stallBudget
     ) async -> LoopbackDelegate.ServeOutcome? {
         let deadline = ContinuousClock.now + timeout
         while ContinuousClock.now < deadline {
@@ -492,14 +497,38 @@ final class WireLoopbackTests: XCTestCase {
         return try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
     }
 
-    private func waitForPort(_ server: WireServer, attempts: Int = 50) -> UInt16? {
-        for _ in 0..<attempts {
-            if let port = server.port, port != 0 {
-                return port
+    /// Where to dial the server once Network.framework has bound it a port.
+    ///
+    /// Polls with `Task.sleep`, not `usleep`: every caller is an async test,
+    /// and blocking that thread also stalls the session tasks the port is
+    /// being waited on for.
+    private func loopbackEndpoint(
+        for server: WireServer,
+        timeout: Duration = stallBudget
+    ) async throws -> NWEndpoint {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            if let raw = server.port, raw != 0, let port = NWEndpoint.Port(rawValue: raw) {
+                return .hostPort(host: .ipv4(.loopback), port: port)
             }
-            usleep(100_000)
+            try? await Task.sleep(for: .milliseconds(10))
         }
-        return nil
+        throw LoopbackWait.listenerNeverBoundAPort(timeout)
+    }
+
+    /// Named so a red CI run says which wait ran out. Both budgets are the
+    /// same number and xcodebuild prints only a duration, so `failed (5.562
+    /// seconds)` on its own does not say whether the listener or the Mac's
+    /// outcome was the thing that never came.
+    private enum LoopbackWait: Error, CustomStringConvertible {
+        case listenerNeverBoundAPort(Duration)
+
+        var description: String {
+            switch self {
+            case let .listenerNeverBoundAPort(timeout):
+                "The loopback listener never bound a port in \(timeout)."
+            }
+        }
     }
 
     private func outgoingItem(for url: URL, kind: String) throws -> OutgoingItem {
