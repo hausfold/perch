@@ -99,9 +99,16 @@ a companion, not a standalone.
   matches those two paths exactly, above a ⚠️ never to widen them to `/perch/*`,
   which would swallow the one URL App Store Connect requires.
   ⚠️ **Editing a listing field is a manual act.** A commit here changes the copy
-  of record, not the listing. Both halves are still owed a check against App
-  Store Connect: the Support and Marketing fields, which predate the redirect,
-  and the **Description**, whose last paragraph names a URL of its own.
+  of record, not the listing — and the two drift on *facts*, not just URLs, so
+  the pre-submission check is a full diff of the live Description against this
+  file, not a glance at the URL inside it. Three things a paraphrase loses,
+  each load-bearing: that pairing needs someone to **approve it on the Mac**
+  (`Perch/Mobile/MobilePairingWindow.swift` — no Mac window, no pairing), and
+  dropping it leaves a reviewer scanning a QR and concluding the app is broken;
+  that delivery also works **peer-to-peer with no network** (`includePeerToPeer`
+  across `PerchWire/Wire/`), which the review notes claim and the listing should
+  not undersell; and the closing line, where "the companion" reads as this
+  listing rather than the Mac app — the rule below.
 - **Keywords** (100 chars, comma-separated, no spaces):
   `shelf,airdrop,transfer,mac,send,share,files,drop,handoff,local,offline,nearby`
 
