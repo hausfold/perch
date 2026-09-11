@@ -61,9 +61,9 @@ What bites:
   this Mac is a bad instrument for Finder-menu questions — duplicate Service
   rows have been misread as perch bugs. `pbs -dump_pboard` names the bundle
   behind each row; `pluginkit -r` clears nothing; the `lsregister -kill` recipe
-  is in [`docs/feel-testing.md`](./docs/feel-testing.md), the hands-on runbook
-  (`docs/demo-video.md` inherits it). A hand-built bundle may need `xattr -dr
-  com.apple.quarantine /Applications/Perch.app`.
+  is in [`docs/feel-testing.md`](./docs/feel-testing.md), the hands-on runbook.
+  A hand-built bundle may need `xattr -dr com.apple.quarantine
+  /Applications/Perch.app`.
 - Never pass `CODE_SIGNING_ALLOWED=NO` to an **iOS** build you intend to run —
   it strips the App Group entitlement and the app aborts at launch.
 - **`arch=arm64` on the destination is load-bearing**, and every invocation in
@@ -145,7 +145,10 @@ notarized release ZIP.
 The iOS half ships through the App Store, free, on the same `v*` tag:
 `.github/workflows/testflight.yml` archives `PerchIOS` and uploads the `.ipa` to
 TestFlight. Submitting for review is a human act — runbook:
-[`docs/app-store.md`](./docs/app-store.md).
+[`docs/app-store.md`](./docs/app-store.md). It **stays here, not in
+hausfold/ops**: the shipping loop reruns on every `bench release perch` carrying
+a phone change, so it is a live reference rather than a record, and `ops/log/`
+takes only the latter.
 
 - `PerchIOS/` and `PerchShare/` each carry a `PrivacyInfo.xcprivacy` over the
   same shared sources — a new required-reason API is a two-file change.

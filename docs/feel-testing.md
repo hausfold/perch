@@ -1,22 +1,13 @@
 # Feel-testing perch by hand
 
-A hands-on pass over the shelf is worth more than any test suite for the
-things a suite cannot see — but on this kind of app several of the obvious
-recipes **produce a confident wrong answer on the first run**. Each section
-below is one of those, written down because it already cost somebody a wrong
-turn during the 2026-08-22 field test.
+A hands-on pass over the shelf is worth more than any test suite for the things
+a suite cannot see — but on this kind of app several of the obvious recipes
+**produce a confident wrong answer on the first run**. Each section below is one
+of those, and each has already cost somebody a wrong turn.
 
 Everything here is about *measuring*. What perch does lives in the manual on
 [hausfold.co](https://hausfold.co/docs/perch); why it does it lives in `PRD.md`
-and `ARCHITECTURE.md`. The punch list
-itself is gone — it was empty — but the record of what each finding ruled out is
-retrievable: `git show v2026.08.24:docs/field-test-2026-08-22.md`.
-
-One of its findings outlived it, and the watched-folder section below is how to
-test it honestly: **"quit → drop into `~/Downloads` → relaunch → no catch-up"
-was never reproduced.** The stream now resumes from a persisted position, and
-the launch rescan would find a missed arrival on its own; nothing is owed unless
-it recurs.
+and `ARCHITECTURE.md`.
 
 ## Reading perch's own log
 
@@ -35,13 +26,12 @@ live, on a relaunch.
 ## Before measuring any Finder door
 
 Every `xcodebuild` registers the app it built with LaunchServices and nothing
-ever unregisters it, so this Mac accumulates dozens of `Perch.app` records
-across lanes, bench and scratchpads (measured 2026-08-23: 40 records, 6 of them
-live bundles declaring the `addToShelf` Service, under two bundle ids).
-Duplicate Service rows and a Quick Action whose provider is some lane's build
-cache are both artifacts of that, and both were misread as perch bugs twice
-(2026-08-23 and 2026-08-25). `pluginkit -r` is **not** a substitute — it only
-knows appex providers.
+ever unregisters it, so a development Mac accumulates dozens of `Perch.app`
+records across lanes, bench and scratchpads — 40 records on this one, 6 of them
+live bundles declaring the `addToShelf` Service, under two bundle ids. Duplicate
+Service rows and a Quick Action whose provider is some lane's build cache are
+both artifacts of that, and both have been misread as perch bugs. `pluginkit
+-r` is **not** a substitute — it only knows appex providers.
 
 ### Ask who the providers are before you count rows
 
@@ -66,29 +56,29 @@ entry per row you will see in the menu, each naming the bundle behind it. Two
 entries under two different ids is lane pollution — that is what every
 duplicate measured here has been.
 
-Measured 2026-08-25, on a "the duplicate is back" report: two providers —
-`com.hausfold.perch` at `/Applications/Perch.app`, and `com.hausfold.perch.dev`
+A "the duplicate is back" report resolved this way: two providers,
+`com.hausfold.perch` at `/Applications/Perch.app` and `com.hausfold.perch.dev`
 at `~/.cache/bench/perch-dd/…/Debug/Perch.app`, a `bench try` dev app still
-registered from an August feel-test. Both bundles are named `Perch.app`, which
-is why macOS disambiguated both rows as "Add to Perch Shelf (Perch.app)" and
-the second read as the deleted extension returning. `lsregister -u <path>` on
-the stale bundle drops one row without touching the rest of the database; the
-menu then falls through to the *next* registered copy of that id, so re-run the
-dump rather than assuming one unregister was enough.
+registered from an old feel-test. Both bundles are named `Perch.app`, which is
+why macOS disambiguated both rows as "Add to Perch Shelf (Perch.app)" and the
+second read as a deleted extension returning. `lsregister -u <path>` on the
+stale bundle drops one row without touching the rest of the database; the menu
+then falls through to the *next* registered copy of that id, so re-run the dump
+rather than assuming one unregister was enough.
 
-Since 2026-08-25 the two configurations title the row differently — Release
-"Add to Perch Shelf", Debug "Add to Perch Shelf (Debug)" (`PERCH_SERVICE_TITLE`
-in the project, expanded into `Perch/Config/Info.plist`). `bench try` builds
-Debug, so a dev app's row now says so on its face and this reading is only
-needed when the rows are genuinely ambiguous.
+The two configurations title the row differently — Release "Add to Perch Shelf",
+Debug "Add to Perch Shelf (Debug)" (`PERCH_SERVICE_TITLE` in the project,
+expanded into `Perch/Config/Info.plist`). `bench try` builds Debug, so a dev
+app's row says so on its face and this reading is only needed when the rows are
+genuinely ambiguous.
 
 The suffix follows the *configuration*, not the bundle id, so it is not only
 the `…dev` app that wears it: a plain `xcodebuild … -configuration Debug` here
 builds under `com.hausfold.perch`, the release id. If that lane build outranks
 `/Applications/Perch.app` for the id, there is one row and it says "(Debug)" —
-correct, and still a surprise if you were not expecting the menu to change
-after a build. `lsregister -u` on that build drops it and the row falls through
-to the next registered copy of the id (measured 2026-08-25, twice).
+correct, and still a surprise if you were not expecting the menu to change after
+a build. `lsregister -u` on that build drops it and the row falls through to the
+next registered copy of the id.
 
 ### Or clean the instrument
 
@@ -104,33 +94,29 @@ killall Finder
 ```
 
 (`lsregister` is not on `PATH`; the full path above is the whole reason this
-block exists.) One Services row after that means a duplicate was lane
-pollution; two would mean two doors really render.
+block exists.) One Services row after that means a duplicate was lane pollution;
+two would mean two doors really render.
 
-**That clean reading has never actually been taken**, which matters only if
-anyone reconsiders the Finder extension deleted 2026-08-23. The evidence that
-closed it was gathered on a Mac carrying 40 registered copies, so it cannot
-distinguish "the appex is the dead row" from "the second row was another lane's
-build" — both hypotheses predict what was seen. (The 2026-08-25 reading above
-does not settle it retroactively either: it shows *that* day's duplicate was a
-`.dev` bundle, on a Mac where the appex was already deleted. It does mean the
-`pbs` dump, not the nuke, is the instrument to reach for if the question is
-reopened — it discriminates by identity instead of by count.) The extension is gone on a
-**product call** (it bought only not-waking-an-app that owns the notch, and the
-classic Service demonstrably works), not on a discriminating measurement. Run
-the block above before treating the question as settled either way.
+**That clean reading has never been taken**, which matters only if anyone
+reconsiders the deleted Finder extension. The evidence that closed it was
+gathered on a Mac carrying 40 registered copies, so it cannot tell "the appex is
+the dead row" from "the second row was another lane's build" — both predict what
+was seen. The extension is gone on a **product call** (it bought only
+not-waking-an-app that owns the notch, and the classic Service demonstrably
+works), not on a discriminating measurement. If the question is reopened, the
+`pbs` dump is the instrument, not the nuke: it discriminates by identity instead
+of by count.
 
 ## Watched folders: prime the folder, or the first run lies
 
 Testing *quit → drop a file in → relaunch → does it catch up* against a folder
 that has never fired an event reproduces "no catch-up" **for a reason that is
-not a bug**. A folder's FSEvents position (`WatchedFolder.lastEventID`) is only
-written once the stream actually delivers something; absent, the next launch
-falls back to `kFSEventStreamEventIdSinceNow`
-(`Perch/Importing/FolderWatcher.swift`), which is no replay at all. Measured
-2026-08-24 on this Mac: `~/Desktop` had a position (it takes every screenshot)
-and `~/Downloads` — the folder that recipe always names — had **none**. A first
-pass fails, a second passes, and the run reads as flaky.
+not a bug**. A folder's FSEvents position (`WatchedFolder.lastEventID`) is only written once
+the stream actually delivers something; absent, the next launch falls back to
+`kFSEventStreamEventIdSinceNow` (`Perch/Importing/FolderWatcher.swift`), which
+is no replay at all. Measured here: `~/Desktop` had a position (it takes every
+screenshot) and `~/Downloads` — the folder that recipe always names — had
+**none**. A first pass fails, a second passes, and the run reads as flaky.
 
 1. Read the positions first, so there is a before to compare against (the ids
    are UUID prefixes, not folder names):
