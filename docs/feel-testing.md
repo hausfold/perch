@@ -258,7 +258,8 @@ the one part of this flow you cannot fake with a scratch build.
 ```sh
 # On this Mac: a signed, older-looking Release build.
 xcodebuild -project Perch.xcodeproj -scheme Perch -configuration Release \
-  -destination 'platform=macOS' -derivedDataPath dd \
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath dd \
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
   MARKETING_VERSION=2026.08.01 \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Developer ID Application" \
   DEVELOPMENT_TEAM=88M28542LQ ENABLE_HARDENED_RUNTIME=YES build
