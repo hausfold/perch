@@ -1,48 +1,15 @@
 # `perch` — the command line
 
-`perch add` puts files on the shelf from a script, a Makefile, a shell pipe, or
-an agent. It is the same road a drag takes: the same admission handshake (so
+What a contributor needs: the wire protocol behind the verbs, the exit codes, and
+the JSON shapes. What the verbs *do* is the manual's, at
+[hausfold.co/docs/perch/install](https://hausfold.co/docs/perch/install#the-perch-command),
+and `ai/SKILL.md` is the same surface for an agent with no checkout.
+
+`perch add` is the same road a drag takes: the same admission handshake (so
 nothing is copied that no shelf is there to adopt), the same staging pipeline,
-the same "never touch the original" guarantee. `perch list` and `perch rm` are
-the other direction: what is on the shelf, and taking something off it. Two more
-verbs never touch the shelf at all — `perch doctor` reports on this Mac, and
-`perch skill` hands a coding agent the routing document for all of it.
-
-```sh
-perch add report.pdf shot.png
-find . -name '*.png' -newermt '1 hour ago' | perch add -
-perch add --json build/app.zip
-
-perch list
-perch rm 6B0F2C7E-4C1D-4D8E-9E39-6E9F6F7B4A21
-perch list --json | jq -r '.items[] | select(.pinned | not) | .id' | perch rm -
-
-perch doctor
-perch skill install
-```
-
-## Where the binary is
-
-The tool ships **inside** `Perch.app`, at
-`Perch.app/Contents/MacOS/perch-cli`, so it is signed and notarized with the
-app and can never drift from the shelf it talks to.
-
-| Install | What puts it on your PATH |
-|---|---|
-| haus | the Shelf room links it out of the copy it placed in `/Applications` (`haus.shelf.enable = true`) |
-| Nix, on its own | `pkgs.perch` exposes `bin/perch` |
-| Homebrew cask | `Casks/perch.rb`'s `binary … target: "perch"` (hausfold/homebrew-tap) |
-| Neither | nothing does — `ln -s /Applications/Perch.app/Contents/MacOS/perch-cli /usr/local/bin/perch`, once |
-
-Every one of those is a **symlink** into the bundle, never a copy: the tool is
-notarized as part of the app, so a copy outside it is nested code torn out of
-that seal. `perch` resolves the link to find the `.app` it belongs to, which is
-how `--version` knows what it is and how a dev build finds itself.
-
-It is `perch-cli` inside the bundle and `perch` on your PATH for one blunt
-reason: macOS filesystems are case-insensitive by default, so a second
-executable named `perch` in `Contents/MacOS` *is* `Perch` — it overwrites the
-app's own binary, and the "app" you launch is then the CLI printing its usage.
+the same "never touch the original" guarantee. `list` and `rm` are that
+transaction with its middle removed. `doctor` and `skill` never touch the shelf
+at all.
 
 ## Usage
 
@@ -67,19 +34,14 @@ perch --version     print the installed release
 perch help          usage
 ```
 
-Every *shelf* verb — `add`, `list`, `rm` — reaches the running app, and each of
-them will launch it and wait if it isn't running; `--no-launch` is how a script
-says it would rather fail. `doctor` and `skill` are the two that don't, and
-`doctor` will not launch anything even when asked.
+The three shelf verbs launch the app and wait if it isn't running; `doctor` and
+`skill` don't, and `doctor` will not launch anything even when asked. `list`
+prints one line per tile, id first, because the id is what `rm` takes; an empty
+shelf prints nothing on stdout and says so on stderr, so a pipe reads as empty
+and a person still gets an answer. `rm` takes ids and never names, because two
+tiles can share a display name and no removal should have to guess.
 
-`list` prints one line per tile, id first, because the id is what `rm` takes; an
-empty shelf prints nothing on stdout and says so on stderr, so a pipe reads as
-empty and a person still gets an answer.
-
-`rm` takes ids, never names: two tiles can share a display name, and no removal
-should have to guess which one was meant. It removes pinned items too — naming
-an id is as deliberate as picking the tile — and, like everything else here, it
-only ever deletes the copy Perch staged. The original was never Perch's.
+## Exit codes
 
 | Exit | Meaning |
 |---|---|
@@ -102,7 +64,9 @@ not spend shelf slots, or removals, deciding that. An id that is well-formed but
 didn't come off the shelf is different: `rm` removes the rest, names that one on
 stderr — or in `--json`'s `missing` — and exits 1, the way `rm(1)` does.
 
-`--json` answers with the whole result, one object:
+## `--json`
+
+One object per verb:
 
 | Verb | Shape |
 |---|---|
@@ -116,24 +80,14 @@ always present, `contentType` and `bytes` null when Perch doesn't know them,
 the bytes live is the app's business, and `add`'s `path` is only your own
 argument echoed back on your own stdout.
 
+`doctor --json` answers with every key always present:
+`{version, bundleID, app, launchServicesApp, tool, install, installName,
+updateCommand, os, model, container, containerPresent, running, shelfItems, ok,
+checks}`, where `checks` is `[{name, status, detail}]` and `status` is
+`ok`/`note`/`bad`. `install` is the machine token (`homebrew`, `direct`, `haus`,
+`nix`, `unknown`); `installName` is the same thing written for a person.
+
 ## `perch doctor`
-
-The one verb that answers with no Perch running — and it never starts one, on
-purpose: a doctor that starts the patient cannot report on the patient.
-
-```
-$ perch doctor
-perch 2026.08.31 (Homebrew cask)
-macOS 26.0.1 (25A354) on Mac16,10
-
-✓ app        /Applications/Perch.app
-✓ launches   /Applications/Perch.app
-✓ install    Installed with Homebrew — updates come from brew upgrade --cask perch.
-✓ container  /Users/you/Library/Group Containers/88M28542LQ.com.hausfold.perch
-✓ shelf      answering — 3 items on it
-
-doctor: ready
-```
 
 `✓` fine, `!` worth knowing, `✗` blocking; exit 3 if anything is `✗`. The first
 two lines are what the bug form's `perch doctor` field asks for — version,
@@ -142,29 +96,20 @@ quotes into that form, so a pasted `doctor` and a filed issue can't disagree
 about which Mac this is. Not the same bytes: `BugReport` lays those four facts
 out over three lines for the form, this lays them over two for a terminal.
 
-Three of the rows earn their place by naming a trap rather than a state. **`app`
-vs `launches`** are the bundle this tool ships inside and the copy Launch
-Services would open; on a Mac that has ever built perch they routinely differ,
-because every `xcodebuild` registers the app it built and nothing unregisters it
+Three rows earn their place by naming a trap rather than a state. **`app` vs
+`launches`** are the bundle this tool ships inside and the copy Launch Services
+would open; on a Mac that has ever built perch they routinely differ, because
+every `xcodebuild` registers the app it built and nothing unregisters it
 (AGENTS.md). **`install`** is the update cohort, and it is the answer to "how do
-I update this" — `brew upgrade --cask perch`, `haus update`, a flake bump, or
-one click in the app, and only the cohort knows which. And **`shelf` tells three
+I update this" — only the cohort knows which command. And **`shelf` tells three
 answers apart** that all look like silence: nothing running, a mailbox that could
 not be written, and a Perch that is running but predates the verb doctor knocks
 with — that last one answers with no entries, and calling it "not running" would
 send someone hunting for a process that is right there.
 
-The check rows name **local paths** — which bundle, which container. That is the
-point of those rows, and it is also why the *whole* output is not the thing to
-paste into a public issue: the header pair is (it carries no path), the check
-rows are yours.
-
-`--json` answers with every key always present:
-`{version, bundleID, app, launchServicesApp, tool, install, installName,
-updateCommand, os, model, container, containerPresent, running, shelfItems, ok,
-checks}`, where `checks` is `[{name, status, detail}]` and `status` is
-`ok`/`note`/`bad`. `install` is the machine token (`homebrew`, `direct`, `haus`,
-`nix`, `unknown`); `installName` is the same thing written for a person.
+The check rows name **local paths**, which is the point of them and also why the
+*whole* output is not the thing to paste into a public issue: the header pair is
+(it carries no path), the check rows are yours.
 
 The knock is one `list` through the mailbox with a 2-second deadline and no
 launch — the tool's own documented liveness test, since only a running app can
@@ -174,24 +119,13 @@ closed either way; a doctor never leaves a request behind.
 ## `perch skill`
 
 A3 of the family agent surface (the workshop's `docs/agent-surface.md`): the
-tool teaches an agent about itself, from a machine with no checkout.
-
-```
-perch skill                 print ai/SKILL.md, byte for byte
-perch skill <name>          print one of perch's other skills (there is one today)
-perch skill --json          the same, as {name, body}
-perch skill install         write every skill into every agent client found here
-perch skill install --client claude|codex|opencode|pi
-perch skill install --dir PATH
-```
-
-**The skill is baked into the binary**, not read from beside it — perch ships as
-a cask's `.app`, a read-only Nix store path and a ZIP somebody drags, and the
-tool on `PATH` is only ever a symlink into the bundle, so every "read the file
-next to me" scheme is right for exactly one of those doors. Embedded, the
-version that answers `--version` is the version that answers `skill`.
-`scripts/embed-skills.sh` does the baking into the committed
-`PerchCLI/GeneratedSkills.swift`, and CI fails on a stale one.
+tool teaches an agent about itself from a machine with no checkout. The skill is
+baked into the binary, not read from beside it, because perch ships as a cask's
+`.app`, a read-only Nix store path and a ZIP somebody drags, and the tool on
+`PATH` is only ever a symlink into the bundle — every "read the file next to me"
+scheme is right for exactly one of those doors. Embedded, the version that
+answers `--version` answers `skill`. AGENTS.md § *The agent surface* has the
+scripts that keep the three copies byte-identical.
 
 `install` writes `<skills dir>/<skill name>/SKILL.md` — named for the skill, not
 for the tool — into every client whose own config directory exists
@@ -210,15 +144,15 @@ than clobbers**, and says which kind of refusal it is:
 The haus case is the happy path, not a failure: the skill is already installed
 and current, from the same source. Saying so beats an `EPERM`.
 
-## How it works, and why it isn't a URL scheme
+## The protocol, and why it isn't a URL scheme
 
 Perch is sandboxed. It holds `files.user-selected.read-write` and nothing more,
 so it cannot read a path you merely *name* — `perch://add?path=…` would hand it
 a path it isn't allowed to open. The tool is unsandboxed and runs as you, so it
 does the reading, and the two halves meet in the App Group container the Finder
-Action already uses — admission is granted before anything reads source bytes,
+Action already uses: admission is granted before anything reads source bytes,
 and the command line is a second client of that same mailbox rather than a new
-door:
+door.
 
 1. `perch add` writes a request — **display names only**, no paths — into a
    fresh transaction directory in
@@ -231,12 +165,11 @@ door:
 4. It publishes the relative staged paths; the app validates them, adopts the
    bytes into its own staging root, and the tiles appear.
 
-`list` and `rm` are that transaction with its middle removed. The request names
-a verb and, for `rm`, the ids to take off; the app answers in one turn with the
-entries — the whole shelf, or exactly what it removed — and the tool
-acknowledges, which is what lets the app drop the directory. Nothing is copied,
-so nothing is reserved, and the answer carries names and ids and no path of any
-kind.
+For `list` and `rm` the request names a verb and, for `rm`, the ids to take off;
+the app answers in one turn with the entries — the whole shelf, or exactly what
+it removed — and the tool acknowledges, which is what lets the app drop the
+directory. Nothing is copied, so nothing is reserved, and the answer carries
+names and ids and no path of any kind.
 
 A request that names no verb at all is an `add`: the mailbox had only that one
 until the read verbs, and an installed `perch` writes here whether or not it is
@@ -262,7 +195,7 @@ copy if Launch Services knows one, otherwise the bundle it is sitting in) and
 keeps waiting until `--wait` runs out. It never gives up without writing an
 empty completion, which is what releases the slots the app reserved.
 
-## Speaking the protocol yourself
+## Speaking it yourself
 
 The mailbox is plain JSON in a documented directory, so anything unsandboxed and
 running as you can be a second `perch add` — that is the whole SDK.
@@ -272,18 +205,3 @@ are not negotiable if you write your own: **wait for the response before you
 copy anything**, **never put a source path in the JSON**, and **close every
 transaction you open** — the empty completion is what releases a reservation
 after an `add` and what lets the app drop a read verb's directory.
-
-## Teaching an agent to use it
-
-[`ai/SKILL.md`](../ai/SKILL.md) is this page's counterpart for a coding agent on
-a machine with no checkout — the routing document that makes *"put this in my
-shelf"* work first try. It quotes the verbs, flags and exit codes above, so
-**change it in the same PR that changes any of them**, and re-run
-`scripts/embed-skills.sh` so `perch skill` prints what you wrote. It is bound by
-the family standard, the workshop's `docs/agent-surface.md`.
-
-Three copies of that file ship, and they are byte-identical by construction: the
-committed source, `pkgs.perch-skill` (`nix/skill.nix`, which haus installs), and
-the string literal inside the binary. `scripts/check-skills.sh` guards the
-frontmatter and the shape; `scripts/embed-skills.sh --check` guards the literal.
-Both run in CI, and the Nix build runs the first.
