@@ -2,8 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Merged with the generated Info.plist; only keys the
-	     INFOPLIST_KEY_ build settings can't express live here. -->
+	<!-- Merged with the generated Info.plist. What lives here rather than in a
+	     build setting: arrays, which have no INFOPLIST_KEY_ spelling, and the
+	     usage strings that have to agree with them. `INFOPLIST_KEY_` is a
+	     generic prefix and would take both usage strings below — see the Mac
+	     partial's header for the measurement and the reasoning. -->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Perch finds your paired Mac on your network to hand it what you put on the shelf. Nothing leaves your network.</string>
 	<key>NSBonjourServices</key>
