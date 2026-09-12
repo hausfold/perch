@@ -41,6 +41,13 @@ upload is retryable with the Re-run button, no new tag. A same-day re-cut
 (`2026.08.06-2`) uploads as the *same* marketing version with a higher build:
 fine for TestFlight, but a store release of it needs a new VERSION day.
 
+**The version record's number must equal the build's marketing version.** App
+Store Connect's Build picker only lists builds whose `CFBundleShortVersionString`
+matches what you typed, so the number comes from `VERSION` and never from what
+looks like a sensible next one — a hand-typed `1.1` is a dead end with nothing
+to select. A record still in Prepare for Submission can be renamed in place:
+App Store tab → **General App Information** → Version.
+
 Phone-only builds need no tag: `gh workflow run testflight.yml` (`--ref
 <branch>` to run it off a branch). Every run's summary prints the version, the
 build number, and the two clicks still owed.
@@ -81,16 +88,35 @@ a companion, not a standalone.
   back anyway, that keyword is the next to strip.
 - **Category**: Productivity (secondary: Utilities)
 - **Age rating**: 4+ — no user content shown to other users, no web view, no ads
-- **Support URL** and **Marketing URL**: `https://hausfold.co/docs/perch`
-- **Privacy policy URL**: `https://hausfold.co/perch/privacy` — the one URL App
+- **Support URL** and **Marketing URL**: `https://hausfold.co/docs/perch/`
+- **Privacy policy URL**: `https://hausfold.co/perch/privacy/` — the one URL App
   Store Connect *requires*, and the only one of the three still under
-  `hausfold.co/perch`, which otherwise redirects to the docs tree. An unreachable
+  `hausfold.co/perch`, which itself redirects to the docs tree. An unreachable
   support URL is a routine rejection: `curl -sIL` all three before a submission
   if the site has moved.
+  **Paste the trailing slash** — into the two URL *fields*. The Description and
+  the review notes name the URL in running prose, where bare reads better and
+  the field is plain text anyway — the bare form there is deliberate.
+  **Read the status code, not the hop count.** Slashless, each of the three
+  answers exactly one hop, so the count separates nothing. A **307** is
+  Cloudflare's `auto-trailing-slash` normalising a path — what `/docs/perch` and
+  `/perch/privacy` answer, harmless, and what the slashed form skips. A **301**
+  is a page that moved, and `/perch` and `/perch/` → `/docs/perch/` are the only
+  two here. Privacy sits outside them on purpose: hausfold.co's `_redirects`
+  matches those two paths exactly, above a ⚠️ never to widen them to `/perch/*`,
+  which would swallow the one URL App Store Connect requires.
   ⚠️ **Editing a listing field is a manual act.** A commit here changes the copy
-  of record, not the listing. Both halves are still owed a check against App
-  Store Connect: the Support and Marketing fields, which predate the redirect,
-  and the **Description**, whose last paragraph names a URL of its own.
+  of record, not the listing — and the two drift on *facts*, not just URLs, so
+  the pre-submission check is a full diff of the live Description against this
+  file, not a glance at the URL inside it. Three things a paraphrase loses,
+  each load-bearing: that pairing needs someone to **approve it on the Mac**
+  (`MobileReceiver.swift`'s `guard pairingWindow != nil` refuses without one;
+  `MobilePairingWindow.swift` draws the sheet), and
+  dropping it leaves a reviewer scanning a QR and concluding the app is broken;
+  that delivery also works **peer-to-peer with no network** (`includePeerToPeer`
+  across `PerchWire/Wire/`), which the review notes claim and the listing should
+  not undersell; and the closing line, where "the companion" reads as this
+  listing rather than the Mac app — the rule below.
 - **Keywords** (100 chars, comma-separated, no spaces):
   `shelf,airdrop,transfer,mac,send,share,files,drop,handoff,local,offline,nearby`
 
@@ -141,10 +167,13 @@ submission — so the block below *is* those seven answers. Paste it whole;
 shortening it to a summary is what earns a 2.1 Information Needed, and has.
 Item 1's recording is [its own section](#the-screen-recording-apple-asks-for).
 
-- **The Notes field caps at 4,000 characters** and the block below is 3,909, so
+- **The Notes field caps at 4,000 characters** and the block below is 3,927, so
   anything you add has to buy its space from something else. Measure, don't
   assume — it has been over:
   `awk '/^## Review notes/{f=1} f&&/^>/{sub(/^> ?/,"");print} f&&/^Also fill in:/{exit}' docs/app-store.md | wc -m`.
+- **The attachment does not carry over.** App Store Connect pre-fills the Notes
+  text from the previous version and leaves the file behind, so item 1's
+  "Attached" is a promise you re-keep on every submission.
 - **It is a plain-text field**, which is why the block carries no Markdown
   emphasis and uses ALL-CAPS headings. `**bold**` pastes as literal asterisks in
   front of a reviewer.
@@ -166,10 +195,11 @@ Item 1's recording is [its own section](#the-screen-recording-apple-asks-for).
 >
 > 1. SCREEN RECORDING. Attached. Captured from a physical iPhone 15 Pro running
 > iOS 27.0 mirrored to a Mac so both halves of the product are visible in one
-> file. It begins at the Home Screen, launches the app, and shows the whole
-> flow: the local-network and camera prompts, adding items with no Mac present,
-> the Share extension, pairing, and delivery. It shows no registration, login,
-> purchase or user-generated-content flow because the app has none; see 4.
+> file. It begins with a clean install from TestFlight, launches the app, and
+> shows the whole flow: the local-network and camera prompts, adding items with
+> no Mac present, the Share extension, pairing, and delivery. It shows no
+> registration, login, purchase or user-generated-content flow because the app
+> has none; see 4.
 >
 > 2. TESTED ON. iPhone 15 Pro, iOS 27.0 (physical device) — every flow,
 > including pairing and delivery over Wi-Fi. iPad Pro 13-inch (M5), iPadOS 26.5
@@ -233,16 +263,20 @@ wrong, and this doc cannot assert deliverability on your behalf.
 Item 1 of the 2.1 questionnaire, and the only part a commit can't produce.
 Apple's rules: **a physical device** (not the Simulator), the **latest OS**, and
 it must **start by launching the app** and show the typical flow through the core
-features, every permission prompt included.
+features, every permission prompt included. Opening on the TestFlight install
+satisfies that and is what the shot list does: the launch follows immediately,
+and having the install in frame is what makes the prompts in shots 2, 4 and 7
+provably first-run rather than staged.
 
 Half the product is a Mac, which no single-screen recording covers. Wire the
 iPhone to the Mac, unlock it, tap Trust, then QuickTime Player → **File → New
 Movie Recording** → the ⌄ next to the record button → the iPhone: that mirrors
 the *device screen* into a window, camera preview and permission alerts
 included. Put it beside the shelf on one display and ⇧⌘5 the **Mac's** screen —
-one file, both halves, the tile visibly landing at the notch. Delete, reinstall
-and unpair first; the permission prompts and the empty state happen once, and
-they are precisely what Apple asked to see.
+one file, both halves, the tile visibly landing at the notch. Delete and unpair
+before you roll, then do the **reinstall on camera**: the permission prompts and
+the empty state happen once, they are precisely what Apple asked to see, and a
+reviewer who watches the install knows they weren't staged.
 
 ⚠️ **Check which iPhone entry you're picking.** The entry ending in **`Camera`**
 is Continuity Camera, the rear camera pointed at the room. Screen mirroring is a
@@ -262,7 +296,8 @@ permission prompts is what invites a second round:
 
 | # | shot | why Apple wants it |
 |---|---|---|
-| 1 | Home Screen, tap the Perch icon | "must begin with launching the app" |
+| 0 | TestFlight → **Install** → **Open** | puts the clean install in frame, so the prompts below are provably first-run |
+| 1 | The app launches straight from that **Open** | "must begin with launching the app" |
 | 2 | The **local network** prompt → Allow | it fires here, at launch — see the warning below |
 | 3 | Empty shelf: "Nothing waiting" | proves the app is usable with no Mac |
 | 4 | ＋ → From Photos → pick one; ＋ → Paste (iOS asks "Allow Paste?") | core feature, standalone — and a third system alert to expect |
