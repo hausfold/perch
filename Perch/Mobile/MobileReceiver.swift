@@ -28,11 +28,16 @@ final class MobileReceiver: ObservableObject {
     @Published private(set) var pairingWindow: PairingWindow?
     @Published private(set) var pendingApproval: PairingApproval?
     @Published private(set) var pairedDevices: [PairedPeer] = []
+    /// True while the wire server is listening. Settings could surface it;
+    /// the tests read it to prove the launch gate held.
+    @Published private(set) var isListening = false
     @Published var lastEvent: String?
 
     private let store: ShelfStore
     private let settings: AppSettings
-    private let devices = PairedDeviceStore()
+    /// Overridden only by tests, so launch gating never reads the real
+    /// pairings of the machine running them.
+    private let devices: PairedDeviceStore
     private let identity = MacWireIdentity.current()
     private var server: WireServer?
     private let logger = Logger(subsystem: "com.hausfold.perch", category: "MobileReceiver")
@@ -41,9 +46,10 @@ final class MobileReceiver: ObservableObject {
     private nonisolated let shelfRoot: URL
     private var cancellables: Set<AnyCancellable> = []
 
-    init(store: ShelfStore, settings: AppSettings) {
+    init(store: ShelfStore, settings: AppSettings, devices: PairedDeviceStore = PairedDeviceStore()) {
         self.store = store
         self.settings = settings
+        self.devices = devices
         shelfRoot = store.repository.rootURL
         pairedDevices = devices.all()
 
@@ -67,12 +73,38 @@ final class MobileReceiver: ObservableObject {
 
     // MARK: - Lifecycle
 
+    /// Launch-time start, deliberately gated — see the comment for why the
+    /// gate exists and `start()` for why this is a separate door.
+    func startForLaunch() {
+        #if DEBUG
+        // Automated end-to-end runs open the pairing window out of `start()`;
+        // nobody there can click "Pair a Device…", so gating would strand the
+        // harness with no offer to scan.
+        if ProcessInfo.processInfo.environment["PERCH_PAIR_OFFER_PATH"] != nil {
+            start()
+            return
+        }
+        #endif
+        // Nothing paired, nothing to listen for. The setting being on is not
+        // a reason: it is the compiled-in default, so treating it as intent
+        // would put the prompt in front of everyone at second one anyway.
+        guard !pairedDevices.isEmpty else { return }
+        start()
+    }
+
+    /// Ungated start: the wire server comes up and advertises `_perch._tcp`
+    /// over Bonjour. Advertising is exactly what makes macOS put up the Local
+    /// Network prompt, so every path that lands here is one where the person
+    /// at the Mac has just asked for the feature by name — toggling receive
+    /// on, or opening Pair a Device — and the pairing window carries the note
+    /// that says what the prompt is for.
     func start() {
         guard settings.mobileEnabled, server == nil else { return }
         let server = WireServer(delegate: Bridge(receiver: self))
         do {
             try server.start(identity: identity)
             self.server = server
+            isListening = true
         } catch {
             lastEvent = error.localizedDescription
             logger.error("Mobile listener failed to start: \(error.localizedDescription, privacy: .public)")
@@ -95,6 +127,7 @@ final class MobileReceiver: ObservableObject {
     func stop() {
         server?.stop()
         server = nil
+        isListening = false
         closePairingWindow()
     }
 

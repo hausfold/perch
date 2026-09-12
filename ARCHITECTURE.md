@@ -396,7 +396,13 @@ local copy first, then delivery to the Mac is opportunistic and honestly
 stated (`waiting` until the Mac says `stored`). On the Mac, `MobileReceiver`
 listens on Bonjour `_perch._tcp` for devices paired via a one-shot QR secret +
 X25519 + a human-confirmed six-digit code; every frame after the hello is
-ChaChaPoly-sealed under per-session keys. Arriving bytes spool into a hidden
+ChaChaPoly-sealed under per-session keys. The listener is a launch-time
+decision only once something is paired: `MobileReceiver.startForLaunch` keeps a
+Mac with an empty pairing store off the network entirely, so macOS's Local
+Network prompt — which Bonjour advertising is what triggers — arrives with the
+pairing flow that explains it, not at second one of a first launch. Nothing
+legitimate waits behind that gate: only paired devices may connect, so an
+empty pairing store is an empty audience. Arriving bytes spool into a hidden
 dot-directory on the shelf's volume, are digest-verified, and enter the shelf
 through the same admission-first, atomic-commit path as a drag. Pairing lives
 in the Keychain; revoking a device deletes its row.

@@ -468,7 +468,9 @@ struct DevicesPane: View {
                 """
                 Anything you put on Perch on a paired iPhone lands on this shelf when both \
                 are on your network — end-to-end encrypted with a key made at pairing, \
-                never through a server. Revoking a device ends it instantly.
+                never through a server. Revoking a device ends it instantly. Listening \
+                starts when you first pair, which is when macOS asks about local network \
+                access; denying it leaves the shelf working, only with no devices.
                 """
             )
         }
