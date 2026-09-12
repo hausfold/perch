@@ -36,9 +36,10 @@ final class MobileReceiverLaunchTests: XCTestCase {
     /// default (on), nothing is paired, and the machine stays quiet.
     func testACleanMacStartsNoListenerAtLaunch() throws {
         let receiver = try makeReceiver()
-        XCTAssertFalse(receiver.isListening, "launch must not start the listener on an empty pairing store")
         XCTAssertTrue(receiver.pairedDevices.isEmpty)
         XCTAssertTrue(AppConfig().mobileEnabled, "the gate is pairings, not the toggle's default")
+        receiver.startForLaunch()
+        XCTAssertFalse(receiver.isListening, "launch must not start the listener on an empty pairing store")
     }
 
     /// The one case launch does start for: a pairing remembered from before,
