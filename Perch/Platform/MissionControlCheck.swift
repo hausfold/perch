@@ -56,9 +56,15 @@ final class MissionControlCheck: ObservableObject {
     /// Desktop & Dock, where the toggle lives. `com.apple.Desktop-Settings.extension`
     /// is the pane's real bundle id on macOS 26 (System Settings is ExtensionKit
     /// panes now, not prefPanes) — read off
-    /// /System/Library/ExtensionKit/Extensions/DesktopSettings.appex.
+    /// /System/Library/ExtensionKit/Extensions/DesktopSettings.appex. The
+    /// `?MissionControl` anchor scrolls the pane to the Mission Control group —
+    /// the toggle is the last row of that section, several screens down from
+    /// where the pane opens unanchored. Verified on macOS 26.6.2 (2026-09-11):
+    /// the anchor holds from a cold launch, not only when Settings is already
+    /// running, so the toggle is at worst one short scroll below the fold
+    /// rather than five sections away with nothing naming it.
     nonisolated static let settingsURL = URL(
-        string: "x-apple.systempreferences:com.apple.Desktop-Settings.extension"
+        string: "x-apple.systempreferences:com.apple.Desktop-Settings.extension?MissionControl"
     )!
 
     private static let dismissedKey = "MissionControlHintDismissed"

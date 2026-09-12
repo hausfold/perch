@@ -26,14 +26,16 @@ final class MissionControlCheckTests: XCTestCase {
         XCTAssertFalse(MissionControlCheck.isArmed(dockPreference: false))
     }
 
-    /// The pane id the button opens. Read off
+    /// The pane id and anchor the button opens. Read off
     /// /System/Library/ExtensionKit/Extensions/DesktopSettings.appex on macOS
     /// 26 — System Settings is ExtensionKit panes now, and the old
-    /// `com.apple.preference.dock` prefPane id is gone.
+    /// `com.apple.preference.dock` prefPane id is gone. The `?MissionControl`
+    /// anchor is verified live, not from documentation: it scrolls the pane to
+    /// the Mission Control group on macOS 26.6.2, from a cold launch included.
     func testSettingsURLNamesTheDesktopAndDockPane() {
         XCTAssertEqual(
             MissionControlCheck.settingsURL.absoluteString,
-            "x-apple.systempreferences:com.apple.Desktop-Settings.extension"
+            "x-apple.systempreferences:com.apple.Desktop-Settings.extension?MissionControl"
         )
     }
 
