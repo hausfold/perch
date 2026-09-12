@@ -44,6 +44,10 @@ public enum WireStreaming {
 
     /// Streams the file as sequential chunk frames. The caller has already told
     /// the peer what is coming and closes the item afterwards.
+    ///
+    /// Nothing past the offered length ever reaches the wire: a file that grew
+    /// between the digest and the bytes fails here, before the first chunk the
+    /// peer would have to reject.
     public static func send(
         _ item: OutgoingItem,
         over connection: WireConnection,
@@ -60,13 +64,21 @@ public enum WireStreaming {
             else {
                 break
             }
+            // The digest was taken from these same bytes moments ago, so a chunk
+            // running past the promised length means the file grew underfoot.
+            // The peer is holding the arrivals to that same length and refuses
+            // this frame; sending it would strand every frame after it in the
+            // socket, so the file fails here instead.
+            guard offset + Int64(data.count) <= item.offered.byteCount else {
+                throw WireClientError.fileUnreadable(item.offered.displayName)
+            }
             try await connection.send(.chunk(itemID: item.offered.id, offset: offset, data: data))
             offset += Int64(data.count)
             await onProgress(offset, item.offered.byteCount)
         }
-        // The digest was taken from these same bytes moments ago; a different
-        // length now means the file changed underfoot and the peer would only
-        // find out via a digest mismatch after transferring all of it.
+        // The mirror case, and the only one the loop cannot see coming: a file
+        // that shrank just ends early, leaving the peer waiting on bytes that
+        // are never sent.
         guard offset == item.offered.byteCount else {
             throw WireClientError.fileUnreadable(item.offered.displayName)
         }

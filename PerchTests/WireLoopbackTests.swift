@@ -308,14 +308,15 @@ final class WireLoopbackTests: XCTestCase {
         await paired.client.close()
     }
 
-    /// The mirror case: the file grew, so the Mac streams past the byte count it
-    /// promised and the phone stops taking it part-way through.
+    /// The mirror case: the file grew between the digest and the first byte. The
+    /// Mac must refuse it before a chunk goes out, so it ends the way the case
+    /// above does — nothing lands, and the session is still good.
     ///
-    /// Regression: the abandoned item's remaining chunk frames were still in the
-    /// socket, so the *next* request on that session read file bytes as its
-    /// reply — a `list()` answered with a chunk. Nothing may land, and the
-    /// session must say it is finished rather than answer from the backlog.
-    func testAFileThatGrewMidFetchEndsTheSessionInsteadOfDesyncingIt() async throws {
+    /// Regression: the length guard used to run only after the whole file had
+    /// been streamed, so the Mac pushed all 3MB at a phone that had rejected
+    /// chunk one, and the frames left in the socket answered the *next* request
+    /// — a `list()` that came back with file bytes.
+    func testAFileThatGrewMidFetchFailsTheItemButNotTheSession() async throws {
         let paired = try await pairedSession()
         defer { paired.server.stop() }
 
@@ -335,25 +336,16 @@ final class WireLoopbackTests: XCTestCase {
             // Expected.
         }
         XCTAssertEqual(try contents(of: inbox), [], "no partial and no wrongly-named file may survive")
-        do {
-            _ = try await paired.client.list()
-            XCTFail("A session abandoned mid-item must not answer another request")
-        } catch WireClientError.sessionLost {
-            // Expected: stated, not guessed. Answered locally, which is why it
-            // works while the Mac is still pushing bytes at nobody.
-        }
-        // Hanging up is what tells the Mac the phone stopped reading. It must
-        // then report the fetch as failed — its status line said "sending…" and
-        // has nothing else to resolve it.
-        await paired.client.close()
-        switch await waitForOutcome(paired.delegate, itemID: itemID) {
-        case let .failed(_, reason):
-            XCTAssertFalse(reason.isEmpty)
-        case .served:
+        // The Mac described this item, so it must hear how it ended — its own
+        // status line said "sending…" and has nothing else to resolve it.
+        XCTAssertEqual(paired.delegate.servedOutcomes().map(\.itemID), [itemID])
+        if case .served = paired.delegate.servedOutcomes().first {
             XCTFail("A file that grew underfoot was never served whole")
-        case nil:
-            XCTFail("The Mac never reported the abandoned fetch in \(Self.stallBudget)")
         }
+        // No chunk of the grown file ever went out, so nothing is stranded in
+        // the socket and this is one failed request, not a dead session.
+        _ = try await paired.client.list()
+        await paired.client.close()
     }
 
     /// Bytes that do not match the digest are a failed item, not a failed
@@ -463,32 +455,15 @@ final class WireLoopbackTests: XCTestCase {
         )
     }
 
-    /// How long the two polling waits in this class give up after.
+    /// How long the one polling wait left in this class gives up after.
     ///
-    /// Both are failure-path budgets — a healthy run leaves either after a
-    /// poll or two, measured in milliseconds — so the only job of the number
-    /// is to outlast the worst stall a loaded CI worker can impose. Five
-    /// seconds was not enough: `testAFileThatGrewMidFetch…` gave up at exactly
-    /// 5.0s on hausfold/perch#137, a docs-only diff that cannot have caused
-    /// it, and passed on a plain re-run. Nothing passing pays for this.
+    /// A failure-path budget — a healthy run leaves it after a poll or two,
+    /// measured in milliseconds — so the only job of the number is to outlast
+    /// the worst stall a loaded CI worker can impose. Five seconds was not
+    /// enough: a wait in this class gave up at exactly 5.0s on
+    /// hausfold/perch#137, a docs-only diff that cannot have caused it, and
+    /// passed on a plain re-run. Nothing passing pays for this.
     private static let stallBudget: Duration = .seconds(30)
-
-    /// A fetch outcome the Mac reports from its own task. When the phone stops
-    /// reading part-way it has no idea when that lands, so poll for it.
-    private func waitForOutcome(
-        _ delegate: LoopbackDelegate,
-        itemID: UUID,
-        timeout: Duration = stallBudget
-    ) async -> LoopbackDelegate.ServeOutcome? {
-        let deadline = ContinuousClock.now + timeout
-        while ContinuousClock.now < deadline {
-            if let outcome = delegate.servedOutcomes().first(where: { $0.itemID == itemID }) {
-                return outcome
-            }
-            try? await Task.sleep(for: .milliseconds(20))
-        }
-        return nil
-    }
 
     /// What the phone actually has in a fetch directory, hidden `.partial`
     /// spools included — the whole point of these assertions.
@@ -516,10 +491,9 @@ final class WireLoopbackTests: XCTestCase {
         throw LoopbackWait.listenerNeverBoundAPort(timeout)
     }
 
-    /// Named so a red CI run says which wait ran out. Both budgets are the
-    /// same number and xcodebuild prints only a duration, so `failed (5.562
-    /// seconds)` on its own does not say whether the listener or the Mac's
-    /// outcome was the thing that never came.
+    /// Named so a red CI run says what never came. xcodebuild prints only a
+    /// duration, and `failed (5.562 seconds)` on its own does not say whether
+    /// the listener stalled or the test's own work did.
     private enum LoopbackWait: Error, CustomStringConvertible {
         case listenerNeverBoundAPort(Duration)
 
