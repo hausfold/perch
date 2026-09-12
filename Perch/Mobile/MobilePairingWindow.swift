@@ -74,6 +74,14 @@ struct MobilePairingView: View {
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
 
+        // macOS springs the Local Network prompt the moment this window's
+        // listener starts advertising — the one second where it reads as
+        // sensible, because pairing is what it is for.
+        Text("If macOS asks to let Perch find devices on your local network, choose **Allow**. That's how the phone finds this Mac — directly, with no account and nothing leaving your network.")
+            .font(AppFont.caption)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+
         if let qr = Self.qrImage(for: window.encodedOffer) {
             Image(nsImage: qr)
                 .interpolation(.none)

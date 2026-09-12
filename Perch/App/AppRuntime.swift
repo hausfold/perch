@@ -48,7 +48,11 @@ final class AppRuntime: ObservableObject {
         windowSystem.start()
         UpdateCheck.shared.start()
         MissionControlCheck.shared.start()
-        mobile.start()
+        // Gated, not unconditional: see MobileReceiver.startForLaunch. A Mac
+        // with nothing paired stays off the local network until the person at
+        // it asks for the feature, so the Local Network prompt arrives with
+        // the pairing flow that explains it instead of at first launch.
+        mobile.startForLaunch()
         folderWatch.start()
     }
 
