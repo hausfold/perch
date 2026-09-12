@@ -239,9 +239,14 @@ Three things will hand you a wrong answer:
   is not simply the Info.plist of the process that asked, and two copies of one
   bundle id is exactly the state a dev Mac is always in (see the Finder-door
   sections above).
-- **Nothing needs to be paired**, and that is the point of the test: the
-  listener starts at launch because `mobileEnabled` defaults to true, so the
-  dialog is the first thing a fresh install meets.
+- **A launch on its own will not draw it.** `MobileReceiver.startForLaunch`
+  keeps a Mac with an empty pairing store off the network, so a fresh install
+  starts silent — you have to ask for the feature. Pair a Device… from the menu
+  bar is the real path; `PERCH_PAIR_OFFER_PATH` on a Debug build opens the same
+  window headlessly and is the one of the two you can drive over ssh. Run both
+  halves in that order: the silent launch only means anything if the pairing
+  step then draws the dialog, which is also your proof the guest had not
+  answered in a previous life.
 - **The dialog outlives the app.** Quitting perch leaves it on screen, and a
   second launch adds a second one in front of the first — handy, since it means
   a dismissed dialog is genuinely re-asked, but it also means a screenshot can
@@ -257,9 +262,18 @@ xcodebuild -project Perch.xcodeproj -scheme Perch -configuration Debug \
 sudo rm -rf /Applications/Perch.app
 sudo ditto "/Volumes/My Shared Files/work/DerivedData/Build/Products/Debug/Perch.app" \
   /Applications/Perch.app
-open /Applications/Perch.app
-/usr/sbin/screencapture -x /tmp/prompt.png   # or `haus-vm-shot <lane> shot.png`
+
+open /Applications/Perch.app                 # nothing paired: expect NO dialog
+/usr/sbin/screencapture -x /tmp/launch.png   # or `haus-vm-shot <lane> shot.png`
+
+osascript -e 'quit app "Perch"'
+open --env PERCH_PAIR_OFFER_PATH=/tmp/offer.txt /Applications/Perch.app
+/usr/sbin/screencapture -x /tmp/prompt.png   # the dialog, with our sentence
 ```
+
+MEASURED that way in a Tahoe 26.6.2 guest, 2026-09-12: the first shot is a
+running perch with a tray icon and a clean desktop, the second is "Allow
+“Perch” to find devices on local networks?" over the pairing window.
 
 `ditto` complains about `Testing.framework`'s symlinks when the products came
 from a `test` run rather than a `build` — it is copying extended attributes off
@@ -272,8 +286,11 @@ guest, after two unanswered asks: Privacy & Security carried no Local Network
 row at all, and no deep link reaches one — macOS 26 has no `Privacy_LocalNetwork`
 anchor, and the modern `com.apple.settings.PrivacySecurity.extension.<type>`
 spelling is not a deep link for any service (`privacy-allfiles`, which has a
-working anchor, lands on General too). haus's card for this
-(`modules/shelf/default.nix`) leads with "quit and reopen perch" for that reason.
+working anchor, lands on General too). So the remedy has to be re-triggering the
+ask rather than the pane, and what re-triggers it is the next advertise — which
+since the launch gate means opening Pair a Device… again, not quitting and
+reopening perch. haus's card for this is `modules/shelf/default.nix`, and it
+tracks whatever the release on disk does, not main.
 
 ## The one-click update: a VM, never this Mac
 

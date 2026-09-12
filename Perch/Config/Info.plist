@@ -87,18 +87,21 @@
 	</array>
 
 	<!-- The Mac end of the phone wire, and the reason macOS asks about the
-	     local network the first time perch runs.
+	     local network the first time someone pairs a phone.
 
-	     WHAT ASKS is the LISTENER, not a browse: `MobileReceiver.start()` runs
-	     at launch because `mobileEnabled` defaults to true, and
-	     `WireServer.start` advertises `_perch._tcp` over Bonjour from an
-	     NWListener. macOS 15 and newer gate advertising behind Local Network
-	     the same way they gate browsing, so the dialog lands on a Mac that has
-	     never seen a phone and may never pair one. Without this string macOS
-	     falls back to its own sentence — "discover, connect to, and collect
-	     data from devices on your networks", which reads like telemetry and was
-	     the one unexplained prompt a zip-door install met first (found on a VM
-	     install, 2026-09-11).
+	     WHAT ASKS is the LISTENER, not a browse: `WireServer.start` advertises
+	     `_perch._tcp` over Bonjour from an NWListener, and macOS 15 and newer
+	     gate advertising behind Local Network the same way they gate browsing.
+	     WHEN it asks is the pairing flow, not launch —
+	     `MobileReceiver.startForLaunch` keeps a Mac with an empty pairing store
+	     off the network entirely, so the first advertise is the first click of
+	     Pair a Device…, and this sentence lands next to the QR that explains
+	     it. MEASURED in a Tahoe 26.6.2 guest that had never seen perch,
+	     2026-09-12: launch drew nothing, opening the pairing window drew this.
+	     Without the string macOS falls back to its own — "discover, connect to,
+	     and collect data from devices on your networks", which reads like
+	     telemetry and was the one unexplained prompt a zip-door install met
+	     first (found on a VM install, 2026-09-11).
 
 	     There is no prompt API for Local Network: it is asked once, by the
 	     advertise itself, and afterwards only System Settings can change the
