@@ -41,6 +41,13 @@ upload is retryable with the Re-run button, no new tag. A same-day re-cut
 (`2026.08.06-2`) uploads as the *same* marketing version with a higher build:
 fine for TestFlight, but a store release of it needs a new VERSION day.
 
+**The version record's number must equal the build's marketing version.** App
+Store Connect's Build picker only lists builds whose `CFBundleShortVersionString`
+matches what you typed, so the number comes from `VERSION` and never from what
+looks like a sensible next one — a hand-typed `1.1` is a dead end with nothing
+to select. A record still in Prepare for Submission can be renamed in place:
+App Store tab → **General App Information** → Version.
+
 Phone-only builds need no tag: `gh workflow run testflight.yml` (`--ref
 <branch>` to run it off a branch). Every run's summary prints the version, the
 build number, and the two clicks still owed.
@@ -163,6 +170,9 @@ Item 1's recording is [its own section](#the-screen-recording-apple-asks-for).
   anything you add has to buy its space from something else. Measure, don't
   assume — it has been over:
   `awk '/^## Review notes/{f=1} f&&/^>/{sub(/^> ?/,"");print} f&&/^Also fill in:/{exit}' docs/app-store.md | wc -m`.
+- **The attachment does not carry over.** App Store Connect pre-fills the Notes
+  text from the previous version and leaves the file behind, so item 1's
+  "Attached" is a promise you re-keep on every submission.
 - **It is a plain-text field**, which is why the block carries no Markdown
   emphasis and uses ALL-CAPS headings. `**bold**` pastes as literal asterisks in
   front of a reviewer.
