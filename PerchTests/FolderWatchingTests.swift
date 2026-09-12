@@ -337,7 +337,7 @@ final class FolderWatcherTests: XCTestCase {
         watcher.start(seedExisting: false)
 
         try Data("one".utf8).write(to: directory.appending(path: "a.txt"))
-        waitUntil("a stream position is reported", timeout: 15) { !log.reportedEventIDs.isEmpty }
+        waitForAPosition("a stream position is reported", in: directory, reportedTo: log)
 
         try Data("two".utf8).write(to: directory.appending(path: "b.txt"))
         waitUntil("a second, later position", timeout: 15) { log.reportedEventIDs.count >= 2 }
@@ -368,7 +368,7 @@ final class FolderWatcherTests: XCTestCase {
         let watcher = makeWatcher(over: directory, log: first)
         watcher.start(seedExisting: false)
         try Data("one".utf8).write(to: directory.appending(path: "a.txt"))
-        waitUntil("a stream position to resume from", timeout: 15) { !first.reportedEventIDs.isEmpty }
+        waitForAPosition("a stream position to resume from", in: directory, reportedTo: first)
         let resumeFrom = try XCTUnwrap(first.reportedEventIDs.first)
 
         // Everything that happens while perch is "not running".
@@ -379,13 +379,22 @@ final class FolderWatcherTests: XCTestCase {
         // A ledger holding the whole folder: the catch-up scan imports nothing
         // and reports nothing, so only replay can make this watcher speak.
         let ledger = Set(
-            try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
-                .map { try FolderWatchRules.identityToken(forFileAt: $0) }
+            try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )
+            .map { try FolderWatchRules.identityToken(forFileAt: $0) }
         )
 
         let replayed = ImportLog()
         let resumed = makeWatcher(over: directory, ledger: ledger, sinceEventID: resumeFrom, log: replayed)
         resumed.start(seedExisting: false)
+        // Deliberately a plain wait, not `waitForAPosition`: this is the one
+        // position in the test that must come out of FSEvents' history, and a
+        // wait that made its own events would satisfy itself and leave the
+        // replay untested. It needs no liveness touch either — the writes it
+        // is waiting for are already on disk and already have ids.
         waitUntil("the missed writes are replayed", timeout: 15) { !replayed.reportedEventIDs.isEmpty }
         XCTAssertGreaterThan(try XCTUnwrap(replayed.reportedEventIDs.last), resumeFrom)
         XCTAssertEqual(replayed.importedNames, [], "a fully ledgered folder imports nothing on replay")
@@ -397,12 +406,13 @@ final class FolderWatcherTests: XCTestCase {
         // does, and what every launch did before positions were persisted.
         // Asserted by making it speak rather than by sleeping and hoping: it
         // is given a brand-new file, and the *first* thing it ever reports has
-        // to be that file, not the writes it was started after.
+        // to be newer than the replay above, not one of the writes it was
+        // started after.
         let blind = ImportLog()
         let fresh = makeWatcher(over: directory, ledger: ledger, log: blind)
         fresh.start(seedExisting: false)
         try Data("four".utf8).write(to: directory.appending(path: "d.txt"))
-        waitUntil("the control hears its own arrival", timeout: 15) { !blind.reportedEventIDs.isEmpty }
+        waitForAPosition("the control hears its own arrival", in: directory, reportedTo: blind)
         XCTAssertGreaterThan(
             try XCTUnwrap(blind.reportedEventIDs.first),
             replayedThrough,
@@ -700,6 +710,49 @@ final class FolderWatcherTests: XCTestCase {
         XCTAssertEqual(log.adoptedTokens, [])
     }
 
+    /// Waits for the first stream position a watcher reports, keeping the
+    /// folder busy until one arrives.
+    ///
+    /// `start()` arms the stream on the watcher's own serial queue, and
+    /// FSEvents reports nothing that happened before `FSEventStreamStart`.
+    /// Measured here, a write landing 50 ms ahead of that instant is already
+    /// invisible — so writing one file and then waiting is a bet that the
+    /// queue gets scheduled inside a window a loaded host can easily miss.
+    /// Lose it and the folder is quiet from then on, with nothing left that
+    /// could ever satisfy the wait: it burns the whole budget and the test
+    /// reads as a timeout rather than as the race it is.
+    /// `testAResumedStreamReplaysHistory…` did exactly that — it gave up at
+    /// 15.094 s on one full suite run and passed on a plain re-run of the
+    /// same tree, and a 1 s sleep in front of `FSEventStreamStart` reproduces
+    /// it at 15.105 s every time.
+    ///
+    /// So the wait makes its own events: a hidden marker, rewritten each
+    /// poll until the stream answers. `regularFiles()` skips hidden files and
+    /// `isCandidateName` refuses a leading dot, so the marker can move the
+    /// stream and nothing else — it is never probed, imported or ledgered.
+    ///
+    /// Only for a position a *live* stream owes. A replayed one must be
+    /// waited for plainly, or the touch satisfies the wait and the history
+    /// goes untested.
+    private func waitForAPosition(
+        _ what: String,
+        in directory: URL,
+        reportedTo log: ImportLog,
+        timeout: TimeInterval = 15
+    ) {
+        let marker = directory.appending(path: ".perch-stream-liveness")
+        let deadline = Date().addingTimeInterval(timeout)
+        var touch = 0
+        while log.reportedEventIDs.isEmpty {
+            guard Date() < deadline else {
+                return XCTFail("Timed out in \(timeout)s waiting until \(what)")
+            }
+            touch += 1
+            try? Data("touch \(touch)".utf8).write(to: marker)
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+    }
+
     private func waitUntil(
         _ what: String,
         timeout: TimeInterval = 5,
@@ -708,7 +761,7 @@ final class FolderWatcherTests: XCTestCase {
         let deadline = Date().addingTimeInterval(timeout)
         while !condition() {
             guard Date() < deadline else {
-                return XCTFail("Timed out waiting until \(what)")
+                return XCTFail("Timed out in \(timeout)s waiting until \(what)")
             }
             Thread.sleep(forTimeInterval: 0.02)
         }

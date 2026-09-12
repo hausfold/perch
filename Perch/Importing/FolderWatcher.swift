@@ -253,6 +253,13 @@ final class FolderWatcher: @unchecked Sendable {
                 return
             }
             self.stream = stream
+            // Scanned only once the stream is armed, and that order is what
+            // makes the gap covered rather than a hole: FSEvents reports
+            // nothing that happened before `FSEventStreamStart`, so anything
+            // that landed while this block waited its turn on the queue is
+            // found by this scan and by nothing else. Scanning first would
+            // leave whatever arrived between the two invisible until some
+            // later event happened to wake a rescan.
             initialScan(seedExisting: seedExisting)
         }
     }
