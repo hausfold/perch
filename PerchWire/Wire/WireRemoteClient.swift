@@ -19,10 +19,13 @@ public actor WireRemoteClient {
     /// "succeeds" because it saw a chunk. Once that can happen the session is
     /// finished; every later call says so instead of guessing.
     ///
-    /// Draining to the end of the abandoned item would keep the session, but
-    /// only a peer that honours its own offer bounds that drain, and a peer
-    /// that broke its offer is exactly how we get here. One stated failure
-    /// beats an unbounded wait.
+    /// A Mac running perch never puts us here: `WireStreaming.send` refuses a
+    /// chunk that would run past the length it offered, so a file that grew
+    /// underfoot fails the item on a live session, the same as one that shrank.
+    /// What is left is a peer that breaks its own offer. Draining to the end of
+    /// its item would keep the session, but the only thing bounding that drain
+    /// is the offer it already broke. One stated failure beats an unbounded
+    /// wait.
     private var isLost = false
 
     private init(connection: WireConnection) {
