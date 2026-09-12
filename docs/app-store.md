@@ -91,7 +91,7 @@ a companion, not a standalone.
 - **Support URL** and **Marketing URL**: `https://hausfold.co/docs/perch/`
 - **Privacy policy URL**: `https://hausfold.co/perch/privacy/` — the one URL App
   Store Connect *requires*, and the only one of the three still under
-  `hausfold.co/perch`, which otherwise redirects to the docs tree. An unreachable
+  `hausfold.co/perch`, which itself redirects to the docs tree. An unreachable
   support URL is a routine rejection: `curl -sIL` all three before a submission
   if the site has moved.
   **Paste the trailing slash** — into the two URL *fields*. The Description and
@@ -110,7 +110,8 @@ a companion, not a standalone.
   the pre-submission check is a full diff of the live Description against this
   file, not a glance at the URL inside it. Three things a paraphrase loses,
   each load-bearing: that pairing needs someone to **approve it on the Mac**
-  (`Perch/Mobile/MobilePairingWindow.swift` — no Mac window, no pairing), and
+  (`MobileReceiver.swift`'s `guard pairingWindow != nil` refuses without one;
+  `MobilePairingWindow.swift` draws the sheet), and
   dropping it leaves a reviewer scanning a QR and concluding the app is broken;
   that delivery also works **peer-to-peer with no network** (`includePeerToPeer`
   across `PerchWire/Wire/`), which the review notes claim and the listing should
@@ -262,16 +263,20 @@ wrong, and this doc cannot assert deliverability on your behalf.
 Item 1 of the 2.1 questionnaire, and the only part a commit can't produce.
 Apple's rules: **a physical device** (not the Simulator), the **latest OS**, and
 it must **start by launching the app** and show the typical flow through the core
-features, every permission prompt included.
+features, every permission prompt included. Opening on the TestFlight install
+satisfies that and is what the shot list does: the launch follows immediately,
+and having the install in frame is what makes the prompts in shots 2, 4 and 7
+provably first-run rather than staged.
 
 Half the product is a Mac, which no single-screen recording covers. Wire the
 iPhone to the Mac, unlock it, tap Trust, then QuickTime Player → **File → New
 Movie Recording** → the ⌄ next to the record button → the iPhone: that mirrors
 the *device screen* into a window, camera preview and permission alerts
 included. Put it beside the shelf on one display and ⇧⌘5 the **Mac's** screen —
-one file, both halves, the tile visibly landing at the notch. Delete, reinstall
-and unpair first; the permission prompts and the empty state happen once, and
-they are precisely what Apple asked to see.
+one file, both halves, the tile visibly landing at the notch. Delete and unpair
+before you roll, then do the **reinstall on camera**: the permission prompts and
+the empty state happen once, they are precisely what Apple asked to see, and a
+reviewer who watches the install knows they weren't staged.
 
 ⚠️ **Check which iPhone entry you're picking.** The entry ending in **`Camera`**
 is Continuity Camera, the rear camera pointed at the room. Screen mirroring is a
@@ -291,7 +296,8 @@ permission prompts is what invites a second round:
 
 | # | shot | why Apple wants it |
 |---|---|---|
-| 1 | Home Screen, tap the Perch icon | "must begin with launching the app" |
+| 0 | TestFlight → **Install** → **Open** | puts the clean install in frame, so the prompts below are provably first-run |
+| 1 | The app launches straight from that **Open** | "must begin with launching the app" |
 | 2 | The **local network** prompt → Allow | it fires here, at launch — see the warning below |
 | 3 | Empty shelf: "Nothing waiting" | proves the app is usable with no Mac |
 | 4 | ＋ → From Photos → pick one; ＋ → Paste (iOS asks "Allow Paste?") | core feature, standalone — and a third system alert to expect |
