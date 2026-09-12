@@ -619,10 +619,11 @@ private struct MissionControlStrip: View {
                 // and it can never be the one that truncates first.
                 //
                 // The second line names the toggle rather than only the pane it
-                // is in. "Open Settings" lands on Desktop & Dock with nothing
-                // selected and nothing scrolled to, and Mission Control's
-                // section there holds five switches; a reader who knows only
-                // "turn it off in Desktop & Dock" has to guess which. The row
+                // is in. "Open Settings" lands on Desktop & Dock with the
+                // Mission Control group scrolled into view (`?MissionControl`
+                // anchor, see `MissionControlCheck.settingsURL`), but the
+                // toggle is the LAST row of that five-switch section — on a
+                // short or notchless display it can sit below the fold. The row
                 // reads "Drag windows to top of screen to enter Mission
                 // Control" (read off DesktopSettings.appex, macOS 26), and it
                 // is the only one in that section beginning "Drag windows to

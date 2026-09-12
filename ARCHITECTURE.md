@@ -315,7 +315,8 @@ sees a `draggingEntered:`, so the app looks broken by the only gesture it has.
 `MissionControlCheck` reads the Dock's own answer and says so, on the two
 passive surfaces perch already owns: a strip along the bottom of the expanded
 shelf and a row in the menu bar menu. It never writes that key — the button
-opens System Settings ▸ Desktop & Dock and leaves the decision where it belongs.
+opens System Settings ▸ Desktop & Dock, anchored to the Mission Control group
+where the toggle lives, and leaves the decision where it belongs.
 
 Two seams matter here. **An absent value means armed**: a Mac that has never had
 the key written is precisely the stock Mac this exists for, and a denied read is
