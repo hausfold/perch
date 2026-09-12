@@ -3,7 +3,19 @@
 <!--
   Everything else in perch's Info.plist is generated (GENERATE_INFOPLIST_FILE
   is still YES; Xcode merges its keys into this file). This partial exists for
-  one key that has no INFOPLIST_KEY_ build setting: NSServices.
+  the keys no build setting can express, plus the prose that has to stay beside
+  them: NSServices, and the local-network pair at the bottom.
+
+  `INFOPLIST_KEY_<anything>` is a GENERIC prefix, not a fixed list — MEASURED
+  2026-09-12, `INFOPLIST_KEY_NSLocalNetworkUsageDescription=…` on the command
+  line landed verbatim in the built Info.plist, for a key no Xcode template
+  mentions. So the build-setting route is open for every STRING here and the
+  rule is not "what Xcode supports". It is this: an array (NSServices,
+  NSBonjourServices) has no build-setting spelling at all, and a usage string
+  that must agree with one belongs beside it rather than two files away in
+  pbxproj, written twice because settings are per-configuration. PerchIOS's
+  partial plist makes the same call for NSCameraUsageDescription, which DOES
+  have a documented INFOPLIST_KEY_.
 
   This is perch's ONLY Finder door, and it is the one that works. Perch used to
   ship a second — a `PerchFinderAction` Action Extension — on the belief that
@@ -72,6 +84,42 @@
 				<string>public.plain-text</string>
 			</array>
 		</dict>
+	</array>
+
+	<!-- The Mac end of the phone wire, and the reason macOS asks about the
+	     local network the first time perch runs.
+
+	     WHAT ASKS is the LISTENER, not a browse: `MobileReceiver.start()` runs
+	     at launch because `mobileEnabled` defaults to true, and
+	     `WireServer.start` advertises `_perch._tcp` over Bonjour from an
+	     NWListener. macOS 15 and newer gate advertising behind Local Network
+	     the same way they gate browsing, so the dialog lands on a Mac that has
+	     never seen a phone and may never pair one. Without this string macOS
+	     falls back to its own sentence — "discover, connect to, and collect
+	     data from devices on your networks", which reads like telemetry and was
+	     the one unexplained prompt a zip-door install met first (found on a VM
+	     install, 2026-09-11).
+
+	     There is no prompt API for Local Network: it is asked once, by the
+	     advertise itself, and afterwards only System Settings can change the
+	     answer. So this string is the entire explanation the user ever gets,
+	     and it is kept in step with the two phone-side halves
+	     (PerchIOS/Config/Info.plist, PerchShare/Info.plist) — same closing
+	     sentence, opposite direction, because over there perch does the finding
+	     and here it is the thing being found.
+
+	     NSBonjourServices is the browse list, which this bundle does not use
+	     today — nothing on the Mac constructs a WireBrowser. It is declared
+	     anyway because WireBrowser compiles INTO this target (PerchWire is a
+	     synchronized group of the Perch target too), so the day a Mac-side
+	     browse appears, the failure without this key is silent: the browser
+	     runs, finds nothing, and logs nothing. One service type, the only one
+	     either end has ever spoken. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Perch listens on your network so an iPhone or iPad you pair with it can send files to your shelf. Nothing leaves your network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_perch._tcp</string>
 	</array>
 </dict>
 </plist>

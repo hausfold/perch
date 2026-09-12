@@ -220,6 +220,61 @@ Two things to know before you start:
   signature of the entitlement being missing or stripped, not of a stuck view.
   `codesign -d --entitlements - <bundle>` settles it.
 
+## The local network prompt: only the /Applications copy says our sentence
+
+perch's own `NSLocalNetworkUsageDescription` ("Perch listens on your network so
+an iPhone or iPad you pair with it can send files to your shelf. Nothing leaves
+your network.") replaces Apple's fallback about collecting data from devices on
+your networks. Reading it back is a VM job, not a this-Mac job — the answer is
+recorded per Mac and there is no supported way to un-record it, so the first
+launch you feel-test is the only one you get.
+
+Three things will hand you a wrong answer:
+
+- **Run the copy at `/Applications/Perch.app`, not one beside it.** MEASURED in
+  a Tahoe 26.6.2 guest, 2026-09-12: the same build launched from
+  `~/PerchDev.app`, with a `com.hausfold.perch` at `/Applications` that predated
+  the key, drew Apple's fallback string; installed over `/Applications/Perch.app`
+  and relaunched, it drew ours. Whatever macOS resolves the sentence through, it
+  is not simply the Info.plist of the process that asked, and two copies of one
+  bundle id is exactly the state a dev Mac is always in (see the Finder-door
+  sections above).
+- **Nothing needs to be paired**, and that is the point of the test: the
+  listener starts at launch because `mobileEnabled` defaults to true, so the
+  dialog is the first thing a fresh install meets.
+- **The dialog outlives the app.** Quitting perch leaves it on screen, and a
+  second launch adds a second one in front of the first — handy, since it means
+  a dismissed dialog is genuinely re-asked, but it also means a screenshot can
+  show you the stale one.
+
+```sh
+# Host: build, then hand the guest the bundle over the lane's shared folder.
+xcodebuild -project Perch.xcodeproj -scheme Perch -configuration Debug \
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath DerivedData \
+  CODE_SIGNING_ALLOWED=NO build
+
+# Guest (scruff runtime up <lane> --backend tart; then over ssh):
+sudo rm -rf /Applications/Perch.app
+sudo ditto "/Volumes/My Shared Files/work/DerivedData/Build/Products/Debug/Perch.app" \
+  /Applications/Perch.app
+open /Applications/Perch.app
+/usr/sbin/screencapture -x /tmp/prompt.png   # or `haus-vm-shot <lane> shot.png`
+```
+
+`ditto` complains about `Testing.framework`'s symlinks when the products came
+from a `test` run rather than a `build` — it is copying extended attributes off
+a dangling link, the bundle still lands, and `PlistBuddy -c "Print
+:NSLocalNetworkUsageDescription"` on the installed Info.plist is the check that
+matters.
+
+**There is no Settings pane to send anyone to until somebody answers.** Same
+guest, after two unanswered asks: Privacy & Security carried no Local Network
+row at all, and no deep link reaches one — macOS 26 has no `Privacy_LocalNetwork`
+anchor, and the modern `com.apple.settings.PrivacySecurity.extension.<type>`
+spelling is not a deep link for any service (`privacy-allfiles`, which has a
+working anchor, lands on General too). haus's card for this
+(`modules/shelf/default.nix`) leads with "quit and reopen perch" for that reason.
+
 ## The one-click update: a VM, never this Mac
 
 `Update Now` is only offered to the drag-install cohort, and the click lives on
