@@ -455,32 +455,15 @@ final class WireLoopbackTests: XCTestCase {
         )
     }
 
-    /// How long the two polling waits in this class give up after.
+    /// How long the one polling wait left in this class gives up after.
     ///
-    /// Both are failure-path budgets — a healthy run leaves either after a
-    /// poll or two, measured in milliseconds — so the only job of the number
-    /// is to outlast the worst stall a loaded CI worker can impose. Five
-    /// seconds was not enough: a wait on a Mac-side fetch outcome gave up at
-    /// exactly 5.0s on hausfold/perch#137, a docs-only diff that cannot have
-    /// caused it, and passed on a plain re-run. Nothing passing pays for this.
+    /// A failure-path budget — a healthy run leaves it after a poll or two,
+    /// measured in milliseconds — so the only job of the number is to outlast
+    /// the worst stall a loaded CI worker can impose. Five seconds was not
+    /// enough: a wait in this class gave up at exactly 5.0s on
+    /// hausfold/perch#137, a docs-only diff that cannot have caused it, and
+    /// passed on a plain re-run. Nothing passing pays for this.
     private static let stallBudget: Duration = .seconds(30)
-
-    /// A fetch outcome the Mac reports from its own task. When the phone stops
-    /// reading part-way it has no idea when that lands, so poll for it.
-    private func waitForOutcome(
-        _ delegate: LoopbackDelegate,
-        itemID: UUID,
-        timeout: Duration = stallBudget
-    ) async -> LoopbackDelegate.ServeOutcome? {
-        let deadline = ContinuousClock.now + timeout
-        while ContinuousClock.now < deadline {
-            if let outcome = delegate.servedOutcomes().first(where: { $0.itemID == itemID }) {
-                return outcome
-            }
-            try? await Task.sleep(for: .milliseconds(20))
-        }
-        return nil
-    }
 
     /// What the phone actually has in a fetch directory, hidden `.partial`
     /// spools included — the whole point of these assertions.
@@ -508,10 +491,9 @@ final class WireLoopbackTests: XCTestCase {
         throw LoopbackWait.listenerNeverBoundAPort(timeout)
     }
 
-    /// Named so a red CI run says which wait ran out. Both budgets are the
-    /// same number and xcodebuild prints only a duration, so `failed (5.562
-    /// seconds)` on its own does not say whether the listener or the Mac's
-    /// outcome was the thing that never came.
+    /// Named so a red CI run says what never came. xcodebuild prints only a
+    /// duration, and `failed (5.562 seconds)` on its own does not say whether
+    /// the listener stalled or the test's own work did.
     private enum LoopbackWait: Error, CustomStringConvertible {
         case listenerNeverBoundAPort(Duration)
 
