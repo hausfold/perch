@@ -46,7 +46,7 @@ jobs:
   # 6.4s mean to start across 21 macOS jobs here against 7.4s across 14 before,
   # which was the one thing that could have made it a loss.
   #
-  # ⚠️ It is worth nothing on a run where the 74s iOS companion is already the
+  # ⚠️ It is worth nothing on a run where the iOS companion is already the
   # pole. That happened once in seven, and it is the ceiling on this split:
   # nothing further cut out of the Debug half can go below that job.
   test:
