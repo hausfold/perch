@@ -32,9 +32,23 @@ jobs:
   # so neither job `needs:` the other and they run side by side.
   #
   # The sources compiled twice inside one job before this: 70s of Debug in
-  # `Test`, then 51s of Release from nothing. Measured over eight PR runs, that
-  # job was 182s and it was the gate; split, its halves are the numbers in the
-  # jobs below, and what is left as the gate is named there.
+  # `Test`, then 51s of Release from nothing. That job was 182s over eight PR
+  # runs and it was the gate.
+  #
+  # Run both ways, seven pairs alternating a pre-split ref with this one so
+  # both arms saw the same runners: the split takes a median 60s off the gate
+  # (0-99s), and `Debug tests and analyze` was the gate in all seven. The
+  # spread is the runner, not the split — `Test` alone ran 59-147s across those
+  # fourteen runs with no source change — which is why the figure comes from
+  # comparing the two shapes inside each run rather than across arms.
+  #
+  # The third macOS runner this buys does NOT queue behind the other two:
+  # 6.4s mean to start across 21 macOS jobs here against 7.4s across 14 before,
+  # which was the one thing that could have made it a loss.
+  #
+  # ⚠️ It is worth nothing on a run where the iOS companion is already the
+  # pole. That happened once in seven, and it is the ceiling on this split:
+  # nothing further cut out of the Debug half can go below that job.
   test:
     name: Debug tests and analyze
     runs-on: macos-26
@@ -45,7 +59,8 @@ jobs:
       # 99.6s mean of the 182s job this was cut out of, and 70s of that is one
       # Debug build of the target graph — 21s is `xcodebuild` bringing the test
       # host up before the first assertion, and 6s is the tests running. This
-      # job is the gate now; the iOS companion behind it is 74s.
+      # job is the gate, measured: it held the title in all seven post-split
+      # runs, by 1-94s over whichever of the other two came second.
       - name: Test
         run: |
           xcodebuild \
