@@ -167,7 +167,7 @@ submission — so the block below *is* those seven answers. Paste it whole;
 shortening it to a summary is what earns a 2.1 Information Needed, and has.
 Item 1's recording is [its own section](#the-screen-recording-apple-asks-for).
 
-- **The Notes field caps at 4,000 characters** and the block below is 3,927, so
+- **The Notes field caps at 4,000 characters** and the block below is 3,948, so
   anything you add has to buy its space from something else. Measure, don't
   assume — it has been over:
   `awk '/^## Review notes/{f=1} f&&/^>/{sub(/^> ?/,"");print} f&&/^Also fill in:/{exit}' docs/app-store.md | wc -m`.
@@ -182,7 +182,9 @@ Item 1's recording is [its own section](#the-screen-recording-apple-asks-for).
   versions *you actually ran* — naming a device you never booted is the one way
   this block can lie. Saying "Simulator" out loud is fine, and item 2 lists
   **one** iPad rather than a plausible-looking spread because one is what was
-  booted (iPad Pro 13-inch (M5), iPadOS 26.5, on 2026-08-16). Paste 3–7
+  booted (iPad Pro 13-inch (M5), iPadOS 26.5, on 2026-08-16). The phone was on
+  iOS 27.2 by 2026-09-24; check Settings > General > About before each paste.
+  Item 1 dates the recording, so it stays true until you re-record. Paste 3–7
   unchanged.
 - **The rest is a claim about the code** — the UI strings, the framework list,
   the "no third-party SDK / no backend" claim, the crypto primitives. If you
@@ -193,15 +195,15 @@ Item 1's recording is [its own section](#the-screen-recording-apple-asks-for).
 > https://hausfold.co/docs/perch. This app does NOT need a Mac to be reviewed —
 > see 4.
 >
-> 1. SCREEN RECORDING. Attached. Captured from a physical iPhone 15 Pro running
-> iOS 27.0 mirrored to a Mac so both halves of the product are visible in one
+> 1. SCREEN RECORDING. Attached. Captured on 2026-08-16 from a physical iPhone
+> 15 Pro, then running iOS 27.0, mirrored to a Mac so both halves of the product are visible in one
 > file. It begins with a clean install from TestFlight, launches the app, and
 > shows the whole flow: the local-network and camera prompts, adding items with
 > no Mac present, the Share extension, pairing, and delivery. It shows no
 > registration, login, purchase or user-generated-content flow because the app
 > has none; see 4.
 >
-> 2. TESTED ON. iPhone 15 Pro, iOS 27.0 (physical device) — every flow,
+> 2. TESTED ON. iPhone 15 Pro, iOS 27.2 (physical device) — every flow,
 > including pairing and delivery over Wi-Fi. iPad Pro 13-inch (M5), iPadOS 26.5
 > (Simulator) — layout and shelf behaviour. Mac side: macOS 26 running the
 > Perch desktop app.
