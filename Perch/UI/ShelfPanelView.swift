@@ -30,11 +30,8 @@ struct ShelfPanelView: View {
     /// from compact toolbars. (The menu bar's Clear Shelf, which has no armed
     /// state to leave on screen, raises a real alert instead — see `PerchApp`.)
     ///
-    /// The rules live in `ClearConfirmation`; the timeout lives below. Note
-    /// where the guards are attached: on the **root**, not on `header`. The
-    /// panel is not torn down when it hides — `ShelfPanelController.hide()`
-    /// only collapses it — so `header` unmounts while this state survives, and
-    /// a guard mounted alongside `header` would go with it.
+    /// The rules live in `ClearConfirmation`; the timeout and the other two
+    /// guards sit on the root of `body`, which says why they aren't on `header`.
     @State private var clearConfirmation = ClearConfirmation()
 
     /// The palette this pass paints with. Published down the tree as well, for
@@ -752,9 +749,8 @@ private struct FileTile: View {
             .opacity(isExiting ? 0 : 1)
             // Contain the shrinking tile so it never bleeds over its neighbours,
             // but only while exiting — at rest the clip region is expanded so the
-            // remove badge can still overhang the corner. Parameterising one clip
-            // (rather than branching with `if`) keeps the subtree — and its live
-            // FileDragSourceView — mounted for the whole drag.
+            // remove badge can still overhang the corner. `CollapseClip` says why
+            // it is one clip and not an `if`.
             .clipShape(CollapseClip(collapsed: isExiting))
     }
 
