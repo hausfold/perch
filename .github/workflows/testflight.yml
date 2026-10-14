@@ -45,6 +45,13 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# GitHub can deliver one tag push as two `push` events, and each run uploads its
+# own build. The twin lands seconds after the first, so cancelling the older run
+# stops it at checkout and one build reaches TestFlight, not two.
+concurrency:
+  group: testflight-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   testflight:
     name: archive + upload to TestFlight
