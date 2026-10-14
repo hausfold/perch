@@ -24,9 +24,10 @@ import os.log
 /// act (`haus rebuild`, or a text editor), exactly like declaring the theme.
 ///
 /// `UserDefaults` keeps only what a settings file has no business holding:
-/// which pane Settings was last on, the Settings window's frame, and the update
-/// checker's cache of what GitHub last said — none of which means anything to a
-/// human reading a config file.
+/// window state (the last Settings pane, the window's frame) and the app's own
+/// bookkeeping (the update checker's cache, this Mac's pairing id, one-shot
+/// markers and dismissed hints) — none of which means anything to a human
+/// reading a config file.
 struct AppConfig: Equatable, Sendable {
     /// A shelf at the notch of every screen. On by default: a drop target that
     /// isn't on the display you're dragging on is a drop target that isn't
@@ -87,8 +88,8 @@ struct AppConfig: Equatable, Sendable {
         /// Every key perch reads as a setting.
         ///
         /// What makes it necessary: the haus drop is a *shared* file. It
-        /// already carries `themeDark`, `themeLight`, `accent` and
-        /// `screenshotsFolder`, and it will carry more. Locking a Settings row
+        /// already carries `themeDark`, `themeLight`, `accent`, `fontFamily`
+        /// and `screenshotsFolder`, and it will carry more. Locking a Settings row
         /// because the file names *some* key would grey out the whole window
         /// on every haus desktop; the intersection with this set is what
         /// "declared" actually means.
@@ -195,7 +196,7 @@ final class ConfigFileStore: @unchecked Sendable {
     /// — survives a toggle instead of being quietly deleted.
     private var raw: [String: Any] = [:]
     /// The same for the haus drop, which perch reads and never writes. Kept
-    /// whole because the theme keys live in it too and none of them are ours.
+    /// whole because the theme, font and screenshot keys live in it too.
     private var declared: [String: Any] = [:]
 
     private let fileWatch: FileWatch
@@ -228,7 +229,7 @@ final class ConfigFileStore: @unchecked Sendable {
     var declarationURL: URL? { declaration }
 
     /// The settings the haus drop names — the ones Settings renders read-only.
-    /// Intersected with `AppConfig.Key.all`, so the theme keys that share that
+    /// Intersected with `AppConfig.Key.all`, so the other keys that share that
     /// file lock nothing.
     func declaredKeys() -> Set<String> {
         queue.sync { Set(declared.keys).intersection(AppConfig.Key.all) }
