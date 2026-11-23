@@ -34,7 +34,8 @@ import os
 //
 // Network: one unauthenticated GitHub API call per hour, carrying nothing but an
 // IP and a user-agent, off by a Settings toggle — plus, only when someone clicks
-// Update on a drag install, the release ZIP itself. Never runs in DEBUG builds.
+// Update on a drag install, the release ZIP itself. The automatic check never
+// runs in DEBUG builds; one the user asks for does.
 // This is the only reason `com.apple.security.network.client` is in the
 // entitlements — perch reaches for exactly one host, and only to read a tag.
 
@@ -291,15 +292,13 @@ final class UpdateCheck: ObservableObject {
 
     // MARK: Applying
     //
-    // Nothing here installs anything. Perch is sandboxed: it cannot replace its
-    // own bundle in /Applications, and a `brew` spawned from here would inherit
-    // the same sandbox and fail. So the action is always advice — the exact
-    // command for this cohort, on the pasteboard, or the release page.
+    // Nothing in this file installs anything. Perch is sandboxed: it cannot
+    // replace its own bundle in /Applications, and a `brew` spawned from here
+    // would inherit the same sandbox and fail. The drag-install cohort hands off
+    // to `PerchUpdater.app` (SelfUpdate.swift); every other cohort gets advice —
+    // the exact command for it, on the pasteboard, or the release page.
 
     func performUpdate() {
-        // The drag-install cohort installs it here and now. Everything the
-        // sandbox forbids happens in `PerchUpdater.app`, which this hands off to
-        // just before quitting — see SelfUpdate.swift.
         // `selfUpdateFailed` is what makes the second click do what the button
         // now says: once an install has failed on this run, the button reads
         // Open Releases, and this must not quietly try again behind it.
