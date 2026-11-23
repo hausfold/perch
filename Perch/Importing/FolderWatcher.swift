@@ -72,10 +72,6 @@ enum FolderWatchRules {
 /// folder was scanned at replays what happened while perch was not running
 /// (#8), instead of starting blind at `kFSEventStreamEventIdSinceNow`.
 ///
-/// Only the event source changed. The probe, the ledger, `forgetImport` and
-/// the `v2` re-seed are the same, and every event still answers with a full
-/// `scan()` — which is what makes a dropped or coalesced batch harmless.
-///
 /// **A watcher must be `stop()`ped.** A C callback cannot hold a weak
 /// reference, so the stream's context retains the watcher and `stop()`'s
 /// release is what lets it go. One that is simply dropped leaks itself, a
@@ -191,8 +187,7 @@ final class FolderWatcher: @unchecked Sendable {
             }
             // `FSEventStreamCreate` happily accepts a path that isn't there —
             // it just waits for one to appear — so reachability is still
-            // checked by opening the directory, the way the kqueue source
-            // used to check it as a side effect of needing a descriptor.
+            // checked by opening the directory.
             let descriptor = open(folderURL.path, O_EVTONLY)
             guard descriptor >= 0 else {
                 releaseScope()
@@ -206,11 +201,9 @@ final class FolderWatcher: @unchecked Sendable {
             let since = seedExisting
                 ? FSEventStreamEventId(kFSEventStreamEventIdSinceNow)
                 : resumeEventID ?? FSEventStreamEventId(kFSEventStreamEventIdSinceNow)
-            // The context retains the watcher for exactly as long as the
-            // stream lives, and `stop()`'s release is what lets it go. A
-            // C callback cannot hold a weak reference, and an unretained one
-            // would be a dangling pointer the moment the center dropped its
-            // last reference without stopping first.
+            // Retained, not merely referenced (see the type's doc comment):
+            // an unretained pointer would dangle the moment the center
+            // dropped its last reference without stopping first.
             var context = FSEventStreamContext(
                 version: 0,
                 info: Unmanaged.passUnretained(self).toOpaque(),
@@ -283,16 +276,15 @@ final class FolderWatcher: @unchecked Sendable {
                 FSEventStreamRelease(stream)
             }
             stream = nil
-            // The scope is held for the watcher's whole life now, not handed
-            // to a dispatch source's cancel handler: FSEvents keeps no
-            // descriptor of ours, so nothing else would ever give it back.
+            // The scope is held for the watcher's whole life: FSEvents keeps
+            // no descriptor of ours, so nothing else would ever give it back.
             releaseScope()
         }
     }
 
-    /// One coalesced FSEvents batch. Every batch answers the same way a
-    /// directory event used to — a full `scan()` — so a dropped, coalesced or
-    /// replayed batch costs a rescan and never a missed file.
+    /// One coalesced FSEvents batch. Every batch answers with a full `scan()`,
+    /// so a dropped, coalesced or replayed batch costs a rescan and never a
+    /// missed file.
     fileprivate func handle(eventIDs: UnsafePointer<FSEventStreamEventId>, count: Int) {
         guard !stopped, count > 0 else { return }
         scan()

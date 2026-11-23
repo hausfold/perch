@@ -154,8 +154,8 @@ final class ShelfStore: ObservableObject {
     /// IDs also make pending reservations recoverable across an app relaunch.
     ///
     /// The running app takes everything it is offered — the handshake exists so
-    /// the extension never copies bytes perch isn't there to adopt, not to
-    /// ration tiles.
+    /// a sender (today the `perch` tool) never copies bytes perch isn't there
+    /// to adopt, not to ration tiles.
     func admitFinderItems(_ offered: [FinderActionItem]) -> [FinderActionItem] {
         resumeFinderItems(offered)
         return offered
